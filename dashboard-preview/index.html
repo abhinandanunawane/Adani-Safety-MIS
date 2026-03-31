@@ -6,21 +6,47 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Group Safety MIS KPI preview: browse categories, filter data, and review charts and tables for stakeholder feedback."
+      content="Adani Safety MIS — group safety KPI preview with clear IA, accessible navigation, category drill-down, filters, charts, and detail data for stakeholder review."
     />
     <!-- Critical: header always paints even if styles.css is blocked or 404 -->
     <style>
       .top-header {
         display: flex !important;
         flex-shrink: 0;
-        align-items: center;
+        align-items: stretch;
         justify-content: space-between;
         min-height: 52px;
         height: 52px;
-        padding: 0 14px;
-        background: linear-gradient(90deg, #0a1628 0%, #132a4a 100%);
-        color: #f1f5f9;
+        padding: 0 14px 0 0;
+        background: #006db6;
+        color: #ffffff;
         font-family: "Segoe UI", system-ui, sans-serif;
+      }
+      .top-header__logo-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        height: 100%;
+        padding: 0 14px;
+        background: #ffffff;
+        border-radius: 0 8px 8px 0;
+        box-sizing: border-box;
+      }
+      .top-header__titles {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 10px 0 14px;
+      }
+      .top-header__logo-wrap img {
+        height: 38px;
+        width: auto;
+        max-height: calc(52px - 6px);
+        object-fit: contain;
+        display: block;
       }
     </style>
     <link rel="stylesheet" href="styles.css" />
@@ -31,7 +57,7 @@
 
     <div class="shell" data-app-shell>
       <header class="top-header" role="banner">
-        <div class="top-header__brand">
+        <div class="top-header__logo-wrap">
           <img
             src="./assets/adani-logo.png"
             width="140"
@@ -40,12 +66,18 @@
             decoding="async"
             onerror="this.onerror=null;this.src='../PowerBI_Assets/Adani_logo_2012.png';"
           />
-          <div class="top-header__titles">
-            <h1>Adani Safety MIS</h1>
-            <p class="top-header__subtitle">Group Safety KPI Dashboard</p>
-          </div>
+        </div>
+        <div class="top-header__titles">
+          <h1>Adani Safety MIS</h1>
+          <p class="top-header__subtitle">Group Safety KPI Dashboard</p>
         </div>
         <div class="top-header__meta">
+          <nav class="top-header__nav" aria-label="Primary">
+            <a class="top-nav-link" href="#landing">Guide</a>
+            <span class="header-sep" aria-hidden="true">|</span>
+            <a class="top-nav-link" href="#categories">Categories</a>
+            <span class="header-sep" aria-hidden="true">|</span>
+          </nav>
           <a
             class="header-link"
             href="mailto:?subject=Adani%20Safety%20MIS%20feedback"
@@ -65,6 +97,12 @@
         tabindex="-1"
         aria-label="Dashboard content"
       ></main>
+
+      <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
+        <p class="app-footer__text">
+          <strong>Disclaimer:</strong> This preview uses illustrative sample data for layout and UX review only. It is not operational reporting. Confirm figures and decisions in your official Power BI workspace and governed sources before use.
+        </p>
+      </footer>
     </div>
 
     <div

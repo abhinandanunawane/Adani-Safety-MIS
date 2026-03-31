@@ -52,15 +52,90 @@
   };
 
   let currentCategoryKey = null;
+  let catSearchAnnounceTimer = null;
 
   function announce(msg) {
     if (liveRegion) liveRegion.textContent = msg;
+  }
+
+  /** IA: visible journey — aligns with header nav (Guide / Categories); no duplicate controls. */
+  function journeyStepsHtml(step) {
+    function item(n, label, isActive) {
+      const cls = isActive ? " route-steps__item--active" : "";
+      const cur = isActive ? ' aria-current="step"' : "";
+      return (
+        '<span class="route-steps__item' +
+        cls +
+        '"' +
+        cur +
+        ">" +
+        n +
+        " " +
+        escapeHtml(label) +
+        "</span>"
+      );
+    }
+    return (
+      '<nav class="route-steps" aria-label="Journey: Guide, Categories, Explore KPIs">' +
+      item(1, "Guide", step === 1) +
+      '<span class="route-steps__sep" aria-hidden="true">→</span>' +
+      item(2, "Categories", step === 2) +
+      '<span class="route-steps__sep" aria-hidden="true">→</span>' +
+      item(3, "Explore KPIs", step === 3) +
+      "</nav>"
+    );
   }
 
   function escapeHtml(s) {
     const d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
+  }
+
+  /** Decorative icons for category cards (list context; button has aria-label). */
+  function categoryIconSvg(categoryKey) {
+    const svg = (paths) =>
+      '<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      paths +
+      "</svg>";
+    switch (categoryKey) {
+      case 1:
+        return svg(
+          '<path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'
+        );
+      case 2:
+        return svg(
+          '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>'
+        );
+      case 3:
+        return svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
+      case 4:
+        return svg(
+          '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+        );
+      case 5:
+        return svg(
+          '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'
+        );
+      case 6:
+        return svg(
+          '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>'
+        );
+      case 7:
+        return svg(
+          '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'
+        );
+      case 8:
+        return svg(
+          '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+        );
+      case 9:
+        return svg(
+          '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>'
+        );
+      default:
+        return svg('<circle cx="12" cy="12" r="10"/>');
+    }
   }
 
   function formatValue(v, unitType) {
@@ -101,15 +176,15 @@
     });
   }
 
-  const gradientColors = [
-    "#0a7c86",
-    "#1565c0",
-    "#5b21b6",
-    "#be185d",
-    "#c62828",
-    "#00838f",
-    "#283593",
-    "#6a1b9a",
+  const chartPaletteColors = [
+    "#00B16B",
+    "#006DB6",
+    "#8E278F",
+    "#F04C23",
+    "#00B16B",
+    "#006DB6",
+    "#8E278F",
+    "#F04C23",
   ];
 
   function readFilters(catKey) {
@@ -417,8 +492,8 @@
             {
               label: "Avg",
               data: lineData,
-              borderColor: "#0a7c86",
-              backgroundColor: "rgba(10, 124, 134, 0.1)",
+              borderColor: "#006DB6",
+              backgroundColor: "rgba(0, 177, 107, 0.12)",
               fill: true,
               tension: 0.2,
               borderWidth: 2,
@@ -448,7 +523,7 @@
             {
               data: bizData,
               backgroundColor: bizLabels.map(
-                (_, i) => gradientColors[i % gradientColors.length]
+                (_, i) => chartPaletteColors[i % chartPaletteColors.length]
               ),
             },
           ],
@@ -475,7 +550,7 @@
           datasets: [
             {
               data: unitData,
-              backgroundColor: gradientColors,
+              backgroundColor: chartPaletteColors,
             },
           ],
         },
@@ -699,7 +774,7 @@
 
     const cat = getCategory(catKey);
     if (!cat) {
-      renderHome();
+      renderCategories();
       return;
     }
 
@@ -813,10 +888,11 @@
           "</select></div>"
         : "");
     wrap.innerHTML =
+      journeyStepsHtml(3) +
       '<div class="cat-top-bar">' +
       '<div class="cat-top-bar__title">' +
       '<nav class="breadcrumb" aria-label="Breadcrumb">' +
-      '<ol><li><a href="#" id="bc-home">Home</a></li><li aria-current="page">' +
+      '<ol><li><a href="#categories" id="bc-cats">Categories</a></li><li aria-current="page">' +
       '<h2 class="cat-heading" id="cat-heading" tabindex="-1">' +
       escapeHtml(cat.categoryName) +
       "</h2></li></ol></nav>" +
@@ -824,7 +900,7 @@
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, month range, or state. Results update charts and the table below.</p>' +
+      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, month range, state, business, or unit when shown. KPI tiles, charts, and the detail table update for your selection.</p>' +
       coreFields +
       '<div class="toolbar-actions">' +
       '<button type="button" class="btn" id="f-reset">Reset</button>' +
@@ -877,16 +953,6 @@
     if (cfg.showUnitType) document.getElementById("f-unit").value = "all";
     if (cfg.showKpi) document.getElementById("f-kpi").value = "all";
 
-    document.getElementById("bc-home").addEventListener("click", (e) => {
-      e.preventDefault();
-      history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.search
-      );
-      renderHome();
-    });
-
     function onFilterChange() {
       tableState.page = 0;
       refreshCategoryView(catKey);
@@ -914,74 +980,242 @@
     if (h) h.focus();
   }
 
-  function renderHome() {
+  function renderLanding() {
     currentCategoryKey = null;
     destroyCharts();
-    history.replaceState(
-      null,
-      "",
-      window.location.pathname + window.location.search
+    history.replaceState(null, "", "#landing");
+
+    const box = document.createElement("div");
+    box.className = "landing";
+    box.innerHTML =
+      journeyStepsHtml(1) +
+      '<div class="landing__hero" role="region" aria-label="About this dashboard">' +
+      '<div class="landing__copy">' +
+      '<h2 class="landing__title" id="landing-h">Adani Safety MIS</h2>' +
+      '<p class="landing__subtitle">Group-level safety KPI dashboard for all Adani businesses — monitor trends, drill down by category, and compare performance month-over-month and year-over-year.</p>' +
+      '<div class="landing__bullets" role="list">' +
+      '<div class="landing__bullet" role="listitem"><strong>What’s included</strong><span>Safety KPIs by category, filters, trend and business charts, unit mix, KPI tiles (with last month / last year), and a sortable detail table.</span></div>' +
+      '<div class="landing__bullet" role="listitem"><strong>Who it’s for</strong><span>Anyone tracking group-wide safety performance across Adani businesses — from quick scans to deeper drill-down.</span></div>' +
+      "</div>" +
+      '<div class="landing__actions">' +
+      '<button type="button" class="btn btn-primary" id="btn-start">Start now</button>' +
+      '<button type="button" class="btn btn-ghost" id="btn-categories">Browse categories</button>' +
+      "</div>" +
+      "</div>" +
+      '<div class="landing__graphic" aria-hidden="true">' +
+      // Inline SVG inspired by the provided reference graphic (no external asset required for GitHub Pages)
+      '<svg viewBox="0 0 820 420" class="landing-graphic" xmlns="http://www.w3.org/2000/svg">' +
+      '<defs>' +
+      '<filter id="ds" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.18"/></filter>' +
+      "</defs>" +
+      '<rect x="0" y="0" width="820" height="420" rx="22" fill="#ffffff"/>' +
+      '<g filter="url(#ds)">' +
+      '<circle cx="410" cy="210" r="62" fill="#ffffff"/>' +
+      '<circle cx="410" cy="210" r="62" fill="none" stroke="#006DB6" stroke-width="10"/>' +
+      '<text x="410" y="205" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Adani</text>' +
+      '<text x="410" y="228" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" fill="#475569">Group</text>' +
+      "</g>" +
+      '<g stroke="#94a3b8" stroke-dasharray="4 6" stroke-width="2" fill="none" opacity="0.9">' +
+      '<path d="M348 190 C260 160, 230 120, 170 110"/>' +
+      '<path d="M350 235 C260 260, 230 300, 170 310"/>' +
+      '<path d="M472 190 C560 160, 590 120, 650 110"/>' +
+      '<path d="M470 235 C560 260, 590 300, 650 310"/>' +
+      "</g>" +
+      '<g filter="url(#ds)">' +
+      '<g transform="translate(90 60)">' +
+      '<circle cx="90" cy="50" r="54" fill="#fff"/><circle cx="90" cy="50" r="54" fill="none" stroke="#93c5fd" stroke-width="10"/>' +
+      '<text x="90" y="54" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Ports</text>' +
+      "</g>" +
+      '<g transform="translate(90 250)">' +
+      '<circle cx="90" cy="50" r="54" fill=\"#fff\"/><circle cx=\"90\" cy=\"50\" r=\"54\" fill=\"none\" stroke=\"#a7f3d0\" stroke-width=\"10\"/>' +
+      '<text x=\"90\" y=\"54\" text-anchor=\"middle\" font-family=\"Segoe UI, system-ui, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#0f172a\">Power</text>' +
+      "</g>" +
+      '<g transform="translate(560 60)">' +
+      '<circle cx="90" cy="50" r="54" fill="#fff"/><circle cx="90" cy="50" r="54" fill="none" stroke="#fde68a" stroke-width="10"/>' +
+      '<text x="90" y="54" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Airports</text>' +
+      "</g>" +
+      '<g transform="translate(560 250)">' +
+      '<circle cx="90" cy="50" r="54" fill="#fff"/><circle cx="90" cy="50" r="54" fill="none" stroke="#8E278F" stroke-width="10"/>' +
+      '<text x="90" y="54" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Energy</text>' +
+      "</g>" +
+      "</g>" +
+      '<g opacity="0.9">' +
+      '<text x="560" y="190" font-family="Segoe UI, system-ui, sans-serif" font-size="26" font-weight="800" fill="#006DB6">All About</text>' +
+      '<text x="560" y="225" font-family="Segoe UI, system-ui, sans-serif" font-size="46" font-weight="900" fill="#00B16B">Safety</text>' +
+      '<text x="560" y="258" font-family="Segoe UI, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">for Adani Group</text>' +
+      "</g>" +
+      "</svg>" +
+      "</div>" +
+      "</div>" +
+      '<section class="landing__guide" aria-labelledby="guide-h">' +
+      '<h3 id="guide-h" class="landing__guide-title">How to use this dashboard</h3>' +
+      '<ol class="landing__steps">' +
+      "<li><strong>Start now</strong> (or <strong>Browse categories</strong>) to open the category list.</li>" +
+      "<li><strong>Select a category</strong> to open that topic and explore its KPIs.</li>" +
+      "<li><strong>Refine results</strong> using filters — core filters on every page, plus extra filters on some categories where they add insight.</li>" +
+      "<li><strong>Review</strong> KPI tiles (with LM/LY comparisons), then charts, then the detail table for underlying rows.</li>" +
+      "</ol>" +
+      '<h4 class="landing__guide-sub">What’s on each category screen</h4>' +
+      '<ul class="landing__guide-list">' +
+      "<li><strong>KPI summary tiles</strong> — current values with last month (LM) and last year (LY) % changes where available.</li>" +
+      "<li><strong>Charts</strong> — trend over time, by business, and unit mix for the filtered data.</li>" +
+      "<li><strong>Detail data</strong> — sortable table; use column headers and pagination to scan rows.</li>" +
+      "</ul>" +
+      '<h4 class="landing__guide-sub">Design intent: research, IA, and inclusive UX</h4>' +
+      '<p class="landing__guide-lede">This preview is built with a <strong>user-centered approach</strong> and <strong>user-centered design (UCD)</strong> — drawing on <strong>human–computer interaction (HCI)</strong> and <strong>customer experience (CX) design</strong> so the product stays understandable and trustworthy. We aim for strong <strong>usability</strong>, <strong>usefulness</strong>, <strong>desirability</strong>, and <strong>accessibility</strong> for every role.</p>' +
+      '<ul class="landing__guide-list landing__guide-list--compact">' +
+      "<li><strong>User research &amp; usability testing</strong> — Task-based review to spot confusion, validate flows, and capture feedback.</li>" +
+      "<li><strong>Information architecture (IA)</strong> — One clear path: Guide → Categories → explore KPIs in a fixed order (tiles, then charts, then detail).</li>" +
+      "<li><strong>Consistency &amp; hierarchy</strong> — Same header, filters, and content zones on each category screen so scanning is predictable.</li>" +
+      "<li><strong>Accessibility</strong> — Keyboard navigation (Tab, Enter, Space), visible focus, and live updates when filters change for assistive technologies.</li>" +
+      "<li><strong>Iterative process</strong> — This HTML preview supports cycles of review before the full Power BI experience.</li>" +
+      "</ul>" +
+      "</section>";
+
+    root.innerHTML = "";
+    root.appendChild(box);
+    const start = document.getElementById("btn-start");
+    const browse = document.getElementById("btn-categories");
+    function goCats() {
+      history.replaceState(null, "", "#categories");
+      renderCategories();
+    }
+    if (start) start.addEventListener("click", goCats);
+    if (browse) browse.addEventListener("click", goCats);
+    const hh = document.getElementById("landing-h");
+    if (hh) hh.focus();
+    announce(
+      "About this dashboard. Use Start now or Browse categories to continue."
     );
+  }
+
+  function renderCategories() {
+    currentCategoryKey = null;
+    destroyCharts();
+    history.replaceState(null, "", "#categories");
 
     const box = document.createElement("div");
     box.className = "home-body";
     box.innerHTML =
+      journeyStepsHtml(2) +
+      '<div class="home-intro">' +
       '<h2 id="home-h">Categories</h2>' +
+      '<p class="home-lede">Select a category to explore safety KPIs across Adani group businesses. Use filters inside each category to refine insights. Use <strong>Guide</strong> in the header to return to the overview.</p>' +
+      '<div class="home-tools" role="search">' +
+      '<label class="home-search-label" for="cat-q">Find category</label>' +
+      '<input id="cat-q" class="home-search" type="search" placeholder="Type to filter (e.g., Incident, Training…)" autocomplete="off" />' +
+      "</div>" +
+      "</div>" +
       '<div class="home-grid" role="list" aria-labelledby="home-h"></div>';
 
     const grid = box.querySelector(".home-grid");
-    DATA.categories.forEach((cat) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "category-card";
-      btn.setAttribute("role", "listitem");
-      btn.setAttribute(
-        "aria-label",
-        cat.categoryName + ", " + cat.kpiCount + " KPIs"
+    function scheduleCategorySearchAnnounce(opts) {
+      const o = opts || {};
+      clearTimeout(catSearchAnnounceTimer);
+      const run = () => {
+        if (o.noMatch) {
+          announce("No categories match your search.");
+          return;
+        }
+        announce(
+          o.count +
+            " categor" +
+            (o.count === 1 ? "y" : "ies") +
+            " shown." +
+            (o.filtered ? " Search filter applied." : "")
+        );
+      };
+      if (o.immediate) run();
+      else catSearchAnnounceTimer = setTimeout(run, 380);
+    }
+
+    function buildCards(query, opts) {
+      const o = opts || {};
+      grid.innerHTML = "";
+      const q = (query || "").trim().toLowerCase();
+      const cats = DATA.categories.filter((c) =>
+        (c.categoryName || "").toLowerCase().includes(q)
       );
-      btn.innerHTML =
-        '<span class="category-card__badge">' +
-        cat.kpiCount +
-        " KPIs</span>" +
-        '<span class="category-card__name">' +
-        escapeHtml(cat.categoryName) +
-        "</span>" +
-        '<span class="category-card__meta">' +
-        escapeHtml(cat.uxNote) +
-        "</span>";
-      btn.addEventListener("click", () => {
-        history.replaceState({}, "", "#cat=" + cat.categoryKey);
-        renderCategory(cat.categoryKey);
-      });
-      btn.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
+      if (!cats.length) {
+        grid.removeAttribute("role");
+        grid.removeAttribute("aria-labelledby");
+        const empty = document.createElement("div");
+        empty.className = "home-empty";
+        empty.setAttribute("role", "status");
+        empty.setAttribute("aria-live", "polite");
+        empty.innerHTML =
+          "<p><strong>No categories match.</strong> Clear the search or try a shorter keyword.</p>";
+        grid.appendChild(empty);
+        scheduleCategorySearchAnnounce({ noMatch: true, immediate: o.immediate });
+        return;
+      }
+      grid.setAttribute("role", "list");
+      grid.setAttribute("aria-labelledby", "home-h");
+      cats.forEach((cat) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "category-card";
+        btn.setAttribute("role", "listitem");
+        btn.setAttribute(
+          "aria-label",
+          cat.categoryName + ", " + cat.kpiCount + " KPIs"
+        );
+        btn.innerHTML =
+          '<span class="category-card__icon">' +
+          categoryIconSvg(cat.categoryKey) +
+          "</span>" +
+          '<span class="category-card__stack">' +
+          '<span class="category-card__badge">' +
+          cat.kpiCount +
+          " KPIs</span>" +
+          '<span class="category-card__name">' +
+          escapeHtml(cat.categoryName) +
+          "</span>" +
+          '<span class="category-card__meta">' +
+          escapeHtml(cat.uxNote) +
+          "</span>" +
+          "</span>";
+        btn.addEventListener("click", () => {
           history.replaceState({}, "", "#cat=" + cat.categoryKey);
           renderCategory(cat.categoryKey);
-        }
+        });
+        btn.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            history.replaceState({}, "", "#cat=" + cat.categoryKey);
+            renderCategory(cat.categoryKey);
+          }
+        });
+        grid.appendChild(btn);
       });
-      grid.appendChild(btn);
-    });
+      scheduleCategorySearchAnnounce({
+        count: cats.length,
+        filtered: !!q,
+        immediate: o.immediate,
+      });
+    }
 
     root.innerHTML = "";
     root.appendChild(box);
-    const hh = document.getElementById("home-h");
-    if (hh) hh.focus();
-    else root.focus();
-    announce(
-      "Home. Nine safety categories. Select a card to drill KPIs, filters, and detail data."
-    );
+    buildCards("", { immediate: true });
+    const q = document.getElementById("cat-q");
+    if (q) {
+      q.addEventListener("input", () => buildCards(q.value, {}));
+      q.focus();
+    }
   }
 
   window.addEventListener("hashchange", () => {
     const m = location.hash.match(/cat=(\d+)/);
     if (m) renderCategory(parseInt(m[1], 10));
-    else renderHome();
+    else if (location.hash === "#categories") renderCategories();
+    else renderLanding();
   });
 
   setHeaderTimestamp(meta.lastUpdateISO);
 
   const m0 = location.hash.match(/cat=(\d+)/);
   if (m0) renderCategory(parseInt(m0[1], 10));
-  else renderHome();
+  else if (location.hash === "#categories") renderCategories();
+  else renderLanding();
 })();
