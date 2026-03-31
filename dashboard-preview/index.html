@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Adani Safety MIS — Dashboard Preview</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Group Safety MIS KPI preview: browse categories, filter data, and review charts and tables for stakeholder feedback."
+    />
+    <!-- Critical: header always paints even if styles.css is blocked or 404 -->
+    <style>
+      .top-header {
+        display: flex !important;
+        flex-shrink: 0;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 52px;
+        height: 52px;
+        padding: 0 14px;
+        background: linear-gradient(90deg, #0a1628 0%, #132a4a 100%);
+        color: #f1f5f9;
+        font-family: "Segoe UI", system-ui, sans-serif;
+      }
+    </style>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  </head>
+  <body>
+    <a class="skip-link" href="#app-root">Skip to main content</a>
+
+    <div class="shell" data-app-shell>
+      <header class="top-header" role="banner">
+        <div class="top-header__brand">
+          <img
+            src="./assets/adani-logo.png"
+            width="140"
+            height="40"
+            alt="Adani Group logo"
+            decoding="async"
+            onerror="this.onerror=null;this.src='../PowerBI_Assets/Adani_logo_2012.png';"
+          />
+          <div class="top-header__titles">
+            <h1>Adani Safety MIS</h1>
+            <p class="top-header__subtitle">Group Safety KPI Dashboard</p>
+          </div>
+        </div>
+        <div class="top-header__meta">
+          <a
+            class="header-link"
+            href="mailto:?subject=Adani%20Safety%20MIS%20feedback"
+            >Feedback</a
+          >
+          <span class="header-sep" aria-hidden="true">|</span>
+          <span class="last-updated"
+            >Last updated <time id="header-updated">—</time></span
+          >
+        </div>
+      </header>
+
+      <main
+        id="app-root"
+        class="viewport__main"
+        role="main"
+        tabindex="-1"
+        aria-label="Dashboard content"
+      ></main>
+    </div>
+
+    <div
+      id="sr-live"
+      class="visually-hidden"
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script defer src="embedded-data.js"></script>
+    <script defer src="app.js"></script>
+  </body>
+</html>

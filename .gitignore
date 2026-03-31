@@ -1,0 +1,21 @@
+# Office lock / temp files
+~$*
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Large / optional source files (remove these lines if you want them in the repo)
+*.pdf
+*.xlsx

@@ -1,0 +1,44 @@
+================================================================================
+SUGGESTED LAYOUT — 1280 × 720 PX (16:9)
+Information architecture aligned with executive safety dashboards.
+Mirror: browser preview (dashboard-preview) uses the same Home → Category flow.
+================================================================================
+
+PAGE A — HOME (optional navigation hub in Power BI using buttons/bookmarks)
+-------------------------------------------------------------------------------
+Logo + title row; text card with “Last refreshed”; table or grid of categories
+or chiclet slicers for Category; link/bookmark to Page B per category.
+
+PAGE B — CATEGORY DETAIL (duplicate per category or one page + bookmark)
+-------------------------------------------------------------------------------
+KPI cards, line, clustered/stacked bar, matrix/table — match dashboard-preview.
+
+GLOBAL GRID (margins 24 px)
+---------------------------
+Zone A — Header band:  y = 0–72 px,   full width
+Zone B — Slicer row:    y = 72–140 px, full width (or right-aligned stack)
+Zone C — KPI strip:     y = 140–260 px, 4 tiles @ ~300×120 px with 16 px gutters
+Zone D — Primary chart: y = 260–520 px, width ~760 px (left)
+Zone E — Secondary:     y = 260–520 px, width ~456 px (right) — breakdown by category or trend
+Zone F — Footer note:   y = 520–720 px — data freshness, definitions, accessibility
+
+VISUAL MAPPING (wireframe KPIs)
+--------------------------------
+- Category slicer → filters all visuals (Dim_Category)
+- Business slicer → Dim_Business
+- Month slicer → Dim_Date[YearMonth]
+- KPI cards: Total Value, Value vs Target %, YoY %, KPI Count Selected (from DAX)
+- Clustered column or line: [Total Value] by Month
+- Matrix rows: Category, KPI_Name; values: Value, optional Target
+
+ACCESSIBILITY
+-------------
+- Minimum font 10 pt for body labels; 12 pt+ for titles (theme textClasses).
+- Do not rely on colour alone: add data labels or patterns where possible.
+- Reserve footer for “Synthetic data — replace with production feed” when demoing.
+
+LOGO
+----
+Adani_logo_2012.png — top-left Zone A, max height ~48 px, preserve aspect ratio.
+
+================================================================================

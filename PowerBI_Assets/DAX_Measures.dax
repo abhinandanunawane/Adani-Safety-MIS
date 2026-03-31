@@ -1,0 +1,53 @@
+// --- Paste into a dedicated table "Measures" (Modeling > New table: Measures = {0}) or add as measures on Fact_Safety_KPI_Monthly ---
+// Relationships required: Dim_Date[DateKey], Dim_Business[BusinessKey], Dim_KPI[KPIKey] -> Fact_Safety_KPI_Monthly
+// Dim_KPI[CategoryKey] -> Dim_Category[CategoryKey]
+
+Total Value :=
+SUM ( Fact_Safety_KPI_Monthly[Value] )
+
+Target Total :=
+SUM ( Fact_Safety_KPI_Monthly[Target] )
+
+Value vs Target Var :=
+VAR V = [Total Value]
+VAR T = [Target Total]
+RETURN
+    IF ( ISBLANK ( T ) || T = 0, BLANK (), V - T )
+
+Value vs Target % :=
+VAR V = [Total Value]
+VAR T = [Target Total]
+RETURN
+    IF ( ISBLANK ( T ) || T = 0, BLANK (), DIVIDE ( V - T, T ) )
+
+KPI Count Selected :=
+DISTINCTCOUNT ( Dim_KPI[KPIKey] )
+
+Category Count :=
+COUNTROWS ( Dim_Category )
+
+Avg Value by KPI :=
+AVERAGE ( Fact_Safety_KPI_Monthly[Value] )
+
+// Time intelligence (requires Dim_Date marked as date table on Date column — optional alternative use DateKey)
+Value YTD :=
+TOTALYTD ( [Total Value], Dim_Date[Date] )
+
+Prior Year Value :=
+CALCULATE ( [Total Value], SAMEPERIODLASTYEAR ( Dim_Date[Date] ) )
+
+YoY % :=
+VAR C = [Total Value]
+VAR P = [Prior Year Value]
+RETURN
+    IF ( ISBLANK ( P ) || P = 0, BLANK (), DIVIDE ( C - P, P ) )
+
+// UX-oriented: highlight category for accessibility storytelling
+Selected Category Label :=
+SELECTEDVALUE ( Dim_Category[CategoryName], "All categories" )
+
+LTIFR Value :=
+CALCULATE ( [Avg Value by KPI], Dim_KPI[KPI_Name] = "LTIFR" )
+
+TRIR Value :=
+CALCULATE ( [Avg Value by KPI], Dim_KPI[KPI_Name] = "TRIR" )

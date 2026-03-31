@@ -1,0 +1,90 @@
+{
+  "name": "Adani Safety MIS",
+  "description": "Theme aligned to Adani logo gradient (teal–blue–purple–magenta–crimson). Verify primary hex values against Adani Brand Manual (Aug 2025) PDF in project folder.",
+  "version": "1.0",
+  "dataColors": [
+    "#007A94",
+    "#0066CC",
+    "#5B2C91",
+    "#C71585",
+    "#D62828",
+    "#00A3A3",
+    "#4A90D9",
+    "#9B59B6"
+  ],
+  "foreground": "#1F2937",
+  "foregroundNeutralSecondary": "#4B5563",
+  "foregroundNeutralTertiary": "#6B7280",
+  "background": "#FFFFFF",
+  "backgroundLight": "#F8FAFC",
+  "backgroundDark": "#E5E7EB",
+  "tableAccent": "#0066CC",
+  "good": "#0D9488",
+  "neutral": "#6B7280",
+  "bad": "#DC2626",
+  "maximum": "#007A94",
+  "center": "#6B7280",
+  "minimum": "#D62828",
+  "textClasses": {
+    "title": {
+      "fontFace": "Segoe UI",
+      "fontSize": 14,
+      "fontWeight": "bold",
+      "color": "#111827"
+    },
+    "callout": {
+      "fontFace": "Segoe UI",
+      "fontSize": 24,
+      "fontWeight": "bold",
+      "color": "#111827"
+    },
+    "header": {
+      "fontFace": "Segoe UI Semibold",
+      "fontSize": 11,
+      "color": "#374151"
+    },
+    "label": {
+      "fontFace": "Segoe UI",
+      "fontSize": 10,
+      "color": "#4B5563"
+    }
+  },
+  "visualStyles": {
+    "*": {
+      "*": {
+        "background": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#FFFFFF" } },
+            "transparency": 0
+          }
+        ],
+        "border": [
+          {
+            "show": true,
+            "color": { "solid": { "color": "#E5E7EB" } },
+            "radius": 6
+          }
+        ],
+        "title": [
+          {
+            "show": true,
+            "fontColor": { "solid": { "color": "#111827" } },
+            "fontSize": 12,
+            "fontFamily": "Segoe UI Semibold"
+          }
+        ]
+      }
+    },
+    "page": {
+      "*": {
+        "background": [
+          {
+            "color": { "solid": { "color": "#F8FAFC" } },
+            "transparency": 0
+          }
+        ]
+      }
+    }
+  }
+}

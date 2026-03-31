@@ -1,0 +1,137 @@
+================================================================================
+ADANI SAFETY MIS — POWER BI IMPORT PACKAGE
+================================================================================
+Generated: March 2026
+
+PURPOSE
+-------
+This folder contains Power BI–compatible assets: a star-schema data model with
+realistic dummy data, a report theme, DAX measure definitions, and the Adani logo
+for headers. Import into Power BI Desktop, then build pages at 1280 × 720 px.
+
+SOURCE DOCUMENTS (in parent folder)
+-----------------------------------
+1) Copy of Adani_Safety_MIS_KPI_List_Wireframe_26032026.xlsx
+   - Defines KPI list and Category assignment (also in Dim_KPI_Category.csv).
+2) Converter_MIStoDB Feb'26.xlsx
+   - MASTER sheet schema informed column naming and business unit vocabulary
+   (e.g., BUSINESS, UNIT, LOCATION, LAGGING/LEADING, metric columns). Full
+   MASTER extract is very large; this package uses a curated monthly fact for
+   dashboard prototyping.
+3) Adani Brand Manual (Aug 2025).pdf
+   - VERIFY theme colours and typography against this PDF. Theme JSON uses
+   logo-aligned gradient stops; official hex values may differ.
+4) Adani_logo_2012.svg.png (copied here as Adani_logo_2012.png)
+   - Use in report header image.
+
+REFERENCE REPORT (layout inspiration only)
+------------------------------------------
+https://app.powerbi.com/view?r=eyJrIjoiNjMyZmE1ODktNTcwMy00MzhjLWI2MjktNmFlZGU5Yjg4NDY4IiwidCI6IjRlNTEyNTBkLWNmM2EtNDU0MS05ZGU3LWU3NGZmMWY3Yjk1NCJ9
+Use as visual hierarchy reference: top filters, headline KPIs, trend and
+breakdown visuals. Replace with your approved corporate layout.
+
+--------------------------------------------------------------------------------
+STEP 1 — GET DATA (CSV)
+--------------------------------------------------------------------------------
+In Power BI Desktop: Get Data > Text/CSV and load:
+  - Dim_Category.csv
+  - Dim_KPI.csv
+  - Dim_Business.csv
+  - Dim_Date.csv
+  - Fact_Safety_KPI_Monthly.csv
+  - Dim_KPI_Category.csv (optional audit of wireframe mapping)
+
+Power Query (recommended):
+  - Set column types: Fact[Value] and Fact[Target] as decimal number; keys as
+    whole number; replace empty Target with null:
+    Table.ReplaceValue(..., "", null, Replacer.ReplaceValue, {"Target"})
+
+--------------------------------------------------------------------------------
+STEP 2 — MODEL RELATIONSHIPS
+--------------------------------------------------------------------------------
+Mark Dim_Date as a date table on column [Date] (Modeling > Mark as date table).
+
+Relationships (single direction filter: dimensions -> fact):
+  Dim_Date[DateKey]      * --> * Fact_Safety_KPI_Monthly[DateKey]
+  Dim_Business[BusinessKey] * --> * Fact_Safety_KPI_Monthly[BusinessKey]
+  Dim_KPI[KPIKey]        * --> * Fact_Safety_KPI_Monthly[KPIKey]
+  Dim_Category[CategoryKey] * --> * Dim_KPI[CategoryKey]
+
+Hide from report view: Fact_Safety_KPI_Monthly[FactKey], [Source_Note] if desired.
+
+--------------------------------------------------------------------------------
+STEP 3 — MEASURES
+--------------------------------------------------------------------------------
+Create a measures table (or add measures to Fact). Copy definitions from
+DAX_Measures.dax. Adjust table names if your fact table is renamed.
+
+--------------------------------------------------------------------------------
+STEP 4 — THEME
+--------------------------------------------------------------------------------
+View > Themes > Browse for themes > select Adani_Safety_MIS_Theme.json
+
+--------------------------------------------------------------------------------
+STEP 5 — PAGE SIZE (1280 × 720)
+--------------------------------------------------------------------------------
+View > Page settings > Type: Custom
+  Width: 1280 px
+  Height: 720 px
+This matches 16:9 HD-style layout for consistent IA and export to slides/video.
+
+--------------------------------------------------------------------------------
+STEP 6 — REPORT LAYOUT (see Layout_1280x720.txt)
+--------------------------------------------------------------------------------
+Place Adani_logo_2012.png top-left (maintain clear space per brand manual).
+Keep title + one-line subtitle for screen-reader friendly context.
+
+--------------------------------------------------------------------------------
+UX / CX DESIGN CHECKLIST (embedded in model)
+--------------------------------------------------------------------------------
+- User research / UCD: slicers for Business, Category, KPI, Month — test with
+  real user tasks (find LTIFR, compare sites).
+- Information architecture: Category → KPI hierarchy in matrix or drill path.
+- Consistency & hierarchy: one theme; repeat title band on each page.
+- Accessibility: contrast (theme text on light background); data labels on key
+  visuals; alt text on visuals in Format pane.
+- Desirability / usefulness: executive page = few KPIs; detail page = matrix.
+- Iterative process: this dummy data supports refresh when production feeds land.
+
+--------------------------------------------------------------------------------
+BROWSER PREVIEW (team feedback before Power BI sign-off)
+--------------------------------------------------------------------------------
+A static HTML preview mirrors the same category → KPI IA as the planned report:
+
+  Folder:  ..\dashboard-preview\
+  Open:    index.html in a browser (double-click), or serve the folder for sharing:
+           npx --yes serve "dashboard-preview" -p 3333
+           (or any local static file server)
+
+  Contents:
+  - Home: logo, title, last-updated timestamp, list of all 9 categories
+  - Category drill-down: multi KPI cards, line chart (trend), horizontal bar
+    (by business), doughnut (unit-type mix), data table — aligned with Power BI
+    chart types for feedback sessions.
+
+  After changing CSVs in this PowerBI_Assets folder, regenerate preview data:
+    powershell -ExecutionPolicy Bypass -File "dashboard-preview\Refresh-PreviewData.ps1"
+
+  Branding: layout inspired by clean corporate patterns (see adani.com public
+  site for group tone); final colours must still match Adani Brand Manual (Aug 2025).
+
+--------------------------------------------------------------------------------
+FILE LIST
+--------------------------------------------------------------------------------
+Dim_Category.csv              — 9 KPI categories + UX note per category
+Dim_KPI.csv                   — 55 KPIs with CategoryKey and unit type
+Dim_Business.csv              — 10 businesses + State (for browser preview filters)
+Dim_Date.csv                  — Monthly grain Feb 2025 – Feb 2026
+Fact_Safety_KPI_Monthly.csv   — 7,150 rows (10 × 13 × 55)
+Dim_KPI_Category.csv          — Wireframe extract (tab-delimited)
+Adani_Safety_MIS_Theme.json   — Report theme
+DAX_Measures.dax              — Starter measures
+Adani_logo_2012.png           — Header logo
+Layout_1280x720.txt           — Suggested regions
+IMPORT_GUIDE.txt              — This file
+..\dashboard-preview\         — Browser preview (index.html, Chart.js, embedded data)
+
+================================================================================
