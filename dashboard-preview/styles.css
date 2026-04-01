@@ -823,14 +823,6 @@ fieldset.cat-toolbar--compact .field-label {
   line-height: 1.2;
 }
 
-.cat-kpi-meta {
-  display: inline;
-  font-weight: 600;
-  font-size: 0.58rem;
-  color: var(--text-muted);
-  margin-left: 4px;
-}
-
 .cat-context {
   margin: 0;
   padding: 0 2px;
