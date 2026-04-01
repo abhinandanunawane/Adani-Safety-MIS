@@ -1460,11 +1460,12 @@ fieldset.cat-toolbar--compact .field-label {
   background: var(--landing-banner-bg);
 }
 
+/* Hero + guide must both fit in the 720px shell: cap hero so "How to use" is not fully clipped. */
 .landing__hero {
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   display: grid;
   grid-template-columns: 1.05fr 0.95fr;
-  grid-template-rows: minmax(200px, auto);
+  grid-template-rows: minmax(160px, auto);
   align-items: stretch;
   gap: 0;
   padding: 0;
@@ -1473,6 +1474,7 @@ fieldset.cat-toolbar--compact .field-label {
   background: var(--landing-banner-bg);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
   min-height: 0;
+  max-height: min(400px, 56vh);
   overflow: hidden;
 }
 
@@ -1577,13 +1579,13 @@ fieldset.cat-toolbar--compact .field-label {
 
 /* Guide card: two columns — how to use | what’s on each category screen */
 .landing__guide {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 96px;
   padding: 6px 8px 8px;
   border-radius: 14px;
   border: 1px solid #cbd5e1;
   background: var(--bg-card);
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
 }
