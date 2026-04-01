@@ -133,7 +133,7 @@
     if (liveRegion) liveRegion.textContent = msg;
   }
 
-  /** Vs comparison (monthly data; shorter labels use month-level proxies). */
+  /** Vs comparison (monthly facts). Vs Yesterday = current month vs avg of prior 2 months; Vs Last Month = vs prior month only. */
   const DEFAULT_VS_MODE = "vs_last_month";
   const VS_OPTIONS = [
     { id: "vs_yesterday", label: "Vs Yesterday" },
@@ -191,8 +191,9 @@
   function vsCompareShort(mode) {
     switch (mode) {
       case "vs_last_month":
-      case "vs_yesterday":
         return "vs prior month";
+      case "vs_yesterday":
+        return "vs avg of prior 2 months";
       case "vs_last_year":
         return "vs year-ago month";
       case "vs_last_week":
@@ -234,8 +235,11 @@
     if (mode === "vs_last_week" && add) {
       return m + " · 2-mo total vs prior 2-mo";
     }
-    if ((mode === "vs_last_month" || mode === "vs_yesterday") && add) {
+    if (mode === "vs_last_month" && add) {
       return m + " · month total vs prior month";
+    }
+    if (mode === "vs_yesterday" && add) {
+      return m + " · month total vs avg of prior 2 months";
     }
     return m + " · " + vsCompareShort(mode);
   }
@@ -686,9 +690,12 @@
 
       let cur;
       let baseVal;
-      if (mode === "vs_last_month" || mode === "vs_yesterday") {
+      if (mode === "vs_last_month") {
         cur = aggMonth(ref);
         baseVal = aggMonth(m1);
+      } else if (mode === "vs_yesterday") {
+        cur = aggMonth(ref);
+        baseVal = avgMonthsList([m1, m2]);
       } else if (mode === "vs_last_year") {
         if (add) {
           cur = aggMonthsRolling(ref, 12);
@@ -1021,9 +1028,12 @@
 
     let cur;
     let baseVal;
-    if (mode === "vs_last_month" || mode === "vs_yesterday") {
+    if (mode === "vs_last_month") {
       cur = rowValueAt(pool, tk, ref);
       baseVal = rowValueAt(pool, tk, m1);
+    } else if (mode === "vs_yesterday") {
+      cur = rowValueAt(pool, tk, ref);
+      baseVal = avgPair([m1, m2]);
     } else if (mode === "vs_last_year") {
       if (add) {
         cur = rowWindowAgg(pool, tk, ref, 12, ut);
@@ -1080,13 +1090,13 @@
 
     if (!tbody) return;
 
-    const cap = document.getElementById("tbl-caption");
-    if (cap) {
+    const summaryEl = document.getElementById("tbl-summary");
+    if (summaryEl) {
       if (total === 0) {
-        cap.textContent =
+        summaryEl.textContent =
           "No rows match for the reference month. Set State to All or reset filters.";
       } else {
-        cap.textContent =
+        summaryEl.textContent =
           "Showing " +
           pageRows.length +
           " of " +
@@ -1400,7 +1410,7 @@
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, Versus comparison, state, business, or unit when shown. Trend uses twelve months; business and unit charts use the reference month. Count or Hours KPIs sum across months in wider Vs windows.</p>' +
+      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, Versus comparison, state, business, or unit when shown. Vs Yesterday compares the reference month to the average of the two prior months (short-horizon proxy on monthly data). Vs Last Month compares to the single prior month. Trend uses twelve months; business and unit charts use the reference month. Count or Hours KPIs sum across months in wider Vs windows. Choose All states and All businesses to see the full preview slice.</p>' +
       coreFields +
       '<div class="toolbar-actions">' +
       '<button type="button" class="btn" id="f-reset">Reset</button>' +
@@ -1416,7 +1426,11 @@
       '<div class="chart-box"><h3>Unit mix <span class="chart-box__hint">(reference month)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-doughnut" role="img" aria-label="Unit mix for the reference month: row counts if all KPIs, else summed values for the selected KPI"></canvas></div></div>' +
       "</div>" +
       '<div class="table-zone">' +
-      '<div class="table-zone__head"><span>Detail data</span>' +
+      '<div class="table-zone__head">' +
+      '<div class="table-zone__title">' +
+      '<span class="table-zone__label">Detail data</span>' +
+      '<span id="tbl-summary" class="table-zone__summary" aria-live="polite"></span>' +
+      "</div>" +
       '<div class="table-pager">' +
       '<button type="button" id="tbl-prev" aria-label="Previous page">Prev</button>' +
       '<span id="tbl-pageinfo"></span>' +
@@ -1424,7 +1438,7 @@
       "</div></div>" +
       '<div class="table-scroll">' +
       '<table class="data-table" id="tbl-detail">' +
-      '<caption id="tbl-caption">Detailed rows matching filters. Use column headers to sort.</caption>' +
+      '<caption class="visually-hidden">Detailed rows matching filters. Use column headers to sort.</caption>' +
       "<colgroup>" +
       '<col class="col-m" /><col class="col-s" /><col class="col-s" /><col class="col-kpi" />' +
       '<col class="col-s" /><col class="col-num" /><col class="col-num" /><col class="col-num" />' +
