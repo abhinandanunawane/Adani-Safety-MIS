@@ -1,0 +1,47 @@
+Adani Safety MIS — Dashboard preview: UX, IA, and Power BI alignment
+====================================================================
+This static preview is a user-centered prototype for stakeholder review, usability testing, and iterative refinement before or alongside Power BI report development.
+
+1. Information architecture (IA)
+--------------------------------
+- Global: Header (persistent product identity + primary nav) → Main canvas → Footer (disclaimer).
+- Task flow: Landing (orientation) → Categories (topic choice) → Category / KPI view (filters → KPI summary → charts → detail table).
+- Wayfinding: Journey steps (1–3), breadcrumb on drill-down, primary nav with aria-current reflecting route.
+- Hierarchy: Filters and Vs mode above summaries; summaries above charts; charts above granular table (general-to-specific).
+
+2. Power BI feasibility (mapping)
+--------------------------------
+- Report pages: Landing ≈ cover / intro page; Categories ≈ hub or bookmark; Category view ≈ one report page per domain (or one page with slicer “Category”).
+- Slicers / filters: KPI, Vs, State, Business, Unit align with Power BI slicers and the semantic model (dimension tables, fact relationships).
+- Bookmarks: Optional for “step” navigation (Home / Categories / Explore) if a single-page app pattern is used in Power BI.
+- Visuals: Line / bar-style breakdown / donut map to native Power BI visuals; KPI cards map to card visuals or custom tooltip KPI templates.
+- Theme: Brand tokens in CSS (:root) align with a Power BI theme JSON (hex for primary, background, text, semantic colours).
+- Limitations: This preview uses fixed 1280×720; Power BI layouts are responsive—test bookmarks and mobile layout separately.
+
+3. Accessibility (WCAG-oriented)
+---------------------------------
+- Skip link to main; landmarks (banner, main, contentinfo); live region for filter announcements.
+- Form controls: Labels, fieldset/legend where appropriate, aria-describedby for filter hints, sort state on table headers.
+- Focus: Visible :focus-visible styles on interactive elements; primary nav aria-current for route.
+- Motion: prefers-reduced-motion respected; contrast: prefers-contrast: more strengthens borders.
+- Colour: Brand palette with sufficient contrast on primary UI; charts use distinct tints—validate final reports with contrast checkers.
+
+4. Usability, usefulness, desirability
+--------------------------------------
+- Usefulness: Drill from category to KPIs, filters to refine, table for audit rows.
+- Learnability: Landing copy and “How to use” panels explain the flow; chart subtitles state time scope (12 months vs reference month).
+- Efficiency: Reset control, search on categories, pagination on table.
+- Desirability: Corporate header, journey steps, and card layout support a professional CX aligned with enterprise dashboards.
+
+5. User research and iterative process
+----------------------------------------
+- This build supports moderated usability tests (tasks: find a KPI, change Vs, interpret table) and A/B variants of copy or layout.
+- Feedback should feed: Power BI visual choice, slicer defaults, bookmark strategy, and training materials.
+
+6. HCI / UCD / CX
+------------------
+- UCD: Content and order follow task analysis (orient → select topic → explore → verify detail).
+- HCI: Input controls are standard HTML patterns; feedback via live region and visible KPI/table updates.
+- CX: Disclaimer sets expectations (sample data); Last updated supports trust and governance conversations.
+
+For production Power BI: replicate IA in page and bookmark structure, carry over filter semantics, and run accessibility checks on published reports (keyboard, screen reader, contrast).

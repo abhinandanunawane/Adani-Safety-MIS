@@ -8,6 +8,28 @@
   const liveRegion = document.getElementById("sr-live");
   const DATA = window.__DASHBOARD_DATA__;
 
+  /** Sync primary nav with route for screen readers (IA: Home vs Categories scope). */
+  function updateHeaderNavState() {
+    const raw = location.hash || "";
+    const h = raw === "" || raw === "#" ? "#landing" : raw;
+    const home = document.getElementById("nav-home");
+    const cats = document.getElementById("nav-categories");
+    const onLanding = h === "#landing";
+    const onCategories = h === "#categories";
+    const onCategoryDrill = /^#cat=\d+/.test(h);
+    if (home) {
+      if (onLanding) home.setAttribute("aria-current", "page");
+      else home.removeAttribute("aria-current");
+    }
+    if (cats) {
+      if (onCategories || onCategoryDrill) {
+        cats.setAttribute("aria-current", "page");
+      } else {
+        cats.removeAttribute("aria-current");
+      }
+    }
+  }
+
   function setHeaderTimestamp(iso) {
     const hu = document.getElementById("header-updated");
     if (!hu) return;
@@ -1455,6 +1477,7 @@
     refreshCategoryView(catKey);
     const h = document.getElementById("cat-heading");
     if (h) h.focus();
+    updateHeaderNavState();
   }
 
   function renderLanding() {
@@ -1545,6 +1568,7 @@
     const hh = document.getElementById("landing-h");
     if (hh) hh.focus();
     announce("About this dashboard. Use Start now to continue.");
+    updateHeaderNavState();
   }
 
   function renderCategories() {
@@ -1675,6 +1699,7 @@
       q.addEventListener("input", () => buildCards(q.value, {}));
       q.focus();
     }
+    updateHeaderNavState();
   }
 
   window.addEventListener("hashchange", () => {

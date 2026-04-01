@@ -45,6 +45,26 @@
   }
 }
 
+/* Stronger edges for users who prefer higher contrast (accessibility / Windows high contrast adjacent). */
+@media (prefers-contrast: more) {
+  :root {
+    --border: #94a3b8;
+    --border-kpi-outer: #94a3b8;
+    --border-kpi-tile: #cbd5e1;
+  }
+
+  .top-nav-link {
+    border-color: rgba(255, 255, 255, 0.85);
+  }
+
+  .landing__guide-panel,
+  .multi-kpi-card,
+  .chart-box,
+  .data-table {
+    border-width: 2px;
+  }
+}
+
 *,
 *::before,
 *::after {
