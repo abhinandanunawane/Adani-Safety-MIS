@@ -1576,6 +1576,12 @@ fieldset.cat-toolbar--compact .field-label {
   background: var(--landing-banner-bg);
 }
 
+/* Multiply blends JPEG white areas into the same white banner (no separate “box”). */
+.landing__graphic--photo .landing__banner-img {
+  mix-blend-mode: multiply;
+  background: transparent;
+}
+
 .landing__banner-img {
   display: block;
   box-sizing: border-box;
@@ -1589,7 +1595,7 @@ fieldset.cat-toolbar--compact .field-label {
   pointer-events: none;
   user-select: none;
   -webkit-user-drag: none;
-  background: var(--landing-banner-bg);
+  background: transparent;
 }
 
 /* Guide: two panels — no scrollbar; fits remaining height below hero (fixed shell) */

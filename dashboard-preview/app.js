@@ -1483,7 +1483,7 @@
       "</div>" +
       "</div>" +
       '<div class="landing__graphic landing__graphic--photo" aria-hidden="true">' +
-      '<img class="landing__banner-img" src="./assets/Adani-Group-home.png" width="640" height="400" alt="" decoding="async" loading="eager" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=\'./assets/adani-logo.png\';}else{this.onerror=null;}" />' +
+      '<img class="landing__banner-img" src="./assets/Adani-Group.jpg" width="640" height="400" alt="" decoding="async" loading="eager" onerror="if(!this.dataset.fb){this.dataset.fb=\'1\';this.src=\'./assets/Adani-Group-home.png\';}else if(this.dataset.fb===\'1\'){this.dataset.fb=\'2\';this.src=\'./assets/adani-logo.png\';}else{this.onerror=null;}" />' +
       "</div>" +
       "</div>" +
       '<section class="landing__guide" aria-labelledby="guide-h">' +
