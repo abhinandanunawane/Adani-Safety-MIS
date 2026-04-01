@@ -44,7 +44,8 @@
 
   const meta = DATA.meta || {};
 
-  const PAGE_SIZE = 5;
+  /** Detail table rows per page (keep in sync with styles.css --detail-table-body-rows) */
+  const PAGE_SIZE = 8;
   let tableState = {
     sortKey: "yearMonth",
     asc: false,
@@ -54,11 +55,72 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
+  /** Shared preview: only Incident Management (key 1) is navigable; other categories are visible but inactive. */
+  const ACTIVE_PREVIEW_CATEGORY_KEY = 1;
+
   function announce(msg) {
     if (liveRegion) liveRegion.textContent = msg;
   }
 
-  /** IA: visible journey — aligns with header nav (Guide / Categories); no duplicate controls. */
+  /** Vs comparison (monthly data; shorter labels use month-level proxies). */
+  const DEFAULT_VS_MODE = "vs_last_month";
+  const VS_OPTIONS = [
+    { id: "vs_yesterday", label: "Vs Yesterday" },
+    { id: "vs_last_week", label: "Vs Last Week" },
+    { id: "vs_last_month", label: "Vs Last Month" },
+    { id: "vs_last_quarter", label: "Vs Last Quarter" },
+    { id: "vs_last_year", label: "Vs Last Year" },
+  ];
+
+  function getRefMonth() {
+    if (DATA.months && DATA.months.length) {
+      return DATA.months[DATA.months.length - 1].yearMonth;
+    }
+    return meta.lastDataMonth || "2024-01";
+  }
+
+  function vsOptionLabel(id) {
+    const o = VS_OPTIONS.find((x) => x.id === id);
+    return o ? o.label : id;
+  }
+
+  /** Short tag on KPI tiles only (dropdown keeps full labels). */
+  function vsTagShort(id) {
+    switch (id) {
+      case "vs_yesterday":
+        return "y'day";
+      case "vs_last_week":
+        return "LW";
+      case "vs_last_month":
+        return "LM";
+      case "vs_last_quarter":
+        return "LQ";
+      case "vs_last_year":
+        return "LY";
+      default:
+        return vsOptionLabel(id);
+    }
+  }
+
+  /** What the headline KPI value represents for each Vs mode (monthly data uses rolling proxies). */
+  function vsValuePeriodCaption(id) {
+    switch (id) {
+      case "vs_yesterday":
+        return "Today";
+      case "vs_last_week":
+        return "This week";
+      case "vs_last_month":
+        return "This month";
+      case "vs_last_quarter":
+        return "This quarter";
+      case "vs_last_year":
+        return "This year";
+      default:
+        return "This month";
+    }
+  }
+
+  /** IA: visible journey — aligns with header nav (Home / Categories); no duplicate controls. */
   function journeyStepsHtml(step) {
     function item(n, label, isActive) {
       const cls = isActive ? " route-steps__item--active" : "";
@@ -76,8 +138,8 @@
       );
     }
     return (
-      '<nav class="route-steps" aria-label="Journey: Guide, Categories, Explore KPIs">' +
-      item(1, "Guide", step === 1) +
+      '<nav class="route-steps" aria-label="Journey: Home, Categories, Explore KPIs">' +
+      item(1, "Home", step === 1) +
       '<span class="route-steps__sep" aria-hidden="true">→</span>' +
       item(2, "Categories", step === 2) +
       '<span class="route-steps__sep" aria-hidden="true">→</span>' +
@@ -90,6 +152,25 @@
     const d = document.createElement("div");
     d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
+  }
+
+  function escapeAttr(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;")
+      .replace(/</g, "&lt;");
+  }
+
+  /** Table value column: formatted actual only (Target has its own column). */
+  function tableValueCell(r) {
+    const unit = r.unitType || "";
+    const actualStr = formatValue(r.value, unit);
+    return (
+      '<td class="col-num">' +
+      '<span class="data-table__value-num">' +
+      escapeHtml(actualStr) +
+      "</span></td>"
+    );
   }
 
   /** Decorative icons for category cards (list context; button has aria-label). */
@@ -167,62 +248,129 @@
   }
 
   function destroyCharts() {
-    ["chart-line", "chart-bar", "chart-doughnut"].forEach((id) => {
+    ["chart-line", "chart-doughnut"].forEach((id) => {
       const el = document.getElementById(id);
       if (el && typeof Chart !== "undefined") {
         const c = Chart.getChart(el);
         if (c) c.destroy();
       }
     });
+    const bizHost = document.getElementById("chart-biz-breakdown");
+    if (bizHost) bizHost.innerHTML = "";
   }
 
+  /* Soft tints — readable on white without heavy saturation */
   const chartPaletteColors = [
-    "#00B16B",
-    "#006DB6",
-    "#8E278F",
-    "#F04C23",
-    "#00B16B",
-    "#006DB6",
-    "#8E278F",
-    "#F04C23",
+    "rgba(0, 177, 107, 0.45)",
+    "rgba(0, 109, 182, 0.45)",
+    "rgba(142, 39, 143, 0.4)",
+    "rgba(240, 76, 35, 0.42)",
+    "rgba(0, 177, 107, 0.32)",
+    "rgba(0, 109, 182, 0.32)",
+    "rgba(142, 39, 143, 0.3)",
+    "rgba(240, 76, 35, 0.32)",
   ];
+
+  /**
+   * By business: ranked list + proportional bars (readable labels; scroll inside panel).
+   */
+  function renderBizBreakdown(bizLabels, bizData) {
+    const host = document.getElementById("chart-biz-breakdown");
+    if (!host) return;
+    if (!bizLabels.length) {
+      host.innerHTML =
+        '<p class="chart-biz-empty">No business data for current filters.</p>';
+      return;
+    }
+    const pairs = bizLabels.map((name, i) => ({ name, v: Number(bizData[i]) }));
+    pairs.sort((a, b) => Math.abs(b.v) - Math.abs(a.v));
+    const maxV = Math.max(
+      ...pairs.map((p) => Math.abs(p.v)),
+      Number.EPSILON
+    );
+    host.innerHTML = pairs
+      .map((p, i) => {
+        const pct = (Math.abs(p.v) / maxV) * 100;
+        const col = chartPaletteColors[i % chartPaletteColors.length];
+        const num =
+          Number.isFinite(p.v) && Math.abs(p.v) >= 1e6
+            ? p.v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+            : Number.isFinite(p.v)
+              ? p.v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+              : "—";
+        return (
+          '<div class="chart-biz-row" role="listitem">' +
+          '<div class="chart-biz-row__line">' +
+          '<span class="chart-biz-row__name">' +
+          escapeHtml(p.name) +
+          "</span>" +
+          '<span class="chart-biz-row__val">' +
+          escapeHtml(num) +
+          "</span></div>" +
+          '<div class="chart-biz-row__track" aria-hidden="true">' +
+          '<div class="chart-biz-row__fill" style="width:' +
+          pct.toFixed(1) +
+          "%;background-color:" +
+          col +
+          '"></div></div></div>'
+        );
+      })
+      .join("");
+  }
 
   function readFilters(catKey) {
     const elKpi = document.getElementById("f-kpi");
-    const elFrom = document.getElementById("f-from");
-    const elTo = document.getElementById("f-to");
+    const elVs = document.getElementById("f-vs");
     const elSt = document.getElementById("f-state");
-    if (!elKpi || !elFrom || !elTo || !elSt) return null;
+    if (!elSt) return null;
     const elBiz = document.getElementById("f-biz");
     const elUnit = document.getElementById("f-unit");
-    let mf = elFrom.value;
-    let mt = elTo.value;
-    if (mf > mt) {
-      const t = mf;
-      mf = mt;
-      mt = t;
-    }
     return {
       catKey,
-      kpi: elKpi.value,
-      monthFrom: mf,
-      monthTo: mt,
+      kpi: elKpi ? elKpi.value : "all",
+      vsMode: elVs ? elVs.value : DEFAULT_VS_MODE,
+      refMonth: getRefMonth(),
       state: elSt.value,
       business: elBiz ? elBiz.value : "all",
       unitType: elUnit ? elUnit.value : "all",
     };
   }
 
+  /** Table / KPI tiles: current reference month only (plus non-month filters). */
   function applyRowFilter(rows, f) {
     return rows.filter((r) => {
       if (f.kpi !== "all" && String(r.kpiKey) !== f.kpi) return false;
-      if (r.yearMonth < f.monthFrom || r.yearMonth > f.monthTo) return false;
+      if (r.yearMonth !== f.refMonth) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
       if (f.business !== "all" && r.businessName !== f.business) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       return true;
     });
   }
+
+  /** Charts: last 12 months ending at ref month. */
+  function chartMonthKeys(refMonth, count) {
+    const keys = [];
+    let m = refMonth;
+    for (let i = 0; i < count; i++) {
+      keys.push(m);
+      m = monthAdd(m, -1);
+    }
+    return keys.reverse();
+  }
+
+  function applyChartFilter(rows, f) {
+    const range = new Set(chartMonthKeys(f.refMonth, 12));
+    return rows.filter((r) => {
+      if (f.kpi !== "all" && String(r.kpiKey) !== f.kpi) return false;
+      if (!range.has(r.yearMonth)) return false;
+      if (f.state !== "all" && r.state !== f.state) return false;
+      if (f.business !== "all" && r.businessName !== f.business) return false;
+      if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
+      return true;
+    });
+  }
+
 
   function getRowsForCategory(catKey) {
     return DATA.factRows.filter((r) => r.categoryKey === catKey);
@@ -319,31 +467,63 @@
   function buildKpiDetailMetrics(catKey, kpisMeta, f) {
     const sorted = sortKpisForDisplay(catKey, kpisMeta);
     const base = applyNonMonthFilters(getRowsForCategory(catKey), f);
-    const refMonth = f.monthTo;
-    const lmMonth = monthAdd(refMonth, -1);
-    const lyMonth = monthAdd(refMonth, -12);
+    const ref = f.refMonth;
+    const mode = f.vsMode || DEFAULT_VS_MODE;
 
     return sorted.map((k) => {
       const kk = k.kpiKey;
       function avgFor(ym) {
+        if (!ym) return null;
         const rows = base.filter(
           (r) => r.kpiKey === kk && r.yearMonth === ym
         );
         if (!rows.length) return null;
         return avg(rows.map((r) => r.value));
       }
-      const cur = avgFor(refMonth);
-      const lm = avgFor(lmMonth);
-      const ly = avgFor(lyMonth);
+      function avgForMonths(yms) {
+        const vals = yms.map(avgFor).filter((v) => v != null && !Number.isNaN(v));
+        if (!vals.length) return null;
+        return avg(vals);
+      }
+      const m1 = monthAdd(ref, -1);
+      const m2 = monthAdd(ref, -2);
+      const m3 = monthAdd(ref, -3);
+      const m4 = monthAdd(ref, -4);
+      const m5 = monthAdd(ref, -5);
+      const m12 = monthAdd(ref, -12);
+
+      let cur;
+      let baseVal;
+      if (
+        mode === "vs_last_month" ||
+        mode === "vs_yesterday"
+      ) {
+        cur = avgFor(ref);
+        baseVal = avgFor(m1);
+      } else if (mode === "vs_last_year") {
+        cur = avgFor(ref);
+        baseVal = avgFor(m12);
+      } else if (mode === "vs_last_week") {
+        cur = avgForMonths([ref, m1]);
+        baseVal = avgForMonths([m2, m3]);
+      } else if (mode === "vs_last_quarter") {
+        cur = avgForMonths([ref, m1, m2]);
+        baseVal = avgForMonths([m3, m4, m5]);
+      } else {
+        cur = avgFor(ref);
+        baseVal = avgFor(m1);
+      }
+
+      const vsPct = pctChange(cur, baseVal);
+      const vsD = vsDir(cur, baseVal);
       return {
         kpiKey: kk,
         kpiName: k.kpiName,
         unitType: k.unitType,
         value: cur,
-        lmPct: pctChange(cur, lm),
-        lyPct: pctChange(cur, ly),
-        vsLmDir: vsDir(cur, lm),
-        vsLyDir: vsDir(cur, ly),
+        vsPct: vsPct,
+        vsDir: vsD,
+        vsMode: mode,
       };
     });
   }
@@ -380,26 +560,34 @@
       head.className = "multi-kpi-card__head";
       const start = idx * 4 + 1;
       const end = idx * 4 + chunk.length;
-      head.textContent = "Metrics " + start + "–" + end;
+      if (chunk.length === 1) {
+        head.textContent = "Metric " + start;
+      } else {
+        head.textContent = "Metrics " + start + "–" + end;
+      }
       const grid = document.createElement("div");
       grid.className = "multi-kpi-card__grid";
       chunk.forEach((item) => {
         const tile = document.createElement("div");
         tile.className = "multi-kpi-tile";
-        const lmPct = formatSignedPct(item.lmPct);
-        const lyPct = formatSignedPct(item.lyPct);
+        const vsPct = formatSignedPct(item.vsPct);
+        const vDir = item.vsDir || "neutral";
+        const vsLbl = vsOptionLabel(item.vsMode);
+        const vsShort = vsTagShort(item.vsMode);
+        const periodCap = vsValuePeriodCaption(item.vsMode);
         tile.setAttribute(
           "aria-label",
           item.kpiName +
-            ". Current " +
+            ". Value " +
+            periodCap +
+            ": " +
             formatValue(item.value, item.unitType) +
-            ". Versus last month " +
-            lmPct +
-            ". Versus last year " +
-            lyPct +
+            ". " +
+            vsLbl +
+            " " +
+            vsPct +
             "."
         );
-        tile.title = item.kpiName;
         tile.innerHTML =
           '<div class="multi-kpi-tile__name">' +
           escapeHtml(item.kpiName) +
@@ -408,38 +596,25 @@
           '<span class="multi-kpi-tile__val">' +
           formatValue(item.value, item.unitType) +
           "</span>" +
-          '<span class="' +
-          cmpArrowClass(item.vsLmDir) +
-          '" aria-hidden="true">' +
-          arrowGlyph(item.vsLmDir) +
-          "</span>" +
           "</div>" +
           '<div class="multi-kpi-tile__unit">' +
           escapeHtml(item.unitType) +
           "</div>" +
-          '<div class="multi-kpi-tile__cmp">' +
-          '<div class="multi-kpi-tile__cmp-line">' +
-          '<span class="multi-kpi-tile__cmp-tag">LM</span>' +
-          '<span class="' +
-          cmpArrowClass(item.vsLmDir) +
-          '">' +
-          arrowGlyph(item.vsLmDir) +
-          "</span>" +
-          '<span class="multi-kpi-tile__cmp-pct">' +
-          escapeHtml(lmPct) +
-          "</span>" +
+          '<div class="multi-kpi-tile__period">' +
+          escapeHtml(periodCap) +
           "</div>" +
-          '<div class="multi-kpi-tile__cmp-line">' +
-          '<span class="multi-kpi-tile__cmp-tag">LY</span>' +
+          '<div class="multi-kpi-tile__cmp multi-kpi-tile__cmp--vs">' +
+          '<span class="multi-kpi-tile__cmp-tag multi-kpi-tile__cmp-tag--short">' +
+          escapeHtml(vsShort) +
+          "</span>" +
           '<span class="' +
-          cmpArrowClass(item.vsLyDir) +
-          '">' +
-          arrowGlyph(item.vsLyDir) +
+          cmpArrowClass(vDir) +
+          '" aria-hidden="true">' +
+          arrowGlyph(vDir) +
           "</span>" +
-          '<span class="multi-kpi-tile__cmp-pct">' +
-          escapeHtml(lyPct) +
+          '<span class="multi-kpi-tile__cmp-pct vs-pct-num">' +
+          escapeHtml(vsPct) +
           "</span>" +
-          "</div>" +
           "</div>";
         grid.appendChild(tile);
       });
@@ -492,11 +667,11 @@
             {
               label: "Avg",
               data: lineData,
-              borderColor: "#006DB6",
-              backgroundColor: "rgba(0, 177, 107, 0.12)",
+              borderColor: "rgba(0, 109, 182, 0.75)",
+              backgroundColor: "rgba(0, 177, 107, 0.08)",
               fill: true,
               tension: 0.2,
-              borderWidth: 2,
+              borderWidth: 1.5,
               pointRadius: 2,
             },
           ],
@@ -513,33 +688,7 @@
       });
     }
 
-    const elBar = document.getElementById("chart-bar");
-    if (elBar && bizLabels.length) {
-      new Chart(elBar, {
-        type: "bar",
-        data: {
-          labels: bizLabels,
-          datasets: [
-            {
-              data: bizData,
-              backgroundColor: bizLabels.map(
-                (_, i) => chartPaletteColors[i % chartPaletteColors.length]
-              ),
-            },
-          ],
-        },
-        options: {
-          indexAxis: "y",
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            x: { beginAtZero: true, ticks: { font: { size: 9 } } },
-            y: { ticks: { font: { size: 8 } } },
-          },
-        },
-      });
-    }
+    renderBizBreakdown(bizLabels, bizData);
 
     const elD = document.getElementById("chart-doughnut");
     if (elD && unitLabels.length) {
@@ -551,6 +700,8 @@
             {
               data: unitData,
               backgroundColor: chartPaletteColors,
+              borderColor: "#ffffff",
+              borderWidth: 1,
             },
           ],
         },
@@ -591,10 +742,73 @@
     return copy;
   }
 
+  function rowTupleKey(r) {
+    return (
+      String(r.kpiKey) +
+      "|" +
+      r.state +
+      "|" +
+      r.businessName +
+      "|" +
+      r.unitType
+    );
+  }
+
+  function rowValueAt(pool, tupleKey, ym) {
+    const hit = pool.find(
+      (x) => rowTupleKey(x) === tupleKey && x.yearMonth === ym
+    );
+    return hit == null ? null : Number(hit.value);
+  }
+
+  function rowVsForMode(row, pool, f) {
+    const mode = f.vsMode || DEFAULT_VS_MODE;
+    const ref = row.yearMonth;
+    const tk = rowTupleKey(row);
+    const m1 = monthAdd(ref, -1);
+    const m2 = monthAdd(ref, -2);
+    const m3 = monthAdd(ref, -3);
+    const m4 = monthAdd(ref, -4);
+    const m5 = monthAdd(ref, -5);
+    const m12 = monthAdd(ref, -12);
+
+    function avgPair(yms) {
+      const nums = yms
+        .map((ym) => rowValueAt(pool, tk, ym))
+        .filter((v) => v != null && !Number.isNaN(v));
+      if (!nums.length) return null;
+      return avg(nums);
+    }
+
+    let cur;
+    let baseVal;
+    if (mode === "vs_last_month" || mode === "vs_yesterday") {
+      cur = rowValueAt(pool, tk, ref);
+      baseVal = rowValueAt(pool, tk, m1);
+    } else if (mode === "vs_last_year") {
+      cur = rowValueAt(pool, tk, ref);
+      baseVal = rowValueAt(pool, tk, m12);
+    } else if (mode === "vs_last_week") {
+      cur = avgPair([ref, m1]);
+      baseVal = avgPair([m2, m3]);
+    } else if (mode === "vs_last_quarter") {
+      cur = avgPair([ref, m1, m2]);
+      baseVal = avgPair([m3, m4, m5]);
+    } else {
+      cur = rowValueAt(pool, tk, ref);
+      baseVal = rowValueAt(pool, tk, m1);
+    }
+    return {
+      pct: pctChange(cur, baseVal),
+      dir: vsDir(cur, baseVal),
+    };
+  }
+
   function renderTableBody(catKey) {
     const f = readFilters(catKey);
     if (!f) return;
-    let rows = applyRowFilter(getRowsForCategory(catKey), f);
+    const pool = applyNonMonthFilters(getRowsForCategory(catKey), f);
+    let rows = applyRowFilter(pool, f);
     rows = sortRows(rows, tableState.sortKey, tableState.asc);
 
     const total = rows.length;
@@ -616,7 +830,7 @@
     if (cap) {
       if (total === 0) {
         cap.textContent =
-          "No rows match. Widen the month range, set State to All, or reset filters.";
+          "No rows match for the reference month. Set State to All or reset filters.";
       } else {
         cap.textContent =
           "Showing " +
@@ -629,14 +843,26 @@
 
     if (!pageRows.length) {
       tbody.innerHTML =
-        '<tr><td colspan="7" class="empty-msg">No rows for current filters.</td></tr>';
+        '<tr><td colspan="8" class="empty-msg">No rows for current filters.</td></tr>';
     } else {
       tbody.innerHTML = pageRows
-        .map(
-          (r) =>
-            "<tr title=\"" +
-            escapeHtml(r.kpiName + " — " + r.businessName + " — " + r.yearMonth) +
-            "\">" +
+        .map((r) => {
+          const rv = rowVsForMode(r, pool, f);
+          const pctStr = formatSignedPct(rv.pct);
+          const arrow =
+            rv.dir === "up"
+              ? "▲"
+              : rv.dir === "down"
+                ? "▼"
+                : rv.dir === "same"
+                  ? "◆"
+                  : "—";
+          return (
+            '<tr aria-label="' +
+            escapeAttr(
+              r.kpiName + " — " + r.businessName + " — " + r.yearMonth
+            ) +
+            '">' +
             "<td>" +
             escapeHtml(r.yearMonth) +
             "</td>" +
@@ -652,16 +878,27 @@
             "<td>" +
             escapeHtml(r.unitType) +
             "</td>" +
-            '<td class="col-num">' +
-            formatValue(r.value, r.unitType) +
-            "</td>" +
+            tableValueCell(r) +
+            '<td class="col-num data-table__vs">' +
+            '<span class="multi-kpi-tile__arrow data-table__vs-arrow ' +
+            (rv.dir === "up"
+              ? "multi-kpi-tile__arrow--up"
+              : rv.dir === "down"
+                ? "multi-kpi-tile__arrow--down"
+                : "multi-kpi-tile__arrow--na") +
+            '" aria-hidden="true">' +
+            arrow +
+            '</span> <span class="vs-pct-num">' +
+            escapeHtml(pctStr) +
+            "</span></td>" +
             '<td class="col-num">' +
             (r.target == null || r.target === ""
               ? "—"
               : formatValue(r.target, r.unitType)) +
             "</td>" +
             "</tr>"
-        )
+          );
+        })
         .join("");
     }
 
@@ -749,14 +986,14 @@
     const f = readFilters(catKey);
     if (!f) return;
 
-    const filtered = applyRowFilter(getRowsForCategory(catKey), f);
+    const filtered = applyChartFilter(getRowsForCategory(catKey), f);
     const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
 
     const multiWrap = document.getElementById("multi-kpi-wrap");
     if (multiWrap) {
       if (!aggList.length) {
         multiWrap.innerHTML =
-          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Widen the month range or clear filters.</div>';
+          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Clear filters or choose All KPIs.</div>';
       } else {
         renderMultiKpiCards(multiWrap, aggList);
       }
@@ -764,6 +1001,21 @@
 
     buildCharts(filtered);
     renderTableBody(catKey);
+
+    const cat = getCategory(catKey);
+    const ctx = document.getElementById("cat-context");
+    if (ctx && cat) {
+      ctx.innerHTML =
+        escapeHtml(cat.uxNote) +
+        '<br /><span class="cat-context__meta">Reference month <strong>' +
+        escapeHtml(f.refMonth) +
+        "</strong> · KPI value is <strong>" +
+        escapeHtml(vsValuePeriodCaption(f.vsMode)) +
+        "</strong> · <strong>" +
+        escapeHtml(vsOptionLabel(f.vsMode)) +
+        "</strong> (monthly facts; shorter “Vs” options use rolling months).</span>";
+    }
+
     announceFilterSummary(catKey);
   }
 
@@ -778,14 +1030,18 @@
       return;
     }
 
+    if (catKey !== ACTIVE_PREVIEW_CATEGORY_KEY) {
+      history.replaceState(null, "", "#categories");
+      renderCategories();
+      announce(
+        "This preview only includes Incident Management. Choose Incident Management on the category list."
+      );
+      return;
+    }
+
     const kpisMeta = getKpis(catKey);
     const rowsForCat = getRowsForCategory(catKey);
     const cfg = getFilterConfig(catKey);
-    const months = DATA.months.length
-      ? DATA.months
-      : [{ yearMonth: meta.lastDataMonth, dateKey: 0 }];
-    const firstM = months[0].yearMonth;
-    const lastM = months[months.length - 1].yearMonth;
 
     const kpiOpts =
       '<option value="all">All KPIs</option>' +
@@ -800,16 +1056,16 @@
         )
         .join("");
 
-    const monthOpts = months
-      .map(
-        (m) =>
-          '<option value="' +
-          escapeHtml(m.yearMonth) +
-          '">' +
-          escapeHtml(m.yearMonth) +
-          "</option>"
-      )
-      .join("");
+    const vsOpts = VS_OPTIONS.map(
+      (o) =>
+        '<option value="' +
+        o.id +
+        '"' +
+        (o.id === DEFAULT_VS_MODE ? " selected" : "") +
+        ">" +
+        escapeHtml(o.label) +
+        "</option>"
+    ).join("");
 
     const stateOpts =
       '<option value="all">All states</option>' +
@@ -861,13 +1117,9 @@
           kpiOpts +
           "</select></div>"
         : "") +
-      '<div class="field"><label class="field-label" for="f-from">From</label>' +
-      '<select id="f-from">' +
-      monthOpts +
-      "</select></div>" +
-      '<div class="field"><label class="field-label" for="f-to">To</label>' +
-      '<select id="f-to">' +
-      monthOpts +
+      '<div class="field"><label class="field-label" for="f-vs">Vs</label>' +
+      '<select id="f-vs" aria-describedby="filter-hint">' +
+      vsOpts +
       "</select></div>" +
       (cfg.showState
         ? '<div class="field"><label class="field-label" for="f-state">State</label>' +
@@ -888,34 +1140,32 @@
           "</select></div>"
         : "");
     wrap.innerHTML =
-      journeyStepsHtml(3) +
       '<div class="cat-top-bar">' +
+      '<div class="cat-top-bar__lead">' +
+      journeyStepsHtml(3) +
       '<div class="cat-top-bar__title">' +
       '<nav class="breadcrumb" aria-label="Breadcrumb">' +
       '<ol><li><a href="#categories" id="bc-cats">Categories</a></li><li aria-current="page">' +
       '<h2 class="cat-heading" id="cat-heading" tabindex="-1">' +
       escapeHtml(cat.categoryName) +
       "</h2></li></ol></nav>" +
-      "</div>" +
+      "</div></div>" +
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, month range, state, business, or unit when shown. KPI tiles, charts, and the detail table update for your selection.</p>' +
+      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, Versus comparison, state, business, or unit when shown. Values use the latest data month; charts show the last twelve months.</p>' +
       coreFields +
       '<div class="toolbar-actions">' +
       '<button type="button" class="btn" id="f-reset">Reset</button>' +
       "</div></div></fieldset>" +
       "</div>" +
-      '<p class="cat-context" id="cat-context">' +
-      escapeHtml(cat.uxNote) +
-      "</p>" +
       '<fieldset class="kpi-summary-region">' +
       '<legend class="visually-hidden">KPI summary for current filters</legend>' +
       '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
       "</fieldset>" +
       '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
       '<div class="chart-box"><h3>Trend</h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: average value by month for filtered data"></canvas></div></div>' +
-      '<div class="chart-box"><h3>By business</h3><div class="chart-canvas-wrap"><canvas id="chart-bar" role="img" aria-label="Bar chart: sum of values by business for filtered data"></canvas></div></div>' +
+      '<div class="chart-box chart-box--biz"><h3>By business</h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><div id="chart-biz-breakdown" class="chart-biz-breakdown" role="list" aria-label="Sum of values by business for filtered data, highest first"></div></div></div>' +
       '<div class="chart-box"><h3>Unit mix</h3><div class="chart-canvas-wrap"><canvas id="chart-doughnut" role="img" aria-label="Doughnut chart: row counts by unit type"></canvas></div></div>' +
       "</div>" +
       '<div class="table-zone">' +
@@ -930,7 +1180,7 @@
       '<caption id="tbl-caption">Detailed rows matching filters. Use column headers to sort.</caption>' +
       "<colgroup>" +
       '<col class="col-m" /><col class="col-s" /><col class="col-s" /><col class="col-kpi" />' +
-      '<col class="col-s" /><col class="col-num" /><col class="col-num" />' +
+      '<col class="col-s" /><col class="col-num" /><col class="col-num" /><col class="col-num" />' +
       "</colgroup>" +
       "<thead><tr>" +
       '<th scope="col" data-sort="yearMonth" class="col-m">Month</th>' +
@@ -938,16 +1188,19 @@
       '<th scope="col" data-sort="businessName" class="col-s">Business</th>' +
       '<th scope="col" data-sort="kpiName" class="col-kpi">KPI</th>' +
       '<th scope="col" data-sort="unitType" class="col-s">Unit</th>' +
-      '<th scope="col" data-sort="value" class="col-num">Value</th>' +
+      '<th scope="col" data-sort="value" class="col-num" title="Actual value for the row">Value</th>' +
+      '<th scope="col" class="col-num">Vs %</th>' +
       '<th scope="col" data-sort="target" class="col-num">Target</th>' +
       "</tr></thead>" +
-      '<tbody id="tbl-body"></tbody></table></div></div>';
+      '<tbody id="tbl-body"></tbody></table></div></div>' +
+      '<p class="cat-context" id="cat-context">' +
+      escapeHtml(cat.uxNote) +
+      "</p>";
 
     root.innerHTML = "";
     root.appendChild(wrap);
 
-    document.getElementById("f-from").value = firstM;
-    document.getElementById("f-to").value = lastM;
+    document.getElementById("f-vs").value = DEFAULT_VS_MODE;
     if (cfg.showState) document.getElementById("f-state").value = "all";
     if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
     if (cfg.showUnitType) document.getElementById("f-unit").value = "all";
@@ -958,14 +1211,13 @@
       refreshCategoryView(catKey);
     }
 
-    ["f-kpi", "f-from", "f-to", "f-state", "f-biz", "f-unit"].forEach((id) => {
+    ["f-kpi", "f-vs", "f-state", "f-biz", "f-unit"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", onFilterChange);
     });
 
     document.getElementById("f-reset").addEventListener("click", () => {
-      document.getElementById("f-from").value = firstM;
-      document.getElementById("f-to").value = lastM;
+      document.getElementById("f-vs").value = DEFAULT_VS_MODE;
       if (cfg.showKpi) document.getElementById("f-kpi").value = "all";
       if (cfg.showState) document.getElementById("f-state").value = "all";
       if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
@@ -994,99 +1246,52 @@
       '<h2 class="landing__title" id="landing-h">Adani Safety MIS</h2>' +
       '<p class="landing__subtitle">Group-level safety KPI dashboard for all Adani businesses — monitor trends, drill down by category, and compare performance month-over-month and year-over-year.</p>' +
       '<div class="landing__bullets" role="list">' +
-      '<div class="landing__bullet" role="listitem"><strong>What’s included</strong><span>Safety KPIs by category, filters, trend and business charts, unit mix, KPI tiles (with last month / last year), and a sortable detail table.</span></div>' +
+      '<div class="landing__bullet" role="listitem"><strong>What’s included</strong><span>Safety KPIs by category, Versus comparison, filters, trend and business charts, unit mix, KPI tiles with Vs % change, and a sortable detail table.</span></div>' +
       '<div class="landing__bullet" role="listitem"><strong>Who it’s for</strong><span>Anyone tracking group-wide safety performance across Adani businesses — from quick scans to deeper drill-down.</span></div>' +
+      "</div>" +
+      '<div class="landing__companies" role="region" aria-label="Adani group companies represented">' +
+      "<strong>Group companies</strong>" +
+      "<span>Adani Enterprises Ltd (flagship incubator), Adani Ports &amp; SEZ Ltd, Adani Green Energy Ltd, Adani Energy Solutions Ltd, Adani Power Ltd, Adani Total Gas Ltd, Adani Wilmar Ltd, Ambuja Cements Ltd, and ACC Ltd.</span>" +
       "</div>" +
       '<div class="landing__actions">' +
       '<button type="button" class="btn btn-primary" id="btn-start">Start now</button>' +
-      '<button type="button" class="btn btn-ghost" id="btn-categories">Browse categories</button>' +
       "</div>" +
       "</div>" +
-      '<div class="landing__graphic" aria-hidden="true">' +
-      // Inline SVG inspired by the provided reference graphic (no external asset required for GitHub Pages)
-      '<svg viewBox="0 0 820 420" class="landing-graphic" xmlns="http://www.w3.org/2000/svg">' +
-      '<defs>' +
-      '<filter id="ds" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.18"/></filter>' +
-      "</defs>" +
-      '<rect x="0" y="0" width="820" height="420" rx="22" fill="#ffffff"/>' +
-      '<g filter="url(#ds)">' +
-      '<circle cx="410" cy="210" r="62" fill="#ffffff"/>' +
-      '<circle cx="410" cy="210" r="62" fill="none" stroke="#006DB6" stroke-width="10"/>' +
-      '<text x="410" y="205" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="18" font-weight="700" fill="#0f172a">Adani</text>' +
-      '<text x="410" y="228" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="12" font-weight="600" fill="#475569">Group</text>' +
-      "</g>" +
-      '<g stroke="#94a3b8" stroke-dasharray="4 6" stroke-width="2" fill="none" opacity="0.9">' +
-      '<path d="M348 190 C260 160, 230 120, 170 110"/>' +
-      '<path d="M350 235 C260 260, 230 300, 170 310"/>' +
-      '<path d="M472 190 C560 160, 590 120, 650 110"/>' +
-      '<path d="M470 235 C560 260, 590 300, 650 310"/>' +
-      "</g>" +
-      '<g filter="url(#ds)">' +
-      '<g transform="translate(90 60)">' +
-      '<circle cx="90" cy="50" r="54" fill="#fff"/><circle cx="90" cy="50" r="54" fill="none" stroke="#93c5fd" stroke-width="10"/>' +
-      '<text x="90" y="54" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Ports</text>' +
-      "</g>" +
-      '<g transform="translate(90 250)">' +
-      '<circle cx="90" cy="50" r="54" fill=\"#fff\"/><circle cx=\"90\" cy=\"50\" r=\"54\" fill=\"none\" stroke=\"#a7f3d0\" stroke-width=\"10\"/>' +
-      '<text x=\"90\" y=\"54\" text-anchor=\"middle\" font-family=\"Segoe UI, system-ui, sans-serif\" font-size=\"16\" font-weight=\"700\" fill=\"#0f172a\">Power</text>' +
-      "</g>" +
-      '<g transform="translate(560 60)">' +
-      '<circle cx="90" cy="50" r="54" fill="#fff"/><circle cx="90" cy="50" r="54" fill="none" stroke="#fde68a" stroke-width="10"/>' +
-      '<text x="90" y="54" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Airports</text>' +
-      "</g>" +
-      '<g transform="translate(560 250)">' +
-      '<circle cx="90" cy="50" r="54" fill="#fff"/><circle cx="90" cy="50" r="54" fill="none" stroke="#8E278F" stroke-width="10"/>' +
-      '<text x="90" y="54" text-anchor="middle" font-family="Segoe UI, system-ui, sans-serif" font-size="16" font-weight="700" fill="#0f172a">Energy</text>' +
-      "</g>" +
-      "</g>" +
-      '<g opacity="0.9">' +
-      '<text x="560" y="190" font-family="Segoe UI, system-ui, sans-serif" font-size="26" font-weight="800" fill="#006DB6">All About</text>' +
-      '<text x="560" y="225" font-family="Segoe UI, system-ui, sans-serif" font-size="46" font-weight="900" fill="#00B16B">Safety</text>' +
-      '<text x="560" y="258" font-family="Segoe UI, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">for Adani Group</text>' +
-      "</g>" +
-      "</svg>" +
+      '<div class="landing__graphic landing__graphic--photo" aria-hidden="true">' +
+      '<img class="landing__banner-img" src="./assets/Adani-Group-home.png" width="640" height="400" alt="" decoding="async" loading="eager" onerror="if(this.dataset.fb!==\'1\'){this.dataset.fb=\'1\';this.src=\'./assets/adani-logo.png\';}else{this.onerror=null;}" />' +
       "</div>" +
       "</div>" +
       '<section class="landing__guide" aria-labelledby="guide-h">' +
+      '<div class="landing__guide-grid">' +
+      '<div class="landing__guide-col">' +
       '<h3 id="guide-h" class="landing__guide-title">How to use this dashboard</h3>' +
       '<ol class="landing__steps">' +
-      "<li><strong>Start now</strong> (or <strong>Browse categories</strong>) to open the category list.</li>" +
+      "<li><strong>Start now</strong> to open the category list.</li>" +
       "<li><strong>Select a category</strong> to open that topic and explore its KPIs.</li>" +
       "<li><strong>Refine results</strong> using filters — core filters on every page, plus extra filters on some categories where they add insight.</li>" +
-      "<li><strong>Review</strong> KPI tiles (with LM/LY comparisons), then charts, then the detail table for underlying rows.</li>" +
+      "<li><strong>Review KPI tiles</strong> (Vs % change), then charts, then the detail table for underlying rows.</li>" +
       "</ol>" +
-      '<h4 class="landing__guide-sub">What’s on each category screen</h4>' +
-      '<ul class="landing__guide-list">' +
-      "<li><strong>KPI summary tiles</strong> — current values with last month (LM) and last year (LY) % changes where available.</li>" +
+      "</div>" +
+      '<div class="landing__guide-col">' +
+      '<h4 id="guide-screen-h" class="landing__guide-sub landing__guide-sub--col">What’s on each category screen</h4>' +
+      '<ul class="landing__guide-list" aria-labelledby="guide-screen-h">' +
+      "<li><strong>KPI summary tiles</strong> — current values with the selected Versus comparison (% change with arrow).</li>" +
       "<li><strong>Charts</strong> — trend over time, by business, and unit mix for the filtered data.</li>" +
       "<li><strong>Detail data</strong> — sortable table; use column headers and pagination to scan rows.</li>" +
       "</ul>" +
-      '<h4 class="landing__guide-sub">Design intent: research, IA, and inclusive UX</h4>' +
-      '<p class="landing__guide-lede">This preview is built with a <strong>user-centered approach</strong> and <strong>user-centered design (UCD)</strong> — drawing on <strong>human–computer interaction (HCI)</strong> and <strong>customer experience (CX) design</strong> so the product stays understandable and trustworthy. We aim for strong <strong>usability</strong>, <strong>usefulness</strong>, <strong>desirability</strong>, and <strong>accessibility</strong> for every role.</p>' +
-      '<ul class="landing__guide-list landing__guide-list--compact">' +
-      "<li><strong>User research &amp; usability testing</strong> — Task-based review to spot confusion, validate flows, and capture feedback.</li>" +
-      "<li><strong>Information architecture (IA)</strong> — One clear path: Guide → Categories → explore KPIs in a fixed order (tiles, then charts, then detail).</li>" +
-      "<li><strong>Consistency &amp; hierarchy</strong> — Same header, filters, and content zones on each category screen so scanning is predictable.</li>" +
-      "<li><strong>Accessibility</strong> — Keyboard navigation (Tab, Enter, Space), visible focus, and live updates when filters change for assistive technologies.</li>" +
-      "<li><strong>Iterative process</strong> — This HTML preview supports cycles of review before the full Power BI experience.</li>" +
-      "</ul>" +
-      "</section>";
+      "</div></div></section>";
 
     root.innerHTML = "";
     root.appendChild(box);
     const start = document.getElementById("btn-start");
-    const browse = document.getElementById("btn-categories");
     function goCats() {
       history.replaceState(null, "", "#categories");
       renderCategories();
     }
     if (start) start.addEventListener("click", goCats);
-    if (browse) browse.addEventListener("click", goCats);
     const hh = document.getElementById("landing-h");
     if (hh) hh.focus();
-    announce(
-      "About this dashboard. Use Start now or Browse categories to continue."
-    );
+    announce("About this dashboard. Use Start now to continue.");
   }
 
   function renderCategories() {
@@ -1100,7 +1305,7 @@
       journeyStepsHtml(2) +
       '<div class="home-intro">' +
       '<h2 id="home-h">Categories</h2>' +
-      '<p class="home-lede">Select a category to explore safety KPIs across Adani group businesses. Use filters inside each category to refine insights. Use <strong>Guide</strong> in the header to return to the overview.</p>' +
+      '<p class="home-lede">In this shared preview, only <strong>Incident Management</strong> is interactive; other categories are shown for context. Open Incident Management to explore KPIs and filters. Use <strong>Home</strong> in the header to return to the overview.</p>' +
       '<div class="home-tools" role="search">' +
       '<label class="home-search-label" for="cat-q">Find category</label>' +
       '<input id="cat-q" class="home-search" type="search" placeholder="Type to filter (e.g., Incident, Training…)" autocomplete="off" />' +
@@ -1152,15 +1357,27 @@
       grid.setAttribute("role", "list");
       grid.setAttribute("aria-labelledby", "home-h");
       cats.forEach((cat) => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "category-card";
-        btn.setAttribute("role", "listitem");
-        btn.setAttribute(
+        const active = cat.categoryKey === ACTIVE_PREVIEW_CATEGORY_KEY;
+        const el = active
+          ? document.createElement("button")
+          : document.createElement("div");
+        if (active) el.type = "button";
+        el.className = "category-card" + (active ? "" : " category-card--disabled");
+        el.setAttribute("role", "listitem");
+        el.setAttribute(
           "aria-label",
-          cat.categoryName + ", " + cat.kpiCount + " KPIs"
+          active
+            ? cat.categoryName + ", " + cat.kpiCount + " KPIs"
+            : cat.categoryName +
+                ", " +
+                cat.kpiCount +
+                " KPIs. Not available in this preview; open Incident Management."
         );
-        btn.innerHTML =
+        if (!active) {
+          el.setAttribute("aria-disabled", "true");
+          el.setAttribute("tabindex", "-1");
+        }
+        el.innerHTML =
           '<span class="category-card__icon">' +
           categoryIconSvg(cat.categoryKey) +
           "</span>" +
@@ -1175,18 +1392,20 @@
           escapeHtml(cat.uxNote) +
           "</span>" +
           "</span>";
-        btn.addEventListener("click", () => {
-          history.replaceState({}, "", "#cat=" + cat.categoryKey);
-          renderCategory(cat.categoryKey);
-        });
-        btn.addEventListener("keydown", (e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
+        if (active) {
+          el.addEventListener("click", () => {
             history.replaceState({}, "", "#cat=" + cat.categoryKey);
             renderCategory(cat.categoryKey);
-          }
-        });
-        grid.appendChild(btn);
+          });
+          el.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              history.replaceState({}, "", "#cat=" + cat.categoryKey);
+              renderCategory(cat.categoryKey);
+            }
+          });
+        }
+        grid.appendChild(el);
       });
       scheduleCategorySearchAnnounce({
         count: cats.length,
