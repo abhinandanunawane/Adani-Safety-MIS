@@ -1,4 +1,5 @@
 # Regenerates embedded-data.json + embedded-data.js from PowerBI_Assets CSVs.
+# Uses hashtable grouping for O(n) aggregation (scales to large fact tables).
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $assets = Join-Path $root 'PowerBI_Assets'
@@ -8,7 +9,7 @@ $fact = Import-Csv (Join-Path $assets 'Fact_Safety_KPI_Monthly.csv')
 $kpi = Import-Csv (Join-Path $assets 'Dim_KPI.csv')
 $cat = Import-Csv (Join-Path $assets 'Dim_Category.csv')
 $biz = Import-Csv (Join-Path $assets 'Dim_Business.csv')
-$dates = Import-Csv (Join-Path $assets 'Dim_Date.csv') | Sort-Object DateKey
+$dates = Import-Csv (Join-Path $assets 'Dim_Date.csv') | Sort-Object { [int]$_.DateKey }
 
 $dateMap = @{}
 foreach ($d in $dates) { $dateMap[[int]$d.DateKey] = $d.YearMonth }
@@ -43,11 +44,37 @@ $joined = foreach ($f in $fact) {
 
 $lastDate = [int]($dates | Select-Object -Last 1).DateKey
 
-$catSummary = foreach ($c in ($cat | Sort-Object {[int]$_.SortOrder})) {
+# Group values by category + date for fast avg
+$valsByCatDate = @{}
+foreach ($row in $joined) {
+  $key = "$($row.CategoryKey)|$($row.DateKey)"
+  if (-not $valsByCatDate.ContainsKey($key)) {
+    $valsByCatDate[$key] = [System.Collections.Generic.List[double]]::new()
+  }
+  $valsByCatDate[$key].Add($row.Value)
+}
+
+# Group by category + date + business for biz breakdown
+$valsByCatDateBiz = @{}
+foreach ($row in $joined) {
+  $key = "$($row.CategoryKey)|$($row.DateKey)|$($row.BusinessKey)"
+  if (-not $valsByCatDateBiz.ContainsKey($key)) {
+    $valsByCatDateBiz[$key] = [System.Collections.Generic.List[double]]::new()
+  }
+  $valsByCatDateBiz[$key].Add($row.Value)
+}
+
+function Avg-List($list) {
+  if (-not $list -or $list.Count -eq 0) { return 0 }
+  ($list | Measure-Object -Average).Average
+}
+
+$catSummary = foreach ($c in ($cat | Sort-Object { [int]$_.SortOrder })) {
   $ck = [int]$c.CategoryKey
-  $subset = $joined | Where-Object { $_.CategoryKey -eq $ck -and $_.DateKey -eq $lastDate }
   $kpis = @($kpi | Where-Object { [int]$_.CategoryKey -eq $ck })
-  $avgVal = if ($subset.Count) { ($subset | Measure-Object -Property Value -Average).Average } else { 0 }
+  $kKey = "$ck|$lastDate"
+  $subset = if ($valsByCatDate.ContainsKey($kKey)) { $valsByCatDate[$kKey] } else { $null }
+  $avgVal = if ($subset) { Avg-List $subset } else { 0 }
   [PSCustomObject]@{
     categoryKey = $ck
     categoryName = $c.CategoryName
@@ -64,8 +91,9 @@ foreach ($c in $cat) {
   $points = @()
   foreach ($d in $dates) {
     $dk = [int]$d.DateKey
-    $sub = $joined | Where-Object { $_.CategoryKey -eq $ck -and $_.DateKey -eq $dk }
-    $avg = if ($sub.Count) { ($sub | Measure-Object -Property Value -Average).Average } else { 0 }
+    $kKey = "$ck|$dk"
+    $sub = if ($valsByCatDate.ContainsKey($kKey)) { $valsByCatDate[$kKey] } else { $null }
+    $avg = if ($sub) { Avg-List $sub } else { 0 }
     $points += [PSCustomObject]@{ yearMonth = $d.YearMonth; value = [math]::Round($avg, 2) }
   }
   $monthlyArr += [PSCustomObject]@{ categoryKey = $ck; series = $points }
@@ -77,11 +105,22 @@ foreach ($c in $cat) {
   $bars = @()
   foreach ($b in $biz) {
     $bk = [int]$b.BusinessKey
-    $sub = $joined | Where-Object { $_.CategoryKey -eq $ck -and $_.DateKey -eq $lastDate -and $_.BusinessKey -eq $bk }
-    $sum = if ($sub.Count) { ($sub | Measure-Object -Property Value -Sum).Sum } else { 0 }
+    $kKey = "$ck|$lastDate|$bk"
+    $sub = if ($valsByCatDateBiz.ContainsKey($kKey)) { $valsByCatDateBiz[$kKey] } else { $null }
+    $sum = if ($sub) { ($sub | Measure-Object -Sum).Sum } else { 0 }
     $bars += [PSCustomObject]@{ business = $b.BusinessName; value = [math]::Round($sum, 2) }
   }
   $bizArr += [PSCustomObject]@{ categoryKey = $ck; bars = $bars }
+}
+
+# KPI detail: group by KPI + last date
+$valsByKpiDate = @{}
+foreach ($row in $joined) {
+  $key = "$($row.KPIKey)|$($row.DateKey)"
+  if (-not $valsByKpiDate.ContainsKey($key)) {
+    $valsByKpiDate[$key] = [System.Collections.Generic.List[double]]::new()
+  }
+  $valsByKpiDate[$key].Add($row.Value)
 }
 
 $detailArr = @()
@@ -90,8 +129,9 @@ foreach ($c in $cat) {
   $rows = @()
   foreach ($k in ($kpi | Where-Object { [int]$_.CategoryKey -eq $ck })) {
     $kk = [int]$k.KPIKey
-    $vals = $joined | Where-Object { $_.KPIKey -eq $kk -and $_.DateKey -eq $lastDate }
-    $avg = if ($vals.Count) { ($vals | Measure-Object -Property Value -Average).Average } else { 0 }
+    $kKey = "$kk|$lastDate"
+    $vals = if ($valsByKpiDate.ContainsKey($kKey)) { $valsByKpiDate[$kKey] } else { $null }
+    $avg = if ($vals) { Avg-List $vals } else { 0 }
     $rows += [PSCustomObject]@{
       kpiKey = $kk
       kpiName = $k.KPI_Name
