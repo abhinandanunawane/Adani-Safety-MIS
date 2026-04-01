@@ -274,7 +274,14 @@ body {
 .viewport__main:has(.landing) {
   padding: 6px 8px 6px;
   overflow: hidden;
+  scrollbar-width: none;
   background: var(--landing-banner-bg);
+}
+
+.viewport__main:has(.landing)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .viewport__main:focus {
@@ -1574,7 +1581,7 @@ fieldset.cat-toolbar--compact .field-label {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
-  min-height: 180px;
+  min-height: 0;
   max-height: none;
   object-fit: contain;
   object-position: center center;
@@ -1585,38 +1592,48 @@ fieldset.cat-toolbar--compact .field-label {
   background: var(--landing-banner-bg);
 }
 
-/* Guide: two panels with icon rows — how to use | what’s on each category screen */
+/* Guide: two panels — no scrollbar; fits remaining height below hero (fixed shell) */
 .landing__guide {
-  flex: 1 1 auto;
-  min-height: 168px;
-  padding: 8px 8px 10px;
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 4px 6px 6px;
   border-radius: 0;
   border: none;
   background: transparent;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  scrollbar-width: none;
+}
+
+.landing__guide::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .landing__guide-grid {
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   align-items: stretch;
 }
 
 .landing__guide-panel {
   min-width: 0;
-  padding: 10px 10px 12px;
-  border-radius: 12px;
+  min-height: 0;
+  padding: 6px 7px 7px;
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
   background: linear-gradient(165deg, #ffffff 0%, #f8fafc 100%);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
+  overflow: hidden;
 }
 
 .landing__guide-panel--how {
@@ -1629,16 +1646,17 @@ fieldset.cat-toolbar--compact .field-label {
 
 .landing__guide-panel__title {
   margin: 0;
-  padding: 0 0 6px;
-  font-size: 0.74rem;
+  padding: 0 0 4px;
+  font-size: 0.64rem;
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.01em;
   border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+  flex: 0 0 auto;
 }
 
 .landing__guide-panel__title--sub {
-  font-size: 0.68rem;
+  font-size: 0.58rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: #475569;
@@ -1648,23 +1666,29 @@ fieldset.cat-toolbar--compact .field-label {
   list-style: none;
   margin: 0;
   padding: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
+  justify-content: flex-start;
 }
 
 .landing__guide-item {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 8px;
+  gap: 5px;
+  padding: 3px 5px;
+  border-radius: 6px;
   background: rgba(255, 255, 255, 0.7);
   border: 1px solid rgba(226, 232, 240, 0.9);
-  font-size: 0.62rem;
-  line-height: 1.35;
+  font-size: 0.54rem;
+  line-height: 1.2;
   color: #334155;
+  flex: 0 1 auto;
+  min-height: 0;
 }
 
 .landing__guide-panel--how .landing__guide-item:hover {
@@ -1679,14 +1703,19 @@ fieldset.cat-toolbar--compact .field-label {
 
 .landing__guide-icon {
   flex: 0 0 auto;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
   color: var(--brand-blue);
   background: rgba(0, 109, 182, 0.1);
-  border-radius: 6px;
+  border-radius: 5px;
+}
+
+.landing__guide-icon svg {
+  width: 14px;
+  height: 14px;
 }
 
 .landing__guide-panel--screen .landing__guide-icon {
