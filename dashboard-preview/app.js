@@ -102,22 +102,70 @@
     }
   }
 
-  /** What the headline KPI value represents for each Vs mode (monthly data uses rolling proxies). */
+  /** Legacy label for context text; headline values are monthly — see formatMonthYear + vsCompareShort. */
   function vsValuePeriodCaption(id) {
     switch (id) {
       case "vs_yesterday":
-        return "Today";
+        return "Latest month";
       case "vs_last_week":
-        return "This week";
+        return "Latest months (2 vs 2)";
       case "vs_last_month":
-        return "This month";
+        return "Latest month";
       case "vs_last_quarter":
-        return "This quarter";
+        return "Latest months (3 vs 3)";
       case "vs_last_year":
-        return "This year";
+        return "Latest month";
       default:
-        return "This month";
+        return "Latest month";
     }
+  }
+
+  function formatMonthYear(ym) {
+    if (!ym || ym.length < 7) return ym || "—";
+    const parts = ym.split("-");
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    if (Number.isNaN(y) || Number.isNaN(m)) return ym;
+    const d = new Date(y, m - 1, 1);
+    try {
+      return d.toLocaleString(undefined, { month: "short", year: "numeric" });
+    } catch {
+      return ym;
+    }
+  }
+
+  /** Honest comparison window for monthly facts (tiles + table Vs %). */
+  function vsCompareShort(mode) {
+    switch (mode) {
+      case "vs_last_month":
+      case "vs_yesterday":
+        return "vs prior month";
+      case "vs_last_year":
+        return "vs year-ago month";
+      case "vs_last_week":
+        return "2-mo avg vs prior 2-mo";
+      case "vs_last_quarter":
+        return "3-mo avg vs prior 3-mo";
+      default:
+        return "vs prior month";
+    }
+  }
+
+  function tilePeriodLine(refMonth, mode) {
+    return formatMonthYear(refMonth) + " · " + vsCompareShort(mode);
+  }
+
+  function countDistinctKpisInView(catKey, f) {
+    if (f.kpi !== "all") {
+      const pool = applyNonMonthFilters(getRowsForCategory(catKey), f);
+      const ok = pool.some(
+        (r) =>
+          r.yearMonth === f.refMonth && String(r.kpiKey) === String(f.kpi)
+      );
+      return ok ? 1 : 0;
+    }
+    const rows = applyRowFilter(getRowsForCategory(catKey), f);
+    return new Set(rows.map((r) => r.kpiKey)).size;
   }
 
   /** IA: visible journey — aligns with header nav (Home / Categories); no duplicate controls. */
@@ -465,7 +513,10 @@
   }
 
   function buildKpiDetailMetrics(catKey, kpisMeta, f) {
-    const sorted = sortKpisForDisplay(catKey, kpisMeta);
+    let sorted = sortKpisForDisplay(catKey, kpisMeta);
+    if (f.kpi !== "all") {
+      sorted = sorted.filter((k) => String(k.kpiKey) === String(f.kpi));
+    }
     const base = applyNonMonthFilters(getRowsForCategory(catKey), f);
     const ref = f.refMonth;
     const mode = f.vsMode || DEFAULT_VS_MODE;
@@ -550,9 +601,10 @@
     return "—";
   }
 
-  function renderMultiKpiCards(container, aggregatesList) {
+  function renderMultiKpiCards(container, aggregatesList, refMonth, vsMode) {
     container.innerHTML = "";
     const chunks = chunkArray(aggregatesList, 4);
+    const periodLine = tilePeriodLine(refMonth, vsMode || DEFAULT_VS_MODE);
     chunks.forEach((chunk, idx) => {
       const card = document.createElement("div");
       card.className = "multi-kpi-card";
@@ -574,13 +626,12 @@
         const vDir = item.vsDir || "neutral";
         const vsLbl = vsOptionLabel(item.vsMode);
         const vsShort = vsTagShort(item.vsMode);
-        const periodCap = vsValuePeriodCaption(item.vsMode);
         tile.setAttribute(
           "aria-label",
           item.kpiName +
-            ". Value " +
-            periodCap +
-            ": " +
+            ". Data " +
+            periodLine +
+            ". Value: " +
             formatValue(item.value, item.unitType) +
             ". " +
             vsLbl +
@@ -601,7 +652,7 @@
           escapeHtml(item.unitType) +
           "</div>" +
           '<div class="multi-kpi-tile__period">' +
-          escapeHtml(periodCap) +
+          escapeHtml(periodLine) +
           "</div>" +
           '<div class="multi-kpi-tile__cmp multi-kpi-tile__cmp--vs">' +
           '<span class="multi-kpi-tile__cmp-tag multi-kpi-tile__cmp-tag--short">' +
@@ -631,11 +682,19 @@
     });
   }
 
-  function buildCharts(filteredRows) {
+  /**
+   * Trend: last 12 months (filtered). By business + unit mix: reference month only so counts match the detail table.
+   */
+  function buildCharts(catKey, f) {
     destroyCharts();
 
+    const poolAll = getRowsForCategory(catKey);
+    const filteredTrend = applyChartFilter(poolAll, f);
+    const snapPool = applyNonMonthFilters(poolAll, f);
+    const snapRows = snapPool.filter((r) => r.yearMonth === f.refMonth);
+
     const byMonth = {};
-    filteredRows.forEach((r) => {
+    filteredTrend.forEach((r) => {
       if (!byMonth[r.yearMonth]) byMonth[r.yearMonth] = [];
       byMonth[r.yearMonth].push(r.value);
     });
@@ -643,19 +702,27 @@
     const lineLabels = monthKeys;
     const lineData = monthKeys.map((m) => avg(byMonth[m]));
 
-    const byBiz = {};
-    filteredRows.forEach((r) => {
-      byBiz[r.businessName] = (byBiz[r.businessName] || 0) + r.value;
+    const byBizVals = {};
+    snapRows.forEach((r) => {
+      const b = r.businessName || "—";
+      if (!byBizVals[b]) byBizVals[b] = [];
+      byBizVals[b].push(Number(r.value));
     });
-    const bizLabels = Object.keys(byBiz);
-    const bizData = bizLabels.map((b) => byBiz[b]);
+    const bizLabels = Object.keys(byBizVals);
+    const bizData = bizLabels.map((b) => avg(byBizVals[b]));
 
-    const unitCount = {};
-    filteredRows.forEach((r) => {
-      unitCount[r.unitType] = (unitCount[r.unitType] || 0) + 1;
+    const unitMap = {};
+    snapRows.forEach((r) => {
+      const u = r.unitType || "—";
+      if (f.kpi === "all") {
+        unitMap[u] = (unitMap[u] || 0) + 1;
+      } else {
+        const v = Number(r.value);
+        unitMap[u] = (unitMap[u] || 0) + (Number.isFinite(v) ? v : 0);
+      }
     });
-    const unitLabels = Object.keys(unitCount);
-    const unitData = unitLabels.map((u) => unitCount[u]);
+    const unitLabels = Object.keys(unitMap);
+    const unitData = unitLabels.map((u) => unitMap[u]);
 
     const elLine = document.getElementById("chart-line");
     if (elLine && lineLabels.length) {
@@ -972,12 +1039,21 @@
     const f = readFilters(catKey);
     if (!f) return;
     const n = applyRowFilter(getRowsForCategory(catKey), f).length;
+    const kpiN = countDistinctKpisInView(catKey, f);
+    const kpisMeta = getKpis(catKey);
+    const totalK = kpisMeta.length;
     const cat = getCategory(catKey);
     const label = cat ? cat.categoryName + ". " : "";
     announce(
       label +
+        kpiN +
+        " of " +
+        totalK +
+        " KPIs in view. " +
         n +
-        " rows match filters. Sort with column headers; Prev and Next move pages."
+        " detail rows for " +
+        formatMonthYear(f.refMonth) +
+        ". Sort with column headers; Prev and Next move pages."
     );
   }
 
@@ -986,8 +1062,19 @@
     const f = readFilters(catKey);
     if (!f) return;
 
-    const filtered = applyChartFilter(getRowsForCategory(catKey), f);
     const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
+    const inView = countDistinctKpisInView(catKey, f);
+
+    const metaKpi = document.getElementById("cat-kpi-meta");
+    if (metaKpi) {
+      metaKpi.textContent =
+        " · " +
+        inView +
+        " of " +
+        kpisMeta.length +
+        " KPIs in view · " +
+        formatMonthYear(f.refMonth);
+    }
 
     const multiWrap = document.getElementById("multi-kpi-wrap");
     if (multiWrap) {
@@ -995,11 +1082,11 @@
         multiWrap.innerHTML =
           '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Clear filters or choose All KPIs.</div>';
       } else {
-        renderMultiKpiCards(multiWrap, aggList);
+        renderMultiKpiCards(multiWrap, aggList, f.refMonth, f.vsMode);
       }
     }
 
-    buildCharts(filtered);
+    buildCharts(catKey, f);
     renderTableBody(catKey);
 
     const cat = getCategory(catKey);
@@ -1007,13 +1094,13 @@
     if (ctx && cat) {
       ctx.innerHTML =
         escapeHtml(cat.uxNote) +
-        '<br /><span class="cat-context__meta">Reference month <strong>' +
-        escapeHtml(f.refMonth) +
-        "</strong> · KPI value is <strong>" +
-        escapeHtml(vsValuePeriodCaption(f.vsMode)) +
-        "</strong> · <strong>" +
+        '<br /><span class="cat-context__meta">Detail table and business/unit charts use <strong>' +
+        escapeHtml(formatMonthYear(f.refMonth)) +
+        "</strong>. Trend uses the last 12 months. Vs % uses <strong>" +
+        escapeHtml(vsCompareShort(f.vsMode)) +
+        "</strong> on monthly data (<strong>" +
         escapeHtml(vsOptionLabel(f.vsMode)) +
-        "</strong> (monthly facts; shorter “Vs” options use rolling months).</span>";
+        "</strong>).</span>";
     }
 
     announceFilterSummary(catKey);
@@ -1148,12 +1235,13 @@
       '<ol><li><a href="#categories" id="bc-cats">Categories</a></li><li aria-current="page">' +
       '<h2 class="cat-heading" id="cat-heading" tabindex="-1">' +
       escapeHtml(cat.categoryName) +
+      '<span class="cat-kpi-meta" id="cat-kpi-meta" aria-live="polite"></span>' +
       "</h2></li></ol></nav>" +
       "</div></div>" +
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, Versus comparison, state, business, or unit when shown. Values use the latest data month; charts show the last twelve months.</p>' +
+      '<p id="filter-hint" class="visually-hidden">Narrow by KPI, Versus comparison, state, business, or unit when shown. KPI count and tiles follow your filters. Trend chart uses twelve months; business and unit charts match the reference month with the detail table.</p>' +
       coreFields +
       '<div class="toolbar-actions">' +
       '<button type="button" class="btn" id="f-reset">Reset</button>' +
@@ -1164,9 +1252,9 @@
       '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
       "</fieldset>" +
       '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
-      '<div class="chart-box"><h3>Trend</h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: average value by month for filtered data"></canvas></div></div>' +
-      '<div class="chart-box chart-box--biz"><h3>By business</h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><div id="chart-biz-breakdown" class="chart-biz-breakdown" role="list" aria-label="Sum of values by business for filtered data, highest first"></div></div></div>' +
-      '<div class="chart-box"><h3>Unit mix</h3><div class="chart-canvas-wrap"><canvas id="chart-doughnut" role="img" aria-label="Doughnut chart: row counts by unit type"></canvas></div></div>' +
+      '<div class="chart-box"><h3>Trend <span class="chart-box__hint">(12 months)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for filtered KPIs, last twelve months"></canvas></div></div>' +
+      '<div class="chart-box chart-box--biz"><h3>By business <span class="chart-box__hint">(reference month)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><div id="chart-biz-breakdown" class="chart-biz-breakdown" role="list" aria-label="Average value by business for the reference month and current filters"></div></div></div>' +
+      '<div class="chart-box"><h3>Unit mix <span class="chart-box__hint">(reference month)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-doughnut" role="img" aria-label="Unit mix for the reference month: row counts if all KPIs, else summed values for the selected KPI"></canvas></div></div>' +
       "</div>" +
       '<div class="table-zone">' +
       '<div class="table-zone__head"><span>Detail data</span>' +

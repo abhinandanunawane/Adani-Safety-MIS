@@ -823,16 +823,24 @@ fieldset.cat-toolbar--compact .field-label {
   line-height: 1.2;
 }
 
+.cat-kpi-meta {
+  display: inline;
+  font-weight: 600;
+  font-size: 0.58rem;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
 .cat-context {
   margin: 0;
   padding: 0 2px;
   font-size: 0.58rem;
   color: var(--text-muted);
   line-height: 1.28;
-  max-height: 1.35rem;
+  max-height: 3rem;
   overflow: hidden;
   display: -webkit-box;
-  -webkit-line-clamp: 1;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   flex: 0 0 auto;
 }
@@ -1093,6 +1101,14 @@ fieldset.cat-toolbar--compact .field-label {
   letter-spacing: 0.03em;
   flex-shrink: 0;
   line-height: 1.1;
+}
+
+.chart-box__hint {
+  font-weight: 600;
+  font-size: 0.48rem;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
 }
 
 .chart-canvas-wrap {
