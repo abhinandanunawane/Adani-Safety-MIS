@@ -317,6 +317,60 @@
     }
   }
 
+  /** Icons for landing “How to use” / category screen guide. */
+  function guideIconSvg(kind) {
+    const svg = (paths) =>
+      '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      paths +
+      "</svg>";
+    switch (kind) {
+      case "play":
+        return svg(
+          '<circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/>'
+        );
+      case "grid":
+        return svg(
+          '<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>'
+        );
+      case "filter":
+        return svg(
+          '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>'
+        );
+      case "layers":
+        return svg(
+          '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'
+        );
+      case "tiles":
+        return svg(
+          '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="11" width="7" height="10" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/>'
+        );
+      case "chart":
+        return svg(
+          '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>'
+        );
+      case "table":
+        return svg(
+          '<path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>'
+        );
+      default:
+        return svg('<circle cx="12" cy="12" r="10"/>');
+    }
+  }
+
+  function landingGuideRow(iconKind, strongText, restSentence) {
+    return (
+      '<li class="landing__guide-item">' +
+      '<span class="landing__guide-icon">' +
+      guideIconSvg(iconKind) +
+      "</span>" +
+      '<span class="landing__guide-item__body"><strong>' +
+      escapeHtml(strongText) +
+      "</strong> " +
+      escapeHtml(restSentence) +
+      "</span></li>"
+    );
+  }
+
   function formatValue(v, unitType) {
     if (v == null || v === "") return "—";
     const n = Number(v);
@@ -1434,21 +1488,49 @@
       "</div>" +
       '<section class="landing__guide" aria-labelledby="guide-h">' +
       '<div class="landing__guide-grid">' +
-      '<div class="landing__guide-col">' +
-      '<h3 id="guide-h" class="landing__guide-title">How to use this dashboard</h3>' +
-      '<ol class="landing__steps">' +
-      "<li><strong>Start now</strong> to open the category list.</li>" +
-      "<li><strong>Select a category</strong> to open that topic and explore its KPIs.</li>" +
-      "<li><strong>Refine results</strong> using filters — core filters on every page, plus extra filters on some categories where they add insight.</li>" +
-      "<li><strong>Review KPI tiles</strong> (Vs % change), then charts, then the detail table for underlying rows.</li>" +
-      "</ol>" +
+      '<div class="landing__guide-panel landing__guide-panel--how">' +
+      '<h3 id="guide-h" class="landing__guide-panel__title">How to use this dashboard</h3>' +
+      '<ul class="landing__guide-items">' +
+      landingGuideRow(
+        "play",
+        "Start now",
+        "to open the category list."
+      ) +
+      landingGuideRow(
+        "grid",
+        "Select a category",
+        "to open that topic and explore its KPIs."
+      ) +
+      landingGuideRow(
+        "filter",
+        "Refine results",
+        "using filters — core filters on every page, plus extra filters on some categories where they add insight."
+      ) +
+      landingGuideRow(
+        "layers",
+        "Review KPI tiles",
+        "(Vs % change), then charts, then the detail table for underlying rows."
+      ) +
+      "</ul>" +
       "</div>" +
-      '<div class="landing__guide-col">' +
-      '<h4 id="guide-screen-h" class="landing__guide-sub landing__guide-sub--col">What’s on each category screen</h4>' +
-      '<ul class="landing__guide-list" aria-labelledby="guide-screen-h">' +
-      "<li><strong>KPI summary tiles</strong> — current values with the selected Versus comparison (% change with arrow).</li>" +
-      "<li><strong>Charts</strong> — trend over time, by business, and unit mix for the filtered data.</li>" +
-      "<li><strong>Detail data</strong> — sortable table; use column headers and pagination to scan rows.</li>" +
+      '<div class="landing__guide-panel landing__guide-panel--screen">' +
+      '<h4 id="guide-screen-h" class="landing__guide-panel__title landing__guide-panel__title--sub">What’s on each category screen</h4>' +
+      '<ul class="landing__guide-items" aria-labelledby="guide-screen-h">' +
+      landingGuideRow(
+        "tiles",
+        "KPI summary tiles",
+        "— current values with the selected Versus comparison (% change with arrow)."
+      ) +
+      landingGuideRow(
+        "chart",
+        "Charts",
+        "— trend over time, by business, and unit mix for the filtered data."
+      ) +
+      landingGuideRow(
+        "table",
+        "Detail data",
+        "— sortable table; use column headers and pagination to scan rows."
+      ) +
       "</ul>" +
       "</div></div></section>";
 
