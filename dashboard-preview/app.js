@@ -1072,27 +1072,33 @@
 
     const rowMain = document.createElement("div");
     rowMain.className = "multi-kpi-row";
-    const chunks = chunkArray(headItems, 4);
-    chunks.forEach((chunk, idx) => {
+
+    function appendMetricCard(startMetric, items, useTailStyle) {
+      if (!items.length) return;
       const card = document.createElement("div");
-      card.className = "multi-kpi-card";
+      card.className = useTailStyle
+        ? "multi-kpi-card multi-kpi-card--tail"
+        : "multi-kpi-card";
       const head = document.createElement("div");
-      head.className = "multi-kpi-card__head";
-      const start = idx * 4 + 1;
-      const end = idx * 4 + chunk.length;
-      if (chunk.length === 1) {
-        head.textContent = "Metric " + start;
-      } else {
-        head.textContent = "Metrics " + start + "–" + end;
-      }
+      head.className = useTailStyle
+        ? "multi-kpi-card__head multi-kpi-card__head--tail"
+        : "multi-kpi-card__head";
+      const endMetric = startMetric + items.length - 1;
+      head.textContent =
+        items.length === 1
+          ? "Metric " + startMetric
+          : "Metrics " + startMetric + "–" + endMetric;
       const grid = document.createElement("div");
       grid.className = "multi-kpi-card__grid";
-      chunk.forEach((item) => {
-        appendKpiTileEl(grid, item, refMonth, vsMode, "multi-kpi-tile");
+      const tileClass = useTailStyle
+        ? "multi-kpi-tile multi-kpi-tile--tail"
+        : "multi-kpi-tile";
+      items.forEach((item) => {
+        appendKpiTileEl(grid, item, refMonth, vsMode, tileClass);
       });
       while (grid.children.length < 4) {
         const ph = document.createElement("div");
-        ph.className = "multi-kpi-tile";
+        ph.className = tileClass;
         ph.style.visibility = "hidden";
         ph.innerHTML = "&nbsp;";
         grid.appendChild(ph);
@@ -1100,30 +1106,20 @@
       card.appendChild(head);
       card.appendChild(grid);
       rowMain.appendChild(card);
+    }
+
+    const chunks = chunkArray(headItems, 4);
+    chunks.forEach((chunk, idx) => {
+      appendMetricCard(idx * 4 + 1, chunk, false);
     });
-    if (tailItems.length) {
-      const card = document.createElement("div");
-      card.className = "multi-kpi-card multi-kpi-card--tail";
-      const head = document.createElement("div");
-      head.className = "multi-kpi-card__head multi-kpi-card__head--tail";
-      const t0 = 13;
-      const t1 = 12 + tailItems.length;
-      head.textContent =
-        tailItems.length === 1 ? "Metric " + t0 : "Metrics " + t0 + "–" + t1;
-      const grid = document.createElement("div");
-      grid.className = "multi-kpi-card__grid multi-kpi-card__grid--tail";
-      tailItems.forEach((item) => {
-        appendKpiTileEl(
-          grid,
-          item,
-          refMonth,
-          vsMode,
-          "multi-kpi-tile multi-kpi-tile--tail"
-        );
-      });
-      card.appendChild(head);
-      card.appendChild(grid);
-      rowMain.appendChild(card);
+
+    const tailA = tailItems.slice(0, 4);
+    const tailB = tailItems.slice(4);
+    if (tailA.length) {
+      appendMetricCard(13, tailA, true);
+    }
+    if (tailB.length) {
+      appendMetricCard(13 + tailA.length, tailB, true);
     }
 
     container.appendChild(rowMain);

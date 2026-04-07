@@ -1593,13 +1593,13 @@ fieldset.cat-toolbar--compact .field-label {
   width: 100%;
   display: flex;
   flex-direction: row;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: var(--cat-section-gap);
   align-items: stretch;
-  overflow: hidden;
+  overflow: visible;
 }
 
-/* Tail card (metrics 13–17) sits in same row as 9–12 */
+/* Tail bands (Metrics 13–16, Metrics 17) share the same row as 1–12 */
 .multi-kpi-row .multi-kpi-card--tail {
   flex: 1 1 0;
   min-width: 0;
@@ -1639,7 +1639,7 @@ fieldset.cat-toolbar--compact .field-label {
   min-width: 0;
 }
 
-/* Metrics 13–17: single band, horizontal strip of compact tiles */
+/* Metrics 13–16 and 17+: same 2×2 grid as other cards; distinct chrome */
 .multi-kpi-card--tail {
   border: 1px solid rgba(0, 109, 182, 0.35);
   border-radius: 10px;
@@ -1656,15 +1656,6 @@ fieldset.cat-toolbar--compact .field-label {
   border-bottom-color: rgba(0, 109, 182, 0.22);
   font-size: 0.56rem;
   letter-spacing: 0.06em;
-}
-
-.multi-kpi-card__grid--tail {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  grid-template-rows: 1fr;
-  gap: 4px;
-  min-height: 0;
-  align-content: stretch;
 }
 
 .multi-kpi-tile--tail {
@@ -1693,13 +1684,6 @@ fieldset.cat-toolbar--compact .field-label {
 .multi-kpi-tile--tail .multi-kpi-tile__period,
 .multi-kpi-tile--tail .multi-kpi-tile__unit {
   font-size: 0.44rem;
-}
-
-@media (max-width: 1180px) {
-  .multi-kpi-card__grid--tail {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    grid-template-rows: auto auto;
-  }
 }
 
 .multi-kpi-tile {
