@@ -1073,16 +1073,12 @@
     const rowMain = document.createElement("div");
     rowMain.className = "multi-kpi-row";
 
-    function appendMetricCard(startMetric, items, useTailStyle) {
+    function appendMetricCard(startMetric, items) {
       if (!items.length) return;
       const card = document.createElement("div");
-      card.className = useTailStyle
-        ? "multi-kpi-card multi-kpi-card--tail"
-        : "multi-kpi-card";
+      card.className = "multi-kpi-card";
       const head = document.createElement("div");
-      head.className = useTailStyle
-        ? "multi-kpi-card__head multi-kpi-card__head--tail"
-        : "multi-kpi-card__head";
+      head.className = "multi-kpi-card__head";
       const endMetric = startMetric + items.length - 1;
       head.textContent =
         items.length === 1
@@ -1090,15 +1086,12 @@
           : "Metrics " + startMetric + "–" + endMetric;
       const grid = document.createElement("div");
       grid.className = "multi-kpi-card__grid";
-      const tileClass = useTailStyle
-        ? "multi-kpi-tile multi-kpi-tile--tail"
-        : "multi-kpi-tile";
       items.forEach((item) => {
-        appendKpiTileEl(grid, item, refMonth, vsMode, tileClass);
+        appendKpiTileEl(grid, item, refMonth, vsMode, "multi-kpi-tile");
       });
       while (grid.children.length < 4) {
         const ph = document.createElement("div");
-        ph.className = tileClass;
+        ph.className = "multi-kpi-tile";
         ph.style.visibility = "hidden";
         ph.innerHTML = "&nbsp;";
         grid.appendChild(ph);
@@ -1110,16 +1103,16 @@
 
     const chunks = chunkArray(headItems, 4);
     chunks.forEach((chunk, idx) => {
-      appendMetricCard(idx * 4 + 1, chunk, false);
+      appendMetricCard(idx * 4 + 1, chunk);
     });
 
     const tailA = tailItems.slice(0, 4);
     const tailB = tailItems.slice(4);
     if (tailA.length) {
-      appendMetricCard(13, tailA, true);
+      appendMetricCard(13, tailA);
     }
     if (tailB.length) {
-      appendMetricCard(13 + tailA.length, tailB, true);
+      appendMetricCard(13 + tailA.length, tailB);
     }
 
     container.appendChild(rowMain);

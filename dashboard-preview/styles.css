@@ -1599,13 +1599,6 @@ fieldset.cat-toolbar--compact .field-label {
   overflow: visible;
 }
 
-/* Tail bands (Metrics 13–16, Metrics 17) share the same row as 1–12 */
-.multi-kpi-row .multi-kpi-card--tail {
-  flex: 1 1 0;
-  min-width: 0;
-  max-width: none;
-}
-
 .multi-kpi-card {
   flex: 1 1 0;
   min-width: 0;
@@ -1637,53 +1630,6 @@ fieldset.cat-toolbar--compact .field-label {
   gap: 5px;
   min-height: 72px;
   min-width: 0;
-}
-
-/* Metrics 13–16 and 17+: same 2×2 grid as other cards; distinct chrome */
-.multi-kpi-card--tail {
-  border: 1px solid rgba(0, 109, 182, 0.35);
-  border-radius: 10px;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 109, 182, 0.07) 0%,
-    var(--bg-card) 48%
-  );
-  box-shadow: 0 2px 10px rgba(0, 109, 182, 0.08);
-}
-
-.multi-kpi-card__head--tail {
-  color: var(--brand-blue);
-  border-bottom-color: rgba(0, 109, 182, 0.22);
-  font-size: 0.56rem;
-  letter-spacing: 0.06em;
-}
-
-.multi-kpi-tile--tail {
-  border-left: 3px solid var(--brand-purple);
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.98),
-    rgba(142, 39, 143, 0.06)
-  );
-  padding: 4px 3px 4px 5px;
-  min-height: 0;
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(142, 39, 143, 0.12);
-}
-
-.multi-kpi-tile--tail .multi-kpi-tile__name {
-  font-size: 0.48rem;
-  line-height: 1.15;
-  -webkit-line-clamp: 3;
-}
-
-.multi-kpi-tile--tail .multi-kpi-tile__val {
-  font-size: 0.52rem;
-}
-
-.multi-kpi-tile--tail .multi-kpi-tile__period,
-.multi-kpi-tile--tail .multi-kpi-tile__unit {
-  font-size: 0.44rem;
 }
 
 .multi-kpi-tile {
