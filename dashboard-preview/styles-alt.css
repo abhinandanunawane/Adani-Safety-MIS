@@ -1372,6 +1372,11 @@ button.m2-cat-row {
   min-width: 5.5rem;
 }
 
+.m2-kpi-scope[open] {
+  background: #ffffff;
+  box-shadow: 0 2px 14px rgba(0, 109, 182, 0.14);
+}
+
 .m2-kpi-scope__summary {
   list-style: none;
   cursor: pointer;
@@ -1411,16 +1416,15 @@ button.m2-cat-row {
   min-width: min(300px, calc(100vw - 20px));
   max-width: min(420px, calc(100vw - 16px));
   max-height: min(52vh, 320px);
-  z-index: 50;
-  background: linear-gradient(
-    180deg,
-    #ffffff 0%,
-    rgba(0, 177, 107, 0.06) 40%,
-    rgba(0, 109, 182, 0.08) 100%
-  );
-  border: 1px solid rgba(0, 109, 182, 0.28);
+  z-index: 80;
+  /* Opaque surface so the panel never visually merges with the toolbar / page */
+  background: #ffffff;
+  border: 2px solid rgba(0, 109, 182, 0.5);
   border-radius: 10px;
-  box-shadow: var(--m2-sh-deep);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 1),
+    0 4px 14px rgba(0, 109, 182, 0.12),
+    0 18px 48px rgba(15, 23, 42, 0.16);
   display: flex;
   flex-direction: column;
 }
@@ -1428,9 +1432,11 @@ button.m2-cat-row {
 .m2-kpi-panel__bar {
   display: flex;
   gap: 5px;
-  padding: 5px 8px 3px;
+  padding: 6px 8px 5px;
   flex-shrink: 0;
-  border-bottom: 1px solid rgba(0, 109, 182, 0.1);
+  background: #f1f5f9;
+  border-bottom: 1px solid rgba(0, 109, 182, 0.2);
+  border-radius: 8px 8px 0 0;
 }
 
 .m2-btn--tiny {
@@ -1453,9 +1459,12 @@ button.m2-cat-row {
   overflow-x: hidden;
   overflow-y: auto;
   padding: 6px 8px 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  align-content: start;
+  background: #ffffff;
+  border-radius: 0 0 8px 8px;
   scrollbar-width: thin;
 }
 
@@ -1480,11 +1489,12 @@ button.m2-cat-row {
 .m2-kpi-cb {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  font-size: 0.54rem;
-  line-height: 1.35;
+  gap: 6px;
+  min-width: 0;
+  font-size: 0.52rem;
+  line-height: 1.3;
   cursor: pointer;
-  padding: 2px 0;
+  padding: 3px 4px;
   border-radius: 6px;
 }
 
