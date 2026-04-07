@@ -2,15 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Adani Safety MIS — Dashboard Preview · User research &amp; IA</title>
+    <title>Adani Safety MIS — Insights</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Adani Safety MIS — Dashboard Preview for Power BI: Home → Categories → KPIs, filters, charts, and detail table. Fixed 1280×720. Sample data."
+      content="Adani Safety MIS — Insights preview for Power BI: domains, filters, KPI tiles, charts, and detail table. Fixed 1280×720. Sample data."
     />
     <meta name="theme-color" content="#006db6" />
+    <!-- Brand palette: #00B16B #006DB6 #8E278F #F04C23 · header gradient in styles-alt.css -->
     <meta name="color-scheme" content="light" />
-    <!-- Critical: header always paints even if styles.css is blocked or 404 -->
+    <link rel="canonical" href="insights.html" />
     <style>
       .top-header {
         display: flex !important;
@@ -20,8 +21,6 @@
         min-height: 52px;
         height: 52px;
         padding: 0 14px 0 0;
-        background: #006db6;
-        color: #ffffff;
       }
       .top-header__logo-wrap {
         display: flex;
@@ -52,12 +51,13 @@
     </style>
     <link rel="stylesheet" href="adani-fonts.css?v=20260452" />
     <link rel="stylesheet" href="styles.css?v=20260485" />
+    <link rel="stylesheet" href="styles-alt.css?v=20260485" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   </head>
   <body>
     <a class="skip-link" href="#app-root">Skip to main content</a>
 
-    <div class="shell" data-app-shell>
+    <div class="shell shell--modern" data-app-shell data-layout="insights">
       <header class="top-header" role="banner">
         <div class="top-header__logo-wrap">
           <img
@@ -71,9 +71,7 @@
         </div>
         <div class="top-header__titles">
           <h1>Adani Safety MIS</h1>
-          <p class="top-header__subtitle">
-            Group Safety KPI · User research, IA, usability &amp; accessibility review
-          </p>
+          <p class="top-header__subtitle">Insights · KPI exploration</p>
         </div>
         <div class="top-header__meta">
           <nav class="top-header__nav" aria-label="Primary">
@@ -90,15 +88,15 @@
 
       <main
         id="app-root"
-        class="viewport__main"
+        class="viewport__main viewport__main--modern"
         role="main"
         tabindex="-1"
-        aria-label="Adani Safety MIS: user research, information architecture, usability testing, accessibility, consistency, user-centered design, UCD, HCI, CX design—usability, desirability, usefulness"
+        aria-label="Adani Safety MIS Insights: safety KPI exploration and detail data"
       ></main>
 
       <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
         <p class="app-footer__text">
-          <strong>Disclaimer:</strong> Sample data for user research, IA, usability testing, accessibility review, and iterative UX validation—not operational reporting. Confirm all figures in your governed Power BI workspace.
+          <strong>Disclaimer:</strong> Sample data for preview—not operational reporting. Confirm figures in your governed Power BI workspace.
         </p>
       </footer>
     </div>
@@ -117,6 +115,6 @@
       crossorigin="anonymous"
     ></script>
     <script defer src="embedded-data.js?v=20260412"></script>
-    <script defer src="app.js?v=20260485"></script>
+    <script defer src="app-modern.js?v=20260485"></script>
   </body>
 </html>

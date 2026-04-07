@@ -1,0 +1,43 @@
+/* Adani corporate typeface — same family as https://www.adani.com/ (bundle.css). Local woff2 only. */
+@font-face {
+  font-family: Adani;
+  src: url("assets/fonts/adani/Adani-ExtraLight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Adani;
+  src: url("assets/fonts/adani/Adani-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Adani;
+  src: url("assets/fonts/adani/Adani-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Adani;
+  src: url("assets/fonts/adani/Adani-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Adani;
+  src: url("assets/fonts/adani/Adani-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: Adani;
+  src: url("assets/fonts/adani/Adani-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
