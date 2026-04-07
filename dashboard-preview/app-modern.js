@@ -1199,6 +1199,23 @@
     });
   }
 
+  function chunkArray(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) {
+      out.push(arr.slice(i, i + size));
+    }
+    return out;
+  }
+
+  function appendM2KpiPlaceholder(board) {
+    const ph = document.createElement("div");
+    ph.className = "m2-kpi-tile m2-kpi-tile--card";
+    ph.style.visibility = "hidden";
+    ph.innerHTML = "&nbsp;";
+    ph.setAttribute("aria-hidden", "true");
+    board.appendChild(ph);
+  }
+
   function appendM2KpiTile(board, item, refMonth, vsMode, extraClass) {
     const tile = document.createElement("div");
     const vDir = item.vsDir || "neutral";
@@ -1270,48 +1287,59 @@
   function renderMultiKpiCards(container, aggregatesList, refMonth, vsMode) {
     container.innerHTML = "";
     const sorted = sortKpiTilesForDisplay(aggregatesList);
-    const headItems = sorted.slice(0, 12);
-    const tailItems = sorted.slice(12);
+    if (!sorted.length) return;
 
     const row = document.createElement("div");
     row.className = "m2-kpi-metrics-row";
-
-    const grid = document.createElement("div");
-    grid.className = "m2-kpi-board";
-    grid.setAttribute("role", "list");
-    grid.setAttribute(
+    row.setAttribute("role", "group");
+    row.setAttribute(
       "aria-label",
       "KPI metrics for the KPIs selected in KPI scope"
     );
-    headItems.forEach((item) => {
-      appendM2KpiTile(grid, item, refMonth, vsMode, "");
-    });
-    row.appendChild(grid);
 
-    if (tailItems.length) {
-      const tailSection = document.createElement("div");
-      tailSection.className = "m2-kpi-tail m2-kpi-tail--inline";
-      const tailLbl = document.createElement("div");
-      tailLbl.className = "m2-kpi-tail__label";
-      const t0 = 13;
-      const t1 = 12 + tailItems.length;
-      tailLbl.textContent =
-        tailItems.length === 1 ? "Metric " + t0 : "Metrics " + t0 + "–" + t1;
-      const tailBoard = document.createElement("div");
-      tailBoard.className = "m2-kpi-board m2-kpi-board--tail";
-      tailBoard.setAttribute("role", "list");
-      tailItems.forEach((item) => {
-        appendM2KpiTile(
-          tailBoard,
-          item,
-          refMonth,
-          vsMode,
-          "m2-kpi-tile--tail"
-        );
+    function appendMetricCardBlock(startMetric, items, cardMod) {
+      if (!items.length) return;
+      const card = document.createElement("section");
+      card.className =
+        "m2-kpi-metric-card" +
+        (cardMod ? " " + cardMod : "") +
+        (startMetric >= 13 ? " m2-kpi-metric-card--tail" : "");
+      const head = document.createElement("div");
+      head.className = "m2-kpi-metric-card__head";
+      const endMetric = startMetric + items.length - 1;
+      head.textContent =
+        items.length === 1
+          ? "Metric " + startMetric
+          : "Metrics " + startMetric + "–" + endMetric;
+      const grid = document.createElement("div");
+      grid.className = "m2-kpi-board m2-kpi-board--quad";
+      grid.setAttribute("role", "list");
+      const tailTile = startMetric >= 13 ? "m2-kpi-tile--tail" : "";
+      items.forEach((item) => {
+        appendM2KpiTile(grid, item, refMonth, vsMode, tailTile);
       });
-      tailSection.appendChild(tailLbl);
-      tailSection.appendChild(tailBoard);
-      row.appendChild(tailSection);
+      while (grid.children.length < 4) {
+        appendM2KpiPlaceholder(grid);
+      }
+      card.appendChild(head);
+      card.appendChild(grid);
+      row.appendChild(card);
+    }
+
+    const headItems = sorted.slice(0, 12);
+    const tailItems = sorted.slice(12);
+    const headChunks = chunkArray(headItems, 4);
+    headChunks.forEach((chunk, idx) => {
+      appendMetricCardBlock(idx * 4 + 1, chunk, "");
+    });
+
+    const tailA = tailItems.slice(0, 4);
+    const tailB = tailItems.slice(4);
+    if (tailA.length) {
+      appendMetricCardBlock(13, tailA, "");
+    }
+    if (tailB.length) {
+      appendMetricCardBlock(13 + tailA.length, tailB, "");
     }
 
     container.appendChild(row);

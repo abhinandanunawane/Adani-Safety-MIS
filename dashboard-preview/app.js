@@ -116,7 +116,7 @@
   const meta = DATA.meta || {};
 
   /** Detail table rows per page (keep in sync with styles.css --detail-table-body-rows) */
-  const PAGE_SIZE = 8;
+  const PAGE_SIZE = 5;
   let tableState = {
     sortKey: "yearMonth",
     asc: false,

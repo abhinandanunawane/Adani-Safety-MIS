@@ -35,7 +35,7 @@
   /* Landing hero: matches Adani group infographic canvas */
   --landing-banner-bg: #ffffff;
   /* Category: detail table body rows (pagination page size) */
-  --detail-table-body-rows: 8;
+  --detail-table-body-rows: 5;
   --detail-thead-h: 17px;
   --detail-row-h: 24px;
   --detail-table-pad: 2px;
@@ -1855,14 +1855,23 @@ fieldset.cat-toolbar--compact .field-label {
   vertical-align: baseline;
 }
 
-/* Chart row sits below KPI strip — stack under KPI layer (no overlap) */
+/* Chart row: reclaim vertical space when the detail table shows fewer than 8 body rows */
 .cat-charts {
   flex: 0 0 auto;
   flex-shrink: 0;
   margin: 0;
-  height: 88px;
-  min-height: 88px;
-  max-height: 96px;
+  height: max(
+    88px,
+    calc(88px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
+  );
+  min-height: max(
+    88px,
+    calc(88px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
+  );
+  max-height: max(
+    96px,
+    calc(96px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
+  );
   display: grid;
   grid-template-columns: 1.15fr 1.15fr 0.75fr;
   gap: var(--cat-section-gap);
