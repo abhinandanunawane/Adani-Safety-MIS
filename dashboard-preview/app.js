@@ -1,5 +1,7 @@
 /**
- * Adani Safety MIS — fixed 1280×720 preview (no page scroll)
+ * Adani Safety MIS — fixed 1280×720 preview (no page scroll). Copy and structure support
+ * user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX,
+ * UCD, HCI, and CX review (usability, desirability, accessibility, usefulness).
  */
 (function () {
   "use strict";
@@ -64,6 +66,13 @@
   if (!DATA.months) DATA.months = [];
   if (!DATA.states) DATA.states = [];
 
+  if (typeof Chart !== "undefined") {
+    Chart.defaults.font.family =
+      '"Adani", system-ui, -apple-system, "Segoe UI", sans-serif';
+    Chart.defaults.font.size = 10;
+    Chart.defaults.color = "#231f20";
+  }
+
   /** States & UTs for filter dropdown (merged with any names present in data). */
   const INDIA_STATES_UT = [
     "Andaman and Nicobar Islands",
@@ -126,8 +135,82 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
-  /** Category keys with full KPI drill-down: 1 Incident Management, 2 Hazard & Observation Management (Leading). */
-  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2]);
+  /** Category keys with full KPI drill-down: 1 Incident, 2 Hazard & Observation (Leading), 3 Safety Performance Indices. */
+  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2, 3]);
+  const SPI_CATEGORY_KEY = 3;
+  const EVENT_LEVEL_LABELS = [
+    "0 Near Miss",
+    "1 Minor",
+    "2 Moderate",
+    "3 Serious",
+    "4 Major",
+    "5 Catastrophic",
+    "No Level",
+  ];
+  /** Dim_KPI category 3 order — TRI first. */
+  const SPI_KPI_ORDER = [21, 16, 17, 18, 20, 29];
+  /** Approximate centroids for India states/UTs (preview map). */
+  const STATE_CENTROID_BY_STATE = {
+    "Andaman and Nicobar Islands": [11.7401, 92.6586],
+    "Andhra Pradesh": [15.9129, 79.74],
+    "Arunachal Pradesh": [28.218, 94.7278],
+    Assam: [26.2006, 92.9376],
+    Bihar: [25.0961, 85.3131],
+    Chandigarh: [30.7333, 76.7794],
+    Chhattisgarh: [21.2787, 81.8661],
+    "Dadra and Nagar Haveli and Daman and Diu": [20.2734, 73.0169],
+    Delhi: [28.7041, 77.1025],
+    Goa: [15.2993, 74.124],
+    Gujarat: [22.2587, 71.1924],
+    Haryana: [29.0588, 76.0856],
+    "Himachal Pradesh": [31.1048, 77.1734],
+    "Jammu and Kashmir": [33.7782, 76.5762],
+    Jharkhand: [23.6102, 85.2799],
+    Karnataka: [15.3173, 75.7139],
+    Kerala: [10.8505, 76.2711],
+    Ladakh: [34.2268, 77.5619],
+    Lakshadweep: [10.5667, 72.6417],
+    "Madhya Pradesh": [22.9734, 78.6569],
+    Maharashtra: [19.7515, 75.7139],
+    Manipur: [24.6637, 93.9063],
+    Meghalaya: [25.467, 91.3662],
+    Mizoram: [23.1645, 92.9376],
+    Nagaland: [26.1584, 94.5624],
+    Odisha: [20.9517, 85.0985],
+    Puducherry: [11.9416, 79.8083],
+    Punjab: [31.1471, 75.3412],
+    Rajasthan: [27.0238, 74.2179],
+    Sikkim: [27.533, 88.5122],
+    "Tamil Nadu": [11.1271, 78.6569],
+    Telangana: [18.1124, 79.0193],
+    Tripura: [23.9408, 91.9882],
+    "Uttar Pradesh": [26.8467, 80.9462],
+    Uttarakhand: [30.0668, 79.0193],
+    "West Bengal": [22.9868, 87.855],
+  };
+
+  function hash32(str) {
+    let h = 2166136261;
+    const s = String(str);
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+
+  /** Deterministic event-severity bucket per fact row (preview — replace with model field when available). */
+  function eventLevelIndexForRow(r) {
+    const key =
+      String(r.kpiKey) +
+      "|" +
+      (r.state || "") +
+      "|" +
+      (r.businessName || "") +
+      "|" +
+      (r.yearMonth || "");
+    return hash32(key) % 7;
+  }
 
   function announce(msg) {
     if (liveRegion) liveRegion.textContent = msg;
@@ -258,6 +341,7 @@
   }
 
   const LS_VARIABLE_FILTER = "mis-variable-checkpoints";
+  const LS_CAT_MAIN_VIEW = "adani_cat_main_view";
   const CHECKPOINT_LABELS = ["Field Force", "O and M", "Office", "Projects"];
 
   function getRowCheckpoint(r) {
@@ -286,38 +370,37 @@
   function variableFilterFieldHtml() {
     return (
       '<div class="field field--variable field--var-inline">' +
-      '<span class="field-label" id="f-var-lbl">Variable</span>' +
+      '<span class="field-label" id="f-var-lbl">Verticals</span>' +
       '<details class="var-scope var-scope--toolbar" id="f-var-details">' +
-      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl">' +
+      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl" title="Verticals (checkpoints)">' +
       '<span class="var-scope__summary-text">' +
-      '<span class="var-scope__hint" id="f-var-hint">All</span>' +
+      '<span class="var-scope__hint" id="f-var-hint">All checkpoints</span>' +
       "</span>" +
       '<span class="var-scope__chev" aria-hidden="true"></span>' +
       "</summary>" +
-      '<div class="var-scope__panel" role="group" aria-label="Checkpoint options">' +
-      '<div class="var-scope__panel-head">Checkpoints</div>' +
+      '<div class="var-scope__panel" role="group" aria-label="Vertical options">' +
       '<div class="var-scope__menu">' +
       '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
-      '<span class="field-variable-check__text">All checkpoints</span>' +
       '<input type="checkbox" id="f-var-all" checked />' +
+      '<span class="field-variable-check__text">All checkpoints</span>' +
       "</label>" +
       '<div class="var-scope__divider" aria-hidden="true"></div>' +
       '<div class="var-scope__options">' +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">Field Force</span>' +
       '<input type="checkbox" class="f-var-cb" value="Field Force" />' +
+      '<span class="field-variable-check__text">Field Force</span>' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">O and M</span>' +
       '<input type="checkbox" class="f-var-cb" value="O and M" />' +
+      '<span class="field-variable-check__text">O and M</span>' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">Office</span>' +
       '<input type="checkbox" class="f-var-cb" value="Office" />' +
+      '<span class="field-variable-check__text">Office</span>' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">Projects</span>' +
       '<input type="checkbox" class="f-var-cb" value="Projects" />' +
+      '<span class="field-variable-check__text">Projects</span>' +
       "</label>" +
       "</div></div></div></details></div>"
     );
@@ -329,23 +412,15 @@
     const cbs = document.querySelectorAll("input.f-var-cb");
     if (!hint || !all) return;
     if (all.checked) {
-      hint.textContent = "All";
+      hint.textContent = "All checkpoints";
       return;
     }
     const sel = [...cbs].filter((cb) => cb.checked).map((cb) => cb.value);
     if (sel.length === 0) {
-      hint.textContent = "All";
+      hint.textContent = "All checkpoints";
       return;
     }
-    if (sel.length === 1) {
-      hint.textContent = sel[0];
-      return;
-    }
-    if (sel.length === 2) {
-      hint.textContent = sel.join(", ");
-      return;
-    }
-    hint.textContent = sel.length + " selected";
+    hint.textContent = sel.length + " Selected";
   }
 
   function readVariableSelectionFromDom() {
@@ -516,6 +591,52 @@
     return k ? k.kpis : [];
   }
 
+  /** Preferred default KPI in dropdown (TRI / TRIR); fallback: first KPI in display order. */
+  const TRI_LABEL_FULL = "Total Recordable Incident Rate (TRI)";
+
+  function defaultKpiKeyForCategory(catKey, kpisMetaForUi) {
+    const merged =
+      kpisMetaForUi && kpisMetaForUi.length
+        ? kpisMetaForUi
+        : kpiListForFilterDropdown(catKey);
+    const tri = merged.find((k) => isTriKpiMeta(k));
+    if (tri) return String(tri.kpiKey);
+    const sorted = sortKpisForDisplay(catKey, merged);
+    return sorted.length ? String(sorted[0].kpiKey) : "21";
+  }
+
+  function kpiDropdownLabel(k) {
+    const name = String(k.kpiName || "").trim();
+    if (/^TRIR$/i.test(name) || String(k.kpiKey) === "21") return TRI_LABEL_FULL;
+    return k.kpiName;
+  }
+
+  function isTriKpiMeta(k) {
+    return (
+      String(k.kpiKey) === "21" ||
+      /Total Recordable|TRIR|\bTRI\b|Recordable Incident Rate/i.test(
+        k.kpiName || ""
+      )
+    );
+  }
+
+  /** KPI dropdown / filter: always offer TRI when missing; TRI listed first. */
+  function kpiListForFilterDropdown(catKey) {
+    const m = getKpis(catKey);
+    const hasTri = m.some(isTriKpiMeta);
+    const base = hasTri
+      ? m.slice()
+      : [
+          {
+            kpiKey: 21,
+            kpiName: "TRIR",
+            unitType: "PercentOrRate",
+            latestValue: null,
+          },
+        ].concat(m);
+    return sortKpisForDisplay(catKey, base);
+  }
+
   /** Category map search: match category name or any KPI name in that category. */
   function categoryMatchesSearchQuery(cat, qLower) {
     if (!qLower) return true;
@@ -526,27 +647,253 @@
   }
 
   function kpiUnitTypeForFilter(catKey, f) {
-    if (f.kpi === "all") return null;
     const kpis = getKpis(catKey);
     const k = kpis.find((x) => String(x.kpiKey) === String(f.kpi));
     return k ? k.unitType : null;
   }
 
-  function destroyCharts() {
-    ["chart-line", "chart-area-state", "chart-biz"].forEach((id) => {
-      const el = document.getElementById(id);
-      if (el && typeof Chart !== "undefined") {
-        const c = Chart.getChart(el);
-        if (c) c.destroy();
+  function destroySpiLeafletMap() {
+    if (window.__adaniSpiMap) {
+      try {
+        window.__adaniSpiMap.remove();
+      } catch {
+        /* ignore */
       }
+      window.__adaniSpiMap = null;
+    }
+    const host = document.getElementById("chart-spi-map");
+    if (host) host.innerHTML = "";
+  }
+
+  function destroyCharts() {
+    ["chart-line", "chart-verticals", "chart-biz", "chart-spi-bubble"].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el && typeof Chart !== "undefined") {
+          const c = Chart.getChart(el);
+          if (c) c.destroy();
+        }
+      }
+    );
+    destroySpiLeafletMap();
+  }
+
+  function resizeSpiMapIfAny() {
+    if (window.__adaniSpiMap && typeof window.__adaniSpiMap.invalidateSize === "function") {
+      try {
+        window.__adaniSpiMap.invalidateSize();
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  function resizeAllChartsIndex() {
+    ["chart-line", "chart-verticals", "chart-biz", "chart-spi-bubble"].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el && typeof Chart !== "undefined") {
+          const c = Chart.getChart(el);
+          if (c) c.resize();
+        }
+      }
+    );
+    resizeSpiMapIfAny();
+  }
+
+  function renderSpiEventBubbleChart(snapRows) {
+    const el = document.getElementById("chart-spi-bubble");
+    if (!el || typeof Chart === "undefined") return;
+    const prev = Chart.getChart(el);
+    if (prev) prev.destroy();
+    const counts = [0, 0, 0, 0, 0, 0, 0];
+    snapRows.forEach((r) => {
+      counts[eventLevelIndexForRow(r)]++;
+    });
+    const bubbleData = counts.map((cnt, xi) => ({
+      x: xi,
+      y: cnt,
+      r: Math.max(6, Math.sqrt(cnt + 1) * 7),
+    }));
+    new Chart(el, {
+      type: "bubble",
+      data: {
+        datasets: [
+          {
+            label: "Rows",
+            data: bubbleData,
+            backgroundColor: "rgba(0, 109, 182, 0.45)",
+            borderColor: "#006DB6",
+            borderWidth: 1.5,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 10, right: 12, bottom: 8, left: 8 } },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const raw = ctx.raw;
+                const xi = Math.round(Number(raw.x));
+                const lbl = EVENT_LEVEL_LABELS[xi] || "";
+                return " " + lbl + ": " + raw.y + " rows";
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            type: "linear",
+            min: -0.5,
+            max: 6.5,
+            ticks: {
+              stepSize: 1,
+              font: { size: 8 },
+              maxRotation: 55,
+              minRotation: 35,
+              autoSkip: false,
+              callback(v) {
+                const i = Math.round(Number(v));
+                return i >= 0 && i < EVENT_LEVEL_LABELS.length
+                  ? EVENT_LEVEL_LABELS[i]
+                  : "";
+              },
+            },
+            title: {
+              display: true,
+              text: "Event level",
+              font: { size: 10 },
+              color: "#6D6E71",
+            },
+            grid: { color: "rgba(109, 110, 113, 0.12)" },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: { font: { size: 10 }, color: "#231F20" },
+            title: {
+              display: true,
+              text: "Count (rows)",
+              font: { size: 10 },
+              color: "#6D6E71",
+            },
+            grid: { color: "rgba(109, 110, 113, 0.2)" },
+          },
+        },
+      },
     });
   }
 
-  /** Approved brand colors only — cycle for charts */
+  function renderSpiPerformanceMap(snapRows) {
+    const el = document.getElementById("chart-spi-map");
+    if (!el) return;
+    destroySpiLeafletMap();
+    if (typeof L === "undefined") {
+      el.innerHTML =
+        '<p class="chart-spi-map-fallback">Map unavailable. Load Leaflet to see state circles.</p>';
+      return;
+    }
+    const byState = {};
+    snapRows.forEach((r) => {
+      const st = String(r.state || "").trim() || "—";
+      byState[st] = (byState[st] || 0) + 1;
+    });
+    const map = L.map(el, { scrollWheelZoom: false }).setView([22.6, 79.0], 4.5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+    const latLngs = [];
+    Object.keys(byState).forEach((st) => {
+      const ll = STATE_CENTROID_BY_STATE[st];
+      if (!ll) return;
+      const n = byState[st];
+      latLngs.push(ll);
+      const rad = Math.max(6, Math.min(32, Math.sqrt(n) * 3.2));
+      L.circleMarker(ll, {
+        radius: rad,
+        color: "#006DB6",
+        fillColor: "#00B16B",
+        fillOpacity: 0.52,
+        weight: 2,
+      })
+        .bindPopup(escapeHtml(st) + ": " + n + " rows (filtered)")
+        .addTo(map);
+    });
+    if (latLngs.length === 1) {
+      map.setView(latLngs[0], 6);
+    } else if (latLngs.length > 1) {
+      map.fitBounds(L.latLngBounds(latLngs), { padding: [28, 28], maxZoom: 7 });
+    }
+    window.__adaniSpiMap = map;
+    setTimeout(() => {
+      try {
+        map.invalidateSize();
+      } catch {
+        /* ignore */
+      }
+    }, 80);
+  }
+
+  function wireCatMainViewIndex() {
+    const main = document.getElementById("cat-main-view");
+    if (!main) return;
+    const tabCharts = document.getElementById("view-tab-charts");
+    const tabTable = document.getElementById("view-tab-table");
+    const panelCharts = document.getElementById("view-panel-charts");
+    const panelTable = document.getElementById("view-panel-table");
+    function apply(mode) {
+      const charts = mode === "charts";
+      main.classList.toggle("cat-main-view--charts", charts);
+      main.classList.toggle("cat-main-view--table", !charts);
+      main.dataset.view = mode;
+      if (tabCharts) {
+        tabCharts.setAttribute("aria-selected", charts ? "true" : "false");
+        tabCharts.classList.toggle("view-tabs__btn--active", charts);
+        tabCharts.tabIndex = charts ? 0 : -1;
+      }
+      if (tabTable) {
+        tabTable.setAttribute("aria-selected", charts ? "false" : "true");
+        tabTable.classList.toggle("view-tabs__btn--active", !charts);
+        tabTable.tabIndex = charts ? -1 : 0;
+      }
+      if (panelCharts) panelCharts.hidden = !charts;
+      if (panelTable) panelTable.hidden = charts;
+      try {
+        localStorage.setItem(LS_CAT_MAIN_VIEW, mode);
+      } catch {
+        /* ignore */
+      }
+      if (charts) {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resizeAllChartsIndex());
+        });
+      }
+    }
+    let initial = "charts";
+    try {
+      const s = localStorage.getItem(LS_CAT_MAIN_VIEW);
+      if (s === "charts" || s === "table") initial = s;
+    } catch {
+      /* ignore */
+    }
+    apply(initial);
+    tabCharts?.addEventListener("click", () => apply("charts"));
+    tabTable?.addEventListener("click", () => apply("table"));
+  }
+
+  /**
+   * Adani brand palette (approved — same as styles.css :root).
+   * Green #00B16B · Blue #006DB6 · Purple #8E278F · Orange #F04C23
+   */
   const CHART_BRAND_HEX = ["#00B16B", "#006DB6", "#8E278F", "#F04C23"];
 
   /**
-   * By business: doughnut chart — share of total (|value|) per business; top slices + Other.
+   * By business: donut chart — share of total (|value|) per business; top slices + Other.
+   * Legend on the right keeps the ring centered vertically and avoids bottom clipping.
    */
   function renderBizBreakdown(bizLabels, bizData) {
     const el = document.getElementById("chart-biz");
@@ -623,24 +970,59 @@
             ),
             borderColor: "#ffffff",
             borderWidth: 1.5,
-            hoverOffset: 3,
+            hoverOffset: 4,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: "54%",
+        /* Keeps donut inside chart area (avoids arc clipped at card bottom) */
+        radius: "70%",
+        cutout: "55%",
+        layout: {
+          padding: { top: 6, right: 4, bottom: 6, left: 4 },
+        },
         plugins: {
           legend: {
+            display: true,
             position: "right",
             align: "center",
             labels: {
-              font: { size: 7 },
-              boxWidth: 8,
-              boxHeight: 8,
-              padding: 4,
+              font: {
+                size: 9,
+                family: '"Adani", system-ui, "Segoe UI", sans-serif',
+              },
               color: "#231F20",
+              boxWidth: 10,
+              boxHeight: 10,
+              padding: 6,
+              maxWidth: 118,
+              usePointStyle: true,
+              generateLabels: function (chart) {
+                const ds = chart.data.datasets[0];
+                const labs = chart.data.labels || [];
+                if (!labs.length || !ds) return [];
+                return labs.map(function (label, i) {
+                  const raw = Number(ds.data[i]) || 0;
+                  const pct =
+                    total > 0
+                      ? ((raw / total) * 100).toFixed(1)
+                      : "0.0";
+                  const bg = Array.isArray(ds.backgroundColor)
+                    ? ds.backgroundColor[i]
+                    : ds.backgroundColor;
+                  return {
+                    text: String(label) + " (" + pct + "%)",
+                    fillStyle: bg,
+                    strokeStyle: "#ffffff",
+                    lineWidth: 1,
+                    hidden: !chart.getDataVisibility(i),
+                    index: i,
+                    datasetIndex: 0,
+                  };
+                });
+              },
             },
           },
           tooltip: {
@@ -672,9 +1054,16 @@
     const elSt = document.getElementById("f-state");
     if (!elSt) return null;
     const elBiz = document.getElementById("f-biz");
+    const kpisMeta = kpiListForFilterDropdown(catKey);
+    const defK = defaultKpiKeyForCategory(catKey, kpisMeta);
+    let kpi = defK;
+    if (elKpi && elKpi.value) {
+      const ok = kpisMeta.some((x) => String(x.kpiKey) === String(elKpi.value));
+      if (ok) kpi = String(elKpi.value);
+    }
     return {
       catKey,
-      kpi: elKpi ? elKpi.value : "all",
+      kpi: kpi,
       vsMode: elVs ? elVs.value : DEFAULT_VS_MODE,
       refMonth: getRefMonth(),
       state: elSt.value,
@@ -687,7 +1076,7 @@
   /** Table / KPI tiles: current reference month only (plus non-month filters). */
   function applyRowFilter(rows, f) {
     return rows.filter((r) => {
-      if (f.kpi !== "all" && String(r.kpiKey) !== f.kpi) return false;
+      if (String(r.kpiKey) !== String(f.kpi)) return false;
       if (r.yearMonth !== f.refMonth) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
       if (f.business !== "all" && r.businessName !== f.business) return false;
@@ -713,7 +1102,7 @@
       chartMonthsForVsMode(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
     );
     return rows.filter((r) => {
-      if (f.kpi !== "all" && String(r.kpiKey) !== f.kpi) return false;
+      if (String(r.kpiKey) !== String(f.kpi)) return false;
       if (!range.has(r.yearMonth)) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
       if (f.business !== "all" && r.businessName !== f.business) return false;
@@ -750,17 +1139,29 @@
     return nums.reduce((a, b) => a + b, 0) / nums.length;
   }
 
-  /** Incident Management: wireframe order — chunk 4 = ΔRepeat, ΔFatal, Man-days, Vehicle. */
+  /** Incident Management: TRI first, then wireframe order (ΔRepeat, ΔFatal, Man-days, Vehicle). */
   const INCIDENT_KPI_ORDER = [
-    1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
+    21, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
   ];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
+    const list = kpisMeta.slice();
     if (catKey === 1) {
-      const map = new Map(kpisMeta.map((k) => [k.kpiKey, k]));
+      const map = new Map(list.map((k) => [k.kpiKey, k]));
       return INCIDENT_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
-    return kpisMeta.slice();
+    if (catKey === SPI_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [k.kpiKey, k]));
+      const ordered = SPI_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
+      const rest = list.filter(
+        (k) => !SPI_KPI_ORDER.includes(Number(k.kpiKey))
+      );
+      return ordered.concat(rest);
+    }
+    const tri = list.find((k) => isTriKpiMeta(k));
+    if (!tri) return list;
+    const rest = list.filter((k) => k !== tri);
+    return [tri, ...rest];
   }
 
   function monthAdd(ym, delta) {
@@ -845,7 +1246,18 @@
 
   function applyNonMonthFilters(rows, f) {
     return rows.filter((r) => {
-      if (f.kpi !== "all" && String(r.kpiKey) !== f.kpi) return false;
+      if (String(r.kpiKey) !== String(f.kpi)) return false;
+      if (f.state !== "all" && r.state !== f.state) return false;
+      if (f.business !== "all" && r.businessName !== f.business) return false;
+      if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
+      if (!rowMatchesVariable(r, f.variable)) return false;
+      return true;
+    });
+  }
+
+  /** For multi-KPI tiles: same geography / business / vertical filters, all KPIs. */
+  function applyNonMonthFiltersAllKpis(rows, f) {
+    return rows.filter((r) => {
       if (f.state !== "all" && r.state !== f.state) return false;
       if (f.business !== "all" && r.businessName !== f.business) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
@@ -877,11 +1289,8 @@
   }
 
   function buildKpiDetailMetrics(catKey, kpisMeta, f) {
-    let sorted = sortKpisForDisplay(catKey, kpisMeta);
-    if (f.kpi !== "all") {
-      sorted = sorted.filter((k) => String(k.kpiKey) === String(f.kpi));
-    }
-    const base = applyNonMonthFilters(getRowsForCategory(catKey), f);
+    const sorted = sortKpisForDisplay(catKey, kpisMeta);
+    const base = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
     const ref = f.refMonth;
     const mode = f.vsMode || DEFAULT_VS_MODE;
     const m1 = monthAdd(ref, -1);
@@ -1010,9 +1419,22 @@
     });
   }
 
-  function appendKpiTileEl(grid, item, refMonth, vsMode, tileClass) {
+  function appendKpiTileEl(
+    grid,
+    item,
+    refMonth,
+    vsMode,
+    tileClass,
+    selectedKpiKey
+  ) {
     const tile = document.createElement("div");
     tile.className = tileClass || "multi-kpi-tile";
+    if (
+      selectedKpiKey != null &&
+      String(item.kpiKey) === String(selectedKpiKey)
+    ) {
+      tile.classList.add("multi-kpi-tile--selected");
+    }
     const vsPct = formatSignedPct(item.vsPct);
     const vDir = item.vsDir || "neutral";
     const vsLbl = vsOptionLabel(item.vsMode);
@@ -1064,7 +1486,13 @@
     grid.appendChild(tile);
   }
 
-  function renderMultiKpiCards(container, aggregatesList, refMonth, vsMode) {
+  function renderMultiKpiCards(
+    container,
+    aggregatesList,
+    refMonth,
+    vsMode,
+    selectedKpiKey
+  ) {
     container.innerHTML = "";
     const sorted = sortKpiTilesForDisplay(aggregatesList);
     const headItems = sorted.slice(0, 12);
@@ -1087,7 +1515,14 @@
       const grid = document.createElement("div");
       grid.className = "multi-kpi-card__grid";
       items.forEach((item) => {
-        appendKpiTileEl(grid, item, refMonth, vsMode, "multi-kpi-tile");
+        appendKpiTileEl(
+          grid,
+          item,
+          refMonth,
+          vsMode,
+          "multi-kpi-tile",
+          selectedKpiKey
+        );
       });
       while (grid.children.length < 4) {
         const ph = document.createElement("div");
@@ -1119,7 +1554,7 @@
   }
 
   /**
-   * Trend + business + unit charts respect Vs mode windows (monthly data).
+   * Trend + (SPI: event-level bubble + state map) or (by business + by vertical). Same Vs windows.
    */
   function buildCharts(catKey, f) {
     destroyCharts();
@@ -1141,41 +1576,14 @@
     const lineLabels = monthKeys;
     const lineData = monthKeys.map((m) => avg(byMonth[m]));
 
-    const byBizVals = {};
-    snapRows.forEach((r) => {
-      const b = r.businessName || "—";
-      if (!byBizVals[b]) byBizVals[b] = [];
-      byBizVals[b].push(Number(r.value));
-    });
-    const bizLabels = Object.keys(byBizVals);
+    const kpisLine = getKpis(catKey);
+    const kMetaLine = kpisLine.find(
+      (x) => String(x.kpiKey) === String(f.kpi)
+    );
+    const lineSeriesName = kMetaLine
+      ? kpiDropdownLabel(kMetaLine)
+      : "Value";
     const utChart = kpiUnitTypeForFilter(catKey, f);
-    const bizData = bizLabels.map((b) => {
-      const vals = byBizVals[b];
-      if (utChart && isAdditiveUnit(utChart)) {
-        return vals.reduce((a, x) => a + Number(x), 0);
-      }
-      return avg(vals);
-    });
-
-    /** Location / state mix (same roll-up window as former unit doughnut). */
-    const stateMap = {};
-    snapRows.forEach((r) => {
-      const s = r.state || "—";
-      if (f.kpi === "all") {
-        stateMap[s] = (stateMap[s] || 0) + 1;
-      } else {
-        const v = Number(r.value);
-        stateMap[s] = (stateMap[s] || 0) + (Number.isFinite(v) ? v : 0);
-      }
-    });
-    const stateEntries = Object.keys(stateMap).map((k) => ({
-      state: k,
-      v: stateMap[k],
-    }));
-    stateEntries.sort((a, b) => b.v - a.v);
-    const topStates = stateEntries.slice(0, 14);
-    const stateLabels = topStates.map((e) => e.state);
-    const stateData = topStates.map((e) => e.v);
 
     const elLine = document.getElementById("chart-line");
     if (elLine && lineLabels.length) {
@@ -1185,7 +1593,7 @@
           labels: lineLabels,
           datasets: [
             {
-              label: "Avg",
+              label: lineSeriesName,
               data: lineData,
               borderColor: "#006DB6",
               backgroundColor: "rgba(0, 177, 107, 0.12)",
@@ -1199,15 +1607,28 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: { top: 12, right: 16, bottom: 14, left: 22 },
+          },
           plugins: { legend: { display: false } },
           scales: {
             y: {
               beginAtZero: false,
-              ticks: { font: { size: 9 }, color: "#231F20" },
+              grace: "12%",
+              ticks: {
+                font: { size: 10 },
+                color: "#231F20",
+                padding: 6,
+              },
               grid: { color: "rgba(109, 110, 113, 0.2)" },
             },
             x: {
-              ticks: { font: { size: 8 }, maxRotation: 45, color: "#231F20" },
+              ticks: {
+                font: { size: 10 },
+                maxRotation: 45,
+                color: "#231F20",
+                padding: 4,
+              },
               grid: { color: "rgba(109, 110, 113, 0.15)" },
             },
           },
@@ -1215,18 +1636,67 @@
       });
     }
 
+    if (catKey === SPI_CATEGORY_KEY) {
+      renderSpiEventBubbleChart(snapRows);
+      renderSpiPerformanceMap(snapRows);
+      updateChartHints(f);
+      return;
+    }
+
+    const byBizVals = {};
+    snapRows.forEach((r) => {
+      const b = r.businessName || "—";
+      if (!byBizVals[b]) byBizVals[b] = [];
+      byBizVals[b].push(Number(r.value));
+    });
+    const bizLabels = Object.keys(byBizVals);
+    const bizData = bizLabels.map((b) => {
+      const vals = byBizVals[b];
+      if (utChart && isAdditiveUnit(utChart)) {
+        return vals.reduce((a, x) => a + Number(x), 0);
+      }
+      return avg(vals);
+    });
+
+    /** By vertical (checkpoint mapping) — same roll-up window as By business. */
+    const vertMap = {};
+    snapRows.forEach((r) => {
+      const vx = getRowCheckpoint(r);
+      if (!vertMap[vx]) vertMap[vx] = [];
+      vertMap[vx].push(Number(r.value));
+    });
+    const vertLabelsFull = Object.keys(vertMap).sort((a, b) =>
+      a.localeCompare(b)
+    );
+    function shortVertLabel(name) {
+      const s = String(name);
+      return s.length > 14 ? s.slice(0, 13) + "…" : s;
+    }
+    const vertLabels = vertLabelsFull.map(shortVertLabel);
+    const vertData = vertLabelsFull.map((label) => {
+      const vals = vertMap[label];
+      if (utChart && isAdditiveUnit(utChart)) {
+        return vals.reduce(
+          (a, x) => a + (Number.isFinite(x) ? x : 0),
+          0
+        );
+      }
+      const nums = vals.filter((x) => Number.isFinite(x));
+      return nums.length ? avg(nums) : 0;
+    });
+
     renderBizBreakdown(bizLabels, bizData);
 
-    const elArea = document.getElementById("chart-area-state");
-    if (elArea && stateLabels.length) {
-      new Chart(elArea, {
+    const elVert = document.getElementById("chart-verticals");
+    if (elVert && vertLabels.length) {
+      new Chart(elVert, {
         type: "line",
         data: {
-          labels: stateLabels,
+          labels: vertLabels,
           datasets: [
             {
-              label: "By state",
-              data: stateData,
+              label: "By vertical",
+              data: vertData,
               borderColor: "#006DB6",
               backgroundColor: "rgba(0, 109, 182, 0.18)",
               fill: true,
@@ -1240,13 +1710,16 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: { top: 12, right: 20, bottom: 16, left: 28 },
+          },
           plugins: {
             legend: { display: false },
             tooltip: {
               callbacks: {
                 title(items) {
                   const i = items[0].dataIndex;
-                  return stateLabels[i] || "";
+                  return vertLabelsFull[i] || "";
                 },
               },
             },
@@ -1254,21 +1727,30 @@
           scales: {
             y: {
               beginAtZero: true,
-              ticks: { font: { size: 9 }, color: "#231F20" },
+              grace: "6%",
+              ticks: {
+                font: { size: 10 },
+                color: "#231F20",
+                padding: 6,
+              },
               grid: { color: "rgba(109, 110, 113, 0.2)" },
               title: {
                 display: true,
-                text: f.kpi === "all" ? "Row count" : "Value",
-                font: { size: 9 },
+                text: "Value",
+                font: { size: 10, family: '"Adani", system-ui, sans-serif' },
                 color: "#6D6E71",
+                padding: { top: 0, bottom: 8, left: 0, right: 0 },
               },
             },
             x: {
               ticks: {
-                font: { size: 7 },
-                maxRotation: 55,
-                minRotation: 35,
+                font: { size: 9 },
+                maxRotation: 40,
+                minRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 10,
                 color: "#231F20",
+                padding: 4,
               },
               grid: { color: "rgba(109, 110, 113, 0.12)" },
             },
@@ -1284,23 +1766,50 @@
     const mode = f.vsMode || DEFAULT_VS_MODE;
     const ref = f.refMonth;
     const trendEl = document.getElementById("chart-trend-hint");
+    const lineTitleEl = document.getElementById("chart-line-title");
     const bizEl = document.getElementById("chart-biz-hint");
-    const stateLocEl = document.getElementById("chart-state-hint");
+    const vertEl = document.getElementById("chart-vertical-hint");
     const n = chartMonthsForVsMode(mode, ref).length;
+    if (lineTitleEl && f && f.catKey != null && f.kpi != null) {
+      const list = kpiListForFilterDropdown(f.catKey);
+      const k = list.find((x) => String(x.kpiKey) === String(f.kpi));
+      lineTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
+    }
     if (trendEl) {
       trendEl.textContent =
-        mode === "vs_last_year" ? "(12 months)" : "(" + n + " months)";
+        mode === "vs_last_year"
+          ? "(lines · 12 mo)"
+          : "(lines · " + n + " mo)";
     }
     const bizHint = {
-      vs_yesterday: "(latest month)",
-      vs_last_month: "(latest month)",
-      vs_last_week: "(last 2 months)",
-      vs_last_quarter: "(last 3 months)",
-      vs_last_year: "(YTD)",
+      vs_yesterday: "(share · latest mo)",
+      vs_last_month: "(share · latest mo)",
+      vs_last_week: "(share · 2 mo)",
+      vs_last_quarter: "(share · 3 mo)",
+      vs_last_year: "(share · YTD window)",
     };
-    const bh = bizHint[mode] || "(latest month)";
+    const vertHint = {
+      vs_yesterday: "(vertical · latest mo)",
+      vs_last_month: "(vertical · latest mo)",
+      vs_last_week: "(vertical · 2 mo)",
+      vs_last_quarter: "(vertical · 3 mo)",
+      vs_last_year: "(vertical · YTD window)",
+    };
+    const bh = bizHint[mode] || "(share)";
     if (bizEl) bizEl.textContent = bh;
-    if (stateLocEl) stateLocEl.textContent = bh;
+    if (vertEl) vertEl.textContent = vertHint[mode] || "(vertical)";
+    const spiBubbleHint = document.getElementById("chart-spi-bubble-hint");
+    const spiMapHint = document.getElementById("chart-spi-map-hint");
+    const spiRoll =
+      mode === "vs_last_year"
+        ? "(bubble · YTD window)"
+        : "(bubble · same window)";
+    const spiMapRoll =
+      mode === "vs_last_year"
+        ? "(map · YTD window)"
+        : "(map · same window)";
+    if (spiBubbleHint) spiBubbleHint.textContent = spiRoll;
+    if (spiMapHint) spiMapHint.textContent = spiMapRoll;
   }
 
   function sortRows(rows, key, asc, pool, f) {
@@ -1650,14 +2159,23 @@
     if (multiWrap) {
       if (!aggList.length) {
         multiWrap.innerHTML =
-          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Clear filters or choose All KPIs.</div>';
+          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Adjust Versus or geography filters.</div>';
       } else {
-        renderMultiKpiCards(multiWrap, aggList, f.refMonth, f.vsMode);
+        renderMultiKpiCards(
+          multiWrap,
+          aggList,
+          f.refMonth,
+          f.vsMode,
+          f.kpi
+        );
       }
     }
 
     buildCharts(catKey, f);
     renderTableBody(catKey);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resizeAllChartsIndex());
+    });
 
     const cat = getCategory(catKey);
     const ctx = document.getElementById("cat-context");
@@ -1683,27 +2201,31 @@
       history.replaceState(null, "", "#categories");
       renderCategories();
       announce(
-        "This preview includes Incident Management and Hazard and Observation Management, Leading. Choose one on the category list."
+        "This preview includes Incident Management, Hazard and Observation Management (Leading), and Safety Performance Indices. Choose one on the category list."
       );
       return;
     }
 
     const kpisMeta = getKpis(catKey);
+    const kpisForUi = kpiListForFilterDropdown(catKey);
     const rowsForCat = getRowsForCategory(catKey);
     const cfg = getFilterConfig(catKey);
 
-    const kpiOpts =
-      '<option value="all">All KPIs</option>' +
-      kpisMeta
-        .map(
-          (k) =>
-            '<option value="' +
-            k.kpiKey +
-            '">' +
-            escapeHtml(k.kpiName).replace(/"/g, "&quot;") +
-            "</option>"
-        )
-        .join("");
+    const defKpi = defaultKpiKeyForCategory(catKey, kpisForUi);
+    const kpiOpts = kpisForUi
+      .map((k) => {
+        const sel = String(k.kpiKey) === String(defKpi) ? " selected" : "";
+        return (
+          '<option value="' +
+          k.kpiKey +
+          '"' +
+          sel +
+          ">" +
+          escapeHtml(kpiDropdownLabel(k)).replace(/"/g, "&quot;") +
+          "</option>"
+        );
+      })
+      .join("");
 
     const vsOpts = VS_OPTIONS.map(
       (o) =>
@@ -1771,6 +2293,20 @@
         : "") +
       "";
     const variableFieldHtml = variableFilterFieldHtml();
+    const lineChartBoxHtml =
+      '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-line-title">' +
+      escapeHtml(TRI_LABEL_FULL) +
+      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for the selected KPI in the trend window"></canvas></div></div>';
+    const chartsRowHtml =
+      catKey === SPI_CATEGORY_KEY
+        ? '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: trend, event level, state map">' +
+          lineChartBoxHtml +
+          '<div class="chart-box chart-box--spi-bubble"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Event level</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(bubble · count)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble chart: row counts by event severity level"></canvas></div></div>' +
+          '<div class="chart-box chart-box--spi-map"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Safety performance by state</span> <span id="chart-spi-map-hint" class="chart-box__hint">(map · row counts)</span></h3><div class="chart-spi-map-host" id="chart-spi-map" role="presentation" aria-label="Map of India: circle size by filtered row count per state"></div></div></div>'
+        : '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
+          lineChartBoxHtml +
+          '<div class="chart-box chart-box--biz"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(share · latest mo)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Donut chart: share of total by business, legend shows each segment"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
+          '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
     wrap.innerHTML =
       '<div class="cat-top-bar">' +
       '<div class="cat-top-bar__lead">' +
@@ -1785,7 +2321,7 @@
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">User research, IA, usability testing, accessibility, consistency, and a user-centered approach: filters, KPI scope, and the detail table stay aligned so sessions are comparable—supporting UCD, HCI, and CX review of usability, desirability, and usefulness. Narrow by KPI, Versus, state, and business when shown. Data is monthly: Today vs yesterday and Current month vs last month both use latest month versus prior month. Current week versus last week uses the last two calendar months versus the two before that. Current quarter vs last quarter uses three-month windows. Current year vs last year uses calendar year-to-date versus the same months in the prior year. Charts and KPI tiles use the same windows. Choose All states and All businesses to see the full preview slice.</p>' +
+      '<p id="filter-hint" class="visually-hidden">User research, information architecture (IA), usability testing, accessibility, consistency, visual hierarchy, and an iterative user-centered process: filters, KPI scope, charts, and the detail table stay aligned for comparable sessions—supporting user-centered design (UCD), human-computer interaction (HCI), and customer experience (CX) review of usability, desirability, accessibility, and usefulness. Narrow by KPI, Versus, state, business, and checkpoints when shown. Data is monthly: Today vs yesterday and Current month vs last month both use latest month versus prior month. Current week versus last week uses the last two calendar months versus the two before that. Current quarter vs last quarter uses three-month windows. Current year vs last year uses calendar year-to-date versus the same months in the prior year. Charts and KPI tiles use the same windows. Choose All states and All businesses to see the full preview slice.</p>' +
       '<div class="cat-toolbar__filters-scroll">' +
       '<div class="cat-toolbar__filters-core">' +
       coreFieldsScroll +
@@ -1800,11 +2336,15 @@
       '<legend class="visually-hidden">KPI summary for current filters</legend>' +
       '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
       "</fieldset>" +
-      '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
-      '<div class="chart-box"><h3>Trend <span id="chart-trend-hint" class="chart-box__hint">(12 months)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for filtered KPIs in the trend window"></canvas></div></div>' +
-      '<div class="chart-box chart-box--biz"><h3>By business <span id="chart-biz-hint" class="chart-box__hint">(latest month)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Share of total by business"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
-      '<div class="chart-box"><h3>By state (location) <span id="chart-state-hint" class="chart-box__hint">(latest month)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-area-state" role="img" aria-label="Values by state for the active Versus window"></canvas></div></div>' +
+      '<div class="cat-main-view cat-main-view--charts" id="cat-main-view" data-view="charts">' +
+      '<div class="view-tabs" role="tablist" aria-label="Chart view or table view">' +
+      '<button type="button" role="tab" id="view-tab-charts" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-charts" data-view="charts">Chart view</button>' +
+      '<button type="button" role="tab" id="view-tab-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-table" tabindex="-1" data-view="table">Table view</button>' +
       "</div>" +
+      '<div id="view-panel-charts" class="view-panel view-panel--charts" role="tabpanel" aria-labelledby="view-tab-charts">' +
+      chartsRowHtml +
+      "</div>" +
+      '<div id="view-panel-table" class="view-panel view-panel--table" role="tabpanel" aria-labelledby="view-tab-table" hidden>' +
       '<div class="table-zone">' +
       '<div class="table-zone__head">' +
       '<div class="table-zone__title">' +
@@ -1833,7 +2373,7 @@
       '<th scope="col" class="col-num">Vs %</th>' +
       '<th scope="col" data-sort="target" class="col-num">Target</th>' +
       "</tr></thead>" +
-      '<tbody id="tbl-body"></tbody></table></div></div>' +
+      '<tbody id="tbl-body"></tbody></table></div></div></div></div>' +
       '<p class="cat-context" id="cat-context">' +
       escapeHtml(cat.uxNote) +
       "</p>";
@@ -1844,7 +2384,11 @@
     document.getElementById("f-vs").value = DEFAULT_VS_MODE;
     if (cfg.showState) document.getElementById("f-state").value = "all";
     if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
-    if (cfg.showKpi) document.getElementById("f-kpi").value = "all";
+    if (cfg.showKpi)
+      document.getElementById("f-kpi").value = defaultKpiKeyForCategory(
+        catKey,
+        kpisForUi
+      );
     applyVariableFilterFromStorage();
 
     function onFilterChange() {
@@ -1860,7 +2404,11 @@
 
     document.getElementById("f-reset").addEventListener("click", () => {
       document.getElementById("f-vs").value = DEFAULT_VS_MODE;
-      if (cfg.showKpi) document.getElementById("f-kpi").value = "all";
+      if (cfg.showKpi)
+        document.getElementById("f-kpi").value = defaultKpiKeyForCategory(
+          catKey,
+          kpisForUi
+        );
       if (cfg.showState) document.getElementById("f-state").value = "all";
       if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
       try {
@@ -1882,6 +2430,7 @@
     });
 
     wireTableHeaders(catKey);
+    wireCatMainViewIndex();
     refreshCategoryView(catKey);
     const h = document.getElementById("cat-heading");
     if (h) h.focus();
@@ -1900,10 +2449,10 @@
       '<div class="landing__hero" role="region" aria-label="About this dashboard">' +
       '<div class="landing__copy">' +
       '<h2 class="landing__title" id="landing-h">Adani Safety MIS</h2>' +
-      '<p class="landing__subtitle">Group-level safety KPI dashboard for all Adani businesses — monitor trends, drill by category, and compare performance across periods.</p>' +
+      '<p class="landing__subtitle">Group-level safety KPI dashboard for all Adani businesses — framed for user research, IA, usability testing, accessibility, and an iterative, user-centered (UCD) lens across HCI and customer experience (CX): monitor trends, drill by category, and compare performance while assessing usability, desirability, accessibility, and usefulness.</p>' +
       '<div class="landing__bullets" role="list">' +
-      '<div class="landing__bullet" role="listitem"><strong>What’s included</strong><span>Safety KPIs by category, Versus comparison, filters, multi KPI cards with Vs % change, trend and business charts, by-state (location) area chart, and a sortable detail table.</span></div>' +
-      '<div class="landing__bullet" role="listitem"><strong>Who it’s for</strong><span>Anyone tracking group-wide safety performance across Adani businesses — from quick scans to deeper drill-down.</span></div>' +
+      '<div class="landing__bullet" role="listitem"><strong>What’s included</strong><span>Safety KPIs by category, Versus comparison, filters, multi KPI cards with Vs % change, trend and business charts, by-state (location) area chart, and a sortable detail table—consistent layout and hierarchy for comparable sessions.</span></div>' +
+      '<div class="landing__bullet" role="listitem"><strong>Who it’s for</strong><span>Anyone tracking group-wide safety performance — and teams running UCD, usability, or accessibility reviews of the experience.</span></div>' +
       "</div>" +
       '<div class="landing__companies" role="region" aria-label="Adani group companies represented">' +
       "<strong>Group companies</strong>" +
@@ -1928,7 +2477,9 @@
     if (start) start.addEventListener("click", goCats);
     const hh = document.getElementById("landing-h");
     if (hh) hh.focus();
-    announce("Adani Safety MIS home. Use Start now to open categories.");
+    announce(
+      "Adani Safety MIS home. User research, IA, usability testing, accessibility, and user-centered design: use Start now to open categories."
+    );
     updateHeaderNavState();
   }
 
@@ -1943,7 +2494,7 @@
       journeyStepsHtml(2) +
       '<div class="home-intro home-intro--launchpad">' +
       '<h2 id="home-h">Categories</h2>' +
-      '<p class="home-lede"><strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management (Leading)</strong> are interactive in this preview; other categories are for context. Use <strong>Home</strong> in the header to return here.</p>' +
+      '<p class="home-lede"><strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management (Leading)</strong> are interactive in this preview; other categories are for context. Use <strong>Home</strong> in the header to return here. Same information architecture as production-minded reviews—supporting user research, IA, usability testing, accessibility, UCD, HCI, and CX evaluation of usability, desirability, and usefulness.</p>' +
       '<div class="home-tools" role="search">' +
       '<label class="home-search-label" for="cat-q">Find category or KPI</label>' +
       '<input id="cat-q" class="home-search" type="search" placeholder="Category or KPI name (e.g. Incident, LTI…)" autocomplete="off" />' +

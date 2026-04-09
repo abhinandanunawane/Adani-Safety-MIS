@@ -2,6 +2,12 @@
 
 /* Fixed canvas 1280×720 — no document scroll */
 /* Brand palette: #00B16B #006DB6 #8E278F #F04C23 | page bg #E6E7E8 | surfaces #FFFFFF */
+/*
+ * Power BI–aligned preview tokens (report page + visuals):
+ * - Page: 1280×720 matches common 16:9 HD export; recreate as one page in Power BI with the same pixel size.
+ * - Type: PBI defaults to Segoe UI; we use Adani + Segoe UI fallback. Keep visual title > axis > legend hierarchy.
+ * - Spacing: 8px grid (--space-grid); pad visuals consistently for easy 1:1 rebuild in PBI.
+ */
 :root {
   /* Approved palette only: green / blue / purple / orange / greys / white */
   --bg-page: #e6e7e8;
@@ -26,6 +32,14 @@
   --viewport-w: 1280px;
   --viewport-h: 720px;
   --header-h: 52px;
+  /* Match Power BI visual hierarchy (sizes work at default browser 16px = 1rem) */
+  --space-grid: 8px;
+  --viz-title-fs: 0.62rem;
+  --viz-caption-fs: 0.54rem;
+  --viz-label-fs: 0.62rem;
+  --viz-table-cell-fs: 0.58rem;
+  --viz-footer-fs-min: 0.52rem;
+  --viz-footer-fs-max: 0.58rem;
   /* Category / KPI drill-down — borders from muted grey only */
   --cat-section-gap: 6px;
   --border-kpi-outer: rgba(109, 110, 113, 0.28);
@@ -95,6 +109,8 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .skip-link {
@@ -334,8 +350,12 @@ body {
 
 .app-footer__text {
   margin: 0;
-  font-size: clamp(0.4rem, 0.62vw, 0.52rem);
-  line-height: 1.25;
+  font-size: clamp(
+    var(--viz-footer-fs-min),
+    0.75vw,
+    var(--viz-footer-fs-max)
+  );
+  line-height: 1.35;
   color: var(--text-muted);
   text-align: center;
   max-width: 100%;
@@ -801,8 +821,9 @@ body {
   margin: 0;
   padding: 0;
   display: inline;
+  font-family: var(--font-display);
   font-size: 0.88rem;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.25;
   color: var(--text-heading);
 }
@@ -903,14 +924,16 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 .cat-toolbar .field {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
+  align-items: stretch;
 }
 
 .cat-toolbar .field-label {
-  font-size: 0.62rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
+  font-family: var(--font);
+  font-size: var(--viz-label-fs);
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.02em;
   color: var(--text-muted);
 }
 
@@ -972,7 +995,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   text-overflow: ellipsis;
 }
 
-/* Variable panel: menu-style rows (All + checkpoints), label left / control right */
+/* Variable panel: menu-style rows — checkbox then label on one line */
 .var-scope__panel {
   position: absolute;
   left: 0;
@@ -980,7 +1003,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   z-index: 50;
   min-width: 13.5rem;
   max-width: min(20rem, calc(100vw - 24px));
-  padding: 6px;
+  padding: 4px;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -998,7 +1021,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 .var-scope__menu {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 
@@ -1017,28 +1040,29 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 .var-scope__options {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .field-variable-check {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 6px;
   font-size: 0.65rem;
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  line-height: 1.35;
+  line-height: 1.2;
   width: 100%;
   box-sizing: border-box;
   font-family: var(--font, system-ui, sans-serif);
 }
 
 .field-variable-check--row {
-  justify-content: space-between;
-  padding: 8px 10px;
-  border-radius: 8px;
+  padding: 3px 6px;
+  min-height: 0;
+  border-radius: 6px;
   margin: 0;
   border: 1px solid transparent;
   background: #ffffff;
@@ -1068,6 +1092,9 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   flex: 1;
   min-width: 0;
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Custom checkbox: rounded square, grey border empty; blue + white check when checked */
@@ -1121,8 +1148,8 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 .cat-view .field--variable {
   flex: 0 0 auto;
   min-width: 0;
-  width: 10.5rem;
-  max-width: 11rem;
+  width: 11.5rem;
+  max-width: 13rem;
 }
 
 .cat-view .field--var-inline:has(.var-scope[open]) {
@@ -1135,10 +1162,11 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   border-radius: 0;
   min-width: 0;
   width: 100%;
-  max-width: 11rem;
+  max-width: 13rem;
   box-shadow: none;
 }
 
+/* Variable trigger — same chrome as cat-toolbar <select> + shared chevron */
 .cat-view .var-scope--toolbar .var-scope__summary {
   list-style: none;
   cursor: pointer;
@@ -1150,15 +1178,17 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   box-sizing: border-box;
   min-height: var(--filter-control-h);
   height: var(--filter-control-h);
-  padding: 2px 6px 2px 8px;
+  padding: 2px 5px 2px 6px;
   font-size: 0.68rem;
-  font-weight: 600;
+  font-weight: 500;
+  font-family: var(--font);
   color: var(--text);
   white-space: nowrap;
   background: #ffffff;
   border: 1px solid var(--border);
   border-radius: 4px;
   box-shadow: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .cat-view .var-scope--toolbar .var-scope__summary::-webkit-details-marker {
@@ -1173,8 +1203,9 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 }
 
 .cat-view .var-scope--toolbar .var-scope__hint {
-  font-weight: 600;
+  font-weight: 500;
   font-size: 0.68rem;
+  font-family: var(--font);
   color: var(--text);
   max-width: 100%;
   overflow: hidden;
@@ -1186,14 +1217,15 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   content: none;
 }
 
-.cat-view .var-scope__chev {
+/* Same chevron language as native selects (small gray triangle, not a separate button) */
+.cat-view .var-scope--toolbar .var-scope__chev {
   flex-shrink: 0;
   width: 0;
   height: 0;
   border-left: 4px solid transparent;
   border-right: 4px solid transparent;
-  border-top: 5px solid rgba(35, 31, 32, 0.55);
-  margin-left: 4px;
+  border-top: 5px solid rgba(35, 31, 32, 0.5);
+  margin-left: 2px;
   margin-top: 1px;
   transition: transform 0.15s ease;
 }
@@ -1205,7 +1237,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 
 .cat-view .var-scope--toolbar[open] .var-scope__summary {
   border-color: var(--brand-blue);
-  box-shadow: 0 0 0 1px rgba(0, 109, 182, 0.25);
+  box-shadow: 0 0 0 1px rgba(0, 109, 182, 0.2);
 }
 
 .cat-view .var-scope--toolbar .var-scope__panel {
@@ -1213,120 +1245,118 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   right: auto;
   min-width: 12.5rem;
   max-width: min(18rem, calc(100vw - 24px));
-  margin-top: 4px;
+  margin-top: 6px;
   padding: 0;
   gap: 0;
+  overflow: hidden;
   background: #ffffff;
-  border: 1px solid rgba(0, 109, 182, 0.2);
-  border-radius: 8px;
+  border: 1px solid rgba(109, 110, 113, 0.12);
+  border-radius: 10px;
   box-shadow:
-    0 12px 32px rgba(35, 31, 32, 0.14),
-    0 2px 8px rgba(0, 109, 182, 0.1);
-  max-height: 260px;
-}
-
-.cat-view .var-scope__panel-head {
-  font-size: 0.58rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--brand-blue);
-  padding: 8px 10px 6px;
-  margin: 0;
-  border-bottom: 1px solid rgba(0, 109, 182, 0.12);
-  background: linear-gradient(
-    180deg,
-    rgba(0, 109, 182, 0.06) 0%,
-    rgba(255, 255, 255, 0) 100%
-  );
+    0 10px 28px rgba(15, 23, 42, 0.12),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  max-height: 280px;
 }
 
 .cat-view .var-scope--toolbar .var-scope__menu {
-  padding: 8px;
-  gap: 4px;
+  padding: 8px 6px 10px;
+  gap: 0;
+  background: #ffffff;
 }
 
 .cat-view .var-scope__divider {
-  margin: 4px 2px 6px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(0, 109, 182, 0.12),
-    transparent
-  );
-}
-
-.cat-view .var-scope__options {
-  gap: 4px;
+  height: 0;
+  margin: 6px 4px 8px;
+  border: 0;
+  border-top: 1px solid rgba(109, 110, 113, 0.12);
+  background: none;
 }
 
 .cat-view .var-scope--toolbar .field-variable-check {
   font-size: 0.62rem;
   gap: 8px;
-  line-height: 1.35;
-  font-weight: 600;
-  color: var(--text);
+  line-height: 1.3;
+  font-weight: 500;
+  color: #231f20;
+}
+
+.cat-view .var-scope--toolbar .var-scope__options {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .cat-view .var-scope--toolbar .field-variable-check--row {
-  padding: 6px 8px;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
   border-radius: 6px;
   margin: 0;
-  border: 1px solid rgba(0, 109, 182, 0.1);
-  background: rgba(0, 109, 182, 0.03);
+  border: none;
+  background: transparent;
   box-shadow: none;
-  transition:
-    background 0.15s ease,
-    border-color 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: background 0.12s ease;
 }
 
 .cat-view .var-scope--toolbar .field-variable-check--row:hover {
-  border-color: rgba(0, 109, 182, 0.28);
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(35, 31, 32, 0.06);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .cat-view .var-scope--toolbar .field-variable-check--row:has(input:checked) {
-  background: rgba(0, 109, 182, 0.1);
-  border-color: rgba(0, 109, 182, 0.38);
-}
-
-.cat-view .var-scope--toolbar .field-variable-check--all.field-variable-check--row {
-  font-weight: 700;
-  color: var(--brand-blue);
   background: rgba(0, 109, 182, 0.06);
 }
 
+.cat-view .var-scope--toolbar .field-variable-check--all.field-variable-check--row {
+  font-weight: 600;
+  color: #231f20;
+  background: rgba(0, 109, 182, 0.06);
+}
+
+.cat-view .var-scope--toolbar .field-variable-check--all.field-variable-check--row:hover {
+  background: rgba(0, 109, 182, 0.1);
+}
+
+.cat-view .var-scope--toolbar .field-variable-check__text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #231f20;
+  font-weight: 500;
+}
+
 .cat-view .var-scope__panel .field-variable-check input[type="checkbox"] {
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
   margin: 0;
-  border: 1px solid rgba(109, 110, 113, 0.45);
+  flex-shrink: 0;
+  border: 1px solid rgba(109, 110, 113, 0.4);
   background: #ffffff;
 }
 
 .cat-view .var-scope__panel .field-variable-check input[type="checkbox"]:checked {
-  background: var(--brand-blue);
-  border-color: var(--brand-blue);
+  background: #006db6;
+  border-color: #006db6;
 }
 
 .cat-view .var-scope__panel .field-variable-check input[type="checkbox"]:checked::after {
   left: 4px;
   top: 0;
   width: 4px;
-  height: 8px;
+  height: 9px;
   border: solid #ffffff;
   border-width: 0 2px 2px 0;
 }
 
 .cat-view .field--variable .field-label {
-  font-size: 0.58rem;
-  font-weight: 600;
+  font-family: var(--font);
+  font-size: 0.62rem;
+  font-weight: 500;
   color: var(--text-muted);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  text-transform: none;
 }
 
 /* Reset: pill, purple border — height matches filter controls */
@@ -1334,8 +1364,8 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   box-sizing: border-box;
   min-height: var(--filter-control-h);
   padding: 2px 12px;
-  font-size: 0.58rem;
-  font-weight: 700;
+  font-size: 0.62rem;
+  font-weight: 500;
   border-radius: 999px;
   background: #ffffff;
   color: var(--brand-blue);
@@ -1420,6 +1450,101 @@ fieldset.kpi-summary-region {
   -ms-overflow-style: none;
 }
 
+/* Chart view ↔ detail table — shared with Insights (`m2-cat-main`) */
+.cat-main-view,
+.m2-cat-main {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.cat-view .view-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-self: flex-start;
+  width: 100%;
+  max-width: 22rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  background: #ffffff;
+  box-sizing: border-box;
+}
+
+.cat-view .view-tabs__btn {
+  flex: 1;
+  margin: 0;
+  padding: 4px 12px;
+  min-height: var(--filter-control-h);
+  box-sizing: border-box;
+  font-family: var(--font);
+  font-size: var(--viz-label-fs);
+  font-weight: 500;
+  color: var(--text);
+  background: #f8fafc;
+  border: none;
+  border-right: 1px solid rgba(109, 110, 113, 0.2);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.cat-view .view-tabs__btn:last-child {
+  border-right: none;
+}
+
+.cat-view .view-tabs__btn:hover {
+  background: #ffffff;
+}
+
+.cat-view .view-tabs__btn--active {
+  background: #ffffff;
+  color: var(--brand-blue);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 0 var(--brand-blue);
+}
+
+.cat-view .view-tabs__btn:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 1px;
+  z-index: 1;
+}
+
+.cat-main-view--charts .view-panel--charts,
+.m2-cat-main--charts .view-panel--charts {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cat-main-view--table .view-panel--table,
+.m2-cat-main--table .view-panel--table {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cat-main-view--charts .view-panel--table,
+.m2-cat-main--charts .view-panel--table {
+  display: none !important;
+}
+
+.cat-main-view--table .view-panel--charts,
+.m2-cat-main--table .view-panel--charts {
+  display: none !important;
+}
+
+.cat-main-view--table .table-zone {
+  flex: 1 1 0 !important;
+  min-height: 0;
+}
+
 /* One baseline: labels share height, selects + Variable trigger share control height */
 .cat-view fieldset.cat-toolbar--compact .cat-toolbar__inner {
   align-items: flex-end;
@@ -1428,9 +1553,11 @@ fieldset.kpi-summary-region {
 
 .cat-view fieldset.cat-toolbar--compact .field-label {
   display: block;
-  font-size: 0.58rem;
-  line-height: 1.2;
-  min-height: 0.72rem;
+  font-family: var(--font);
+  font-size: var(--viz-label-fs);
+  font-weight: 500;
+  line-height: 1.25;
+  min-height: 0.78rem;
   margin: 0;
 }
 
@@ -1459,14 +1586,17 @@ fieldset.kpi-summary-region {
 }
 
 fieldset.cat-toolbar--compact select {
+  font-family: var(--font);
   font-size: 0.68rem;
+  font-weight: 400;
   padding: 2px 5px;
   min-width: 0;
   max-width: 160px;
 }
 
 fieldset.cat-toolbar--compact .field-label {
-  font-size: 0.58rem;
+  font-size: var(--viz-label-fs);
+  font-weight: 500;
 }
 
 .cat-toolbar .toolbar-actions {
@@ -1614,11 +1744,12 @@ fieldset.cat-toolbar--compact .field-label {
 }
 
 .multi-kpi-card__head {
-  font-size: 0.58rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-heading);
+  font-family: var(--font);
+  font-size: 0.62rem;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
   border-bottom: 1px solid var(--border-kpi-tile);
   padding-bottom: 2px;
 }
@@ -1644,6 +1775,11 @@ fieldset.cat-toolbar--compact .field-label {
   flex-direction: column;
   justify-content: flex-start;
   gap: 1px;
+}
+
+.multi-kpi-tile--selected {
+  box-shadow: 0 0 0 2px var(--brand-blue);
+  border-color: rgba(0, 109, 182, 0.45);
 }
 
 .multi-kpi-tile__name {
@@ -1791,30 +1927,42 @@ fieldset.cat-toolbar--compact .field-label {
   flex-shrink: 0;
   margin: 0;
   height: max(
-    88px,
-    calc(88px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
+    118px,
+    calc(118px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
   );
   min-height: max(
-    88px,
-    calc(88px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
+    118px,
+    calc(118px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
   );
   max-height: max(
-    96px,
-    calc(96px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
+    132px,
+    calc(132px + (8 - var(--detail-table-body-rows)) * var(--detail-row-h))
   );
   display: grid;
-  grid-template-columns: 1.15fr 1.15fr 0.75fr;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.75fr);
   gap: var(--cat-section-gap);
   min-width: 0;
   position: relative;
   z-index: 1;
 }
 
+.cat-charts > .chart-box {
+  min-width: 0;
+}
+
+/* Chart-only layout: tab strip lets charts grow */
+.cat-main-view--charts .view-panel--charts .cat-charts {
+  flex: 1 1 0 !important;
+  height: auto !important;
+  min-height: min(300px, 45vh) !important;
+  max-height: none !important;
+}
+
 .chart-box {
   background: var(--bg-card);
   border: 1px solid var(--border-kpi-outer);
   border-radius: var(--radius);
-  padding: 2px 4px 3px;
+  padding: 8px 10px 10px;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1828,19 +1976,31 @@ fieldset.cat-toolbar--compact .field-label {
 }
 
 .chart-box h3 {
-  margin: 0 0 1px;
-  font-size: 0.52rem;
-  font-weight: 700;
-  color: var(--text-heading);
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
+  margin: 0 0 8px;
+  padding: 0 2px;
+  font-family: var(--font);
+  font-size: var(--viz-title-fs);
+  font-weight: 500 !important;
+  color: var(--text);
+  text-transform: none;
+  letter-spacing: 0.02em;
   flex-shrink: 0;
-  line-height: 1.1;
+  line-height: 1.3;
+}
+
+.chart-box h3.chart-analytics-title {
+  text-transform: none;
+  letter-spacing: 0.02em;
+}
+
+.chart-analytics-title__label {
+  font-weight: 500;
+  color: var(--text);
 }
 
 .chart-box__hint {
-  font-weight: 600;
-  font-size: 0.48rem;
+  font-weight: 400;
+  font-size: var(--viz-caption-fs);
   text-transform: none;
   letter-spacing: 0;
   color: var(--text-muted);
@@ -1849,27 +2009,58 @@ fieldset.cat-toolbar--compact .field-label {
 .chart-canvas-wrap {
   flex: 1;
   min-height: 0;
+  min-width: 0;
   position: relative;
+  padding: 4px 8px 8px 8px;
+  box-sizing: border-box;
 }
 
-/* By business: doughnut + legend (Chart.js) */
+/* By business: pie + right legend (Chart.js) — centered pie, legend lists each slice */
 .chart-canvas-wrap--biz {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   justify-content: center;
   min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .chart-canvas-wrap--biz canvas#chart-biz {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 140px;
   width: 100% !important;
   height: 100% !important;
 }
 
+/* Same border as other chart cards — avoids a lone accent stripe on the middle panel */
 .chart-box--biz {
-  border-left: 3px solid var(--brand-blue);
+  border-left: 1px solid var(--border-kpi-outer);
+}
+
+.cat-main-view--charts .view-panel--charts .chart-canvas-wrap--biz {
+  min-height: 168px;
+}
+
+/* Safety Performance Indices: event-level bubble + Leaflet map */
+.cat-charts--spi .chart-canvas-wrap--spi-bubble {
+  min-height: 140px;
+}
+.chart-spi-map-host {
+  flex: 1 1 auto;
+  min-height: 160px;
+  height: 168px;
+  width: 100%;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #e8eef2;
+  z-index: 0;
+}
+.chart-spi-map-fallback {
+  margin: 0;
+  padding: 12px;
+  font-size: 12px;
+  color: #6d6e71;
 }
 
 .chart-biz-breakdown {

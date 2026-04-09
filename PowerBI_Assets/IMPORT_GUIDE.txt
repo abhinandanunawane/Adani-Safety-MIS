@@ -119,6 +119,17 @@ A static HTML preview mirrors the same category → KPI IA as the planned report
   site for group tone); final colours must still match Adani Brand Manual (Aug 2025).
 
 --------------------------------------------------------------------------------
+MASTER KPI / MEASURE MAPPING (EXCEL-FRIENDLY)
+--------------------------------------------------------------------------------
+Master_KPI_Measures_Link.csv  — Open in Excel: Category, KPI key, suggested PBI
+                                measure name (m_KPI_##), DAX filter notes, sign-off
+                                notes. Update this when KPI definitions or owners
+                                change; keep in sync with Dim_KPI.csv and DAX.
+
+PowerBI_Build_and_Update_Workflow.txt — UCD/IA/accessibility summary and steps to
+                                keep the PBIX aligned with dashboard-preview and CSVs.
+
+--------------------------------------------------------------------------------
 FILE LIST
 --------------------------------------------------------------------------------
 Dim_Category.csv              — 9 KPI categories + UX note per category
@@ -127,10 +138,12 @@ Dim_Business.csv              — 10 businesses + State (for browser preview fil
 Dim_Date.csv                  — Monthly grain Feb 2025 – Feb 2026
 Fact_Safety_KPI_Monthly.csv   — 7,150 rows (10 × 13 × 55)
 Dim_KPI_Category.csv          — Wireframe extract (tab-delimited)
+Master_KPI_Measures_Link.csv   — Master crosswalk for measures (open in Excel)
 Adani_Safety_MIS_Theme.json   — Report theme
 DAX_Measures.dax              — Starter measures
 Adani_logo_2012.png           — Header logo
 Layout_1280x720.txt           — Suggested regions
+PowerBI_Build_and_Update_Workflow.txt — Build/update and UX parity
 IMPORT_GUIDE.txt              — This file
 ..\dashboard-preview\         — Browser preview (index.html, Chart.js, embedded data)
 

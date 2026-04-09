@@ -17,7 +17,8 @@ GLOBAL GRID (margins 24 px)
 ---------------------------
 Zone A — Header band:  y = 0–72 px,   full width
 Zone B — Slicer row:    y = 72–140 px, full width (or right-aligned stack)
-Zone C — KPI strip:     y = 140–260 px, 4 tiles @ ~300×120 px with 16 px gutters
+Zone C — KPI strip:     y = 140–260 px, card groups wrap (no horizontal scroll on strip);
+                          ~220–280 px wide per group, 6 px gutters (HTML preview)
 Zone D — Primary chart: y = 260–520 px, width ~760 px (left)
 Zone E — Secondary:     y = 260–520 px, width ~456 px (right) — breakdown by category or trend
 Zone F — Footer note:   y = 520–720 px — data freshness, definitions, accessibility

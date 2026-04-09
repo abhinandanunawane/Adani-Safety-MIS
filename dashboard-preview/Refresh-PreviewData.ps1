@@ -142,6 +142,29 @@ foreach ($c in $cat) {
   $detailArr += [PSCustomObject]@{ categoryKey = $ck; kpis = $rows }
 }
 
+# Preview UX: TRIR (KPI 21) lives under category 3 in Dim_KPI — fan out to categories 1 & 2 so
+# default "Total Recordable Incident Rate (TRI)" filters have fact rows and charts render.
+$triMeta = $null
+$d3 = $detailArr | Where-Object { $_.categoryKey -eq 3 }
+if ($d3) {
+  $triMeta = @($d3.kpis) | Where-Object { $_.kpiKey -eq 21 } | Select-Object -First 1
+}
+if ($triMeta) {
+  foreach ($ck in @(1, 2)) {
+    $block = $detailArr | Where-Object { $_.categoryKey -eq $ck } | Select-Object -First 1
+    if (-not $block) { continue }
+    $hasTri = @($block.kpis) | Where-Object { $_.kpiKey -eq 21 }
+    if (-not $hasTri) {
+      $block.kpis = @($block.kpis) + [PSCustomObject]@{
+        kpiKey      = $triMeta.kpiKey
+        kpiName     = $triMeta.kpiName
+        unitType    = $triMeta.unitType
+        latestValue = $triMeta.latestValue
+      }
+    }
+  }
+}
+
 $factRows = [System.Collections.Generic.List[object]]::new()
 foreach ($f in $fact) {
   $bk = [int]$f.BusinessKey
@@ -164,6 +187,25 @@ foreach ($f in $fact) {
       value = [double]$f.Value
       target = $tgt
     })
+}
+
+foreach ($row in @($factRows.ToArray())) {
+  if ($row.kpiKey -ne 21 -or $row.categoryKey -ne 3) { continue }
+  foreach ($altCat in @(1, 2)) {
+    $factRows.Add([PSCustomObject]@{
+        yearMonth     = $row.yearMonth
+        dateKey       = $row.dateKey
+        businessKey   = $row.businessKey
+        businessName  = $row.businessName
+        state         = $row.state
+        kpiKey        = $row.kpiKey
+        kpiName       = $row.kpiName
+        categoryKey   = $altCat
+        unitType      = $row.unitType
+        value         = $row.value
+        target        = $row.target
+      })
+  }
 }
 
 $monthsList = foreach ($d in $dates) {

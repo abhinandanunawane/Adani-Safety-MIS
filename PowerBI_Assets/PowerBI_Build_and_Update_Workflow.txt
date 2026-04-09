@@ -1,0 +1,84 @@
+================================================================================
+ADANI SAFETY MIS — POWER BI BUILD, PARITY WITH HTML PREVIEW, ITERATIVE UPDATES
+================================================================================
+March 2026
+
+PURPOSE
+-------
+Explain how to keep the Power BI report aligned with the static browser preview
+(same information architecture, similar filter band, comparable visuals) while
+using a maintainable workflow: master mapping sheet, CSV data, theme, and DAX.
+
+DESIGN PRINCIPLES (SUMMARY)
+---------------------------
+- User research & UCD: validate tasks (e.g., find LTIFR, compare businesses) with
+  real users; adjust slicer defaults and labels from findings.
+- Information architecture: Category → KPI list → detail — mirrored in report
+  pages and drill paths.
+- Usability & usefulness: one filter band; avoid vertical growth of slicer rows
+  (Power BI: place slicers in a horizontal container or single row where possible).
+- Accessibility: sufficient contrast (theme), alt text on visuals, keyboard
+  access to slicers and bookmarks.
+- Consistency & hierarchy: same theme JSON on every page; title band + filters
+  repeat predictably.
+- Desirability / CX: executive views stay scannable; detail pages support analysts.
+- Iterative process: refresh data and remeasure; re-test after each release.
+
+PARITY WITH ..\dashboard-preview\
+----------------------------------
+- Page size 1280 × 720 (see Layout_1280x720.txt).
+- Filters: period (current month / YTD / custom range) and dimensions (KPI,
+  State, Business, Unit) map to slicers or the date table — not every HTML control
+  has a one-click Power BI twin; replicate the *intent* (same slice of data).
+- Charts: line (trend), bar (by business), doughnut or treemap (unit mix) — choose
+  Power BI visuals that match the story.
+- After changing CSVs in this folder, run dashboard-preview\Refresh-PreviewData.ps1
+  so the HTML demo stays in sync for stakeholder review before you publish PBI.
+
+MASTER EXCEL / CSV FOR MEASURES AND KPI OWNERSHIP
+-------------------------------------------------
+File: Master_KPI_Measures_Link.csv
+- Open in Microsoft Excel (or keep as CSV). This is the crosswalk: Category,
+  KPI key, suggested measure name, and DAX filter hints.
+- When definitions change: edit this sheet first (or the source wireframe Excel),
+  then update Dim_KPI.csv if names/keys change, then DAX_Measures.dax, then refresh
+  Power BI.
+- Optional: "Save As" .xlsx for your team if you need multiple tabs (e.g., one tab
+  for measure definitions, one for sign-off). Power BI imports CSV directly; for
+  .xlsx use Get Data > Excel.
+
+IMPORT AND UPDATE LOOP (POWER BI DESKTOP)
+-----------------------------------------
+1) Get Data: load all CSVs from this folder (see IMPORT_GUIDE.txt).
+2) Model: relationships as in IMPORT_GUIDE; mark Dim_Date as date table.
+3) Measures: paste from DAX_Measures.dax; rename only via Master_KPI_Measures_Link
+   so names stay traceable.
+4) Theme: Adani_Safety_MIS_Theme.json.
+5) Publish or save PBIX; when source files change, replace CSVs, refresh, and
+   regression-check visuals against the HTML preview.
+
+ASSETS THAT CHANGE OFTEN
+------------------------
+- Fact_Safety_KPI_Monthly.csv — refresh from production when available.
+- Dim_KPI.csv / Master_KPI_Measures_Link.csv — when KPI list or owners change.
+- DAX_Measures.dax — when business rules change.
+- Adani_Safety_MIS_Theme.json — rare; after brand updates only.
+
+KPI STRIP — WRAPPED ROWS (MATCHES ..\dashboard-preview\)
+---------------------------------------------------------
+- HTML preview: metric card groups wrap to additional rows (no horizontal scroll on
+  the KPI strip). Chart row uses a fixed height so the detail table stays on-screen.
+- Power BI: use a horizontal container with wrapping, or multiple card rows; keep
+  chart band height constrained so the matrix/table remains visible below.
+- Card group width target ~220–280 px per group; use “Metric N” for a single-tile group.
+
+LANDING / HOME — IMAGE + NO PAGE SCROLL
+---------------------------------------
+- Right hero image: place adani-group.jpg under dashboard-preview\assets\ (same file
+  can be copied into Power BI as “Image” visual, full bleed in the right column).
+- Fallback in preview: if the JPG is missing, the page loads Adani_logo_2012.png from
+  PowerBI_Assets. Publish the JPG with the report or use a known-good URL in PBI.
+- Fixed 1280×720: keep Home and Category pages without vertical page scroll; use
+  internal scroll only where explicitly designed (e.g. KPI strip horizontal).
+
+================================================================================
