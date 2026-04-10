@@ -68,7 +68,7 @@
 
   if (typeof Chart !== "undefined") {
     Chart.defaults.font.family =
-      '"Adani", system-ui, -apple-system, "Segoe UI", sans-serif';
+      '"Segoe UI", "Segoe UI Variable", "Segoe UI Historic", system-ui, sans-serif';
     Chart.defaults.font.size = 10;
     Chart.defaults.color = "#231f20";
   }
@@ -149,84 +149,11 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
-  /** Category keys: 1 Incident, 2 Hazard & Observation (Leading), 3 Safety Performance Indices. */
-  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2, 3]);
-  const SPI_CATEGORY_KEY = 3;
-  const EVENT_LEVEL_LABELS = [
-    "0 Near Miss",
-    "1 Minor",
-    "2 Moderate",
-    "3 Serious",
-    "4 Major",
-    "5 Catastrophic",
-    "No Level",
-  ];
-  const SPI_KPI_ORDER = [21, 16, 17, 18, 20, 29];
-  const STATE_CENTROID_BY_STATE = {
-    "Andaman and Nicobar Islands": [11.7401, 92.6586],
-    "Andhra Pradesh": [15.9129, 79.74],
-    "Arunachal Pradesh": [28.218, 94.7278],
-    Assam: [26.2006, 92.9376],
-    Bihar: [25.0961, 85.3131],
-    Chandigarh: [30.7333, 76.7794],
-    Chhattisgarh: [21.2787, 81.8661],
-    "Dadra and Nagar Haveli and Daman and Diu": [20.2734, 73.0169],
-    Delhi: [28.7041, 77.1025],
-    Goa: [15.2993, 74.124],
-    Gujarat: [22.2587, 71.1924],
-    Haryana: [29.0588, 76.0856],
-    "Himachal Pradesh": [31.1048, 77.1734],
-    "Jammu and Kashmir": [33.7782, 76.5762],
-    Jharkhand: [23.6102, 85.2799],
-    Karnataka: [15.3173, 75.7139],
-    Kerala: [10.8505, 76.2711],
-    Ladakh: [34.2268, 77.5619],
-    Lakshadweep: [10.5667, 72.6417],
-    "Madhya Pradesh": [22.9734, 78.6569],
-    Maharashtra: [19.7515, 75.7139],
-    Manipur: [24.6637, 93.9063],
-    Meghalaya: [25.467, 91.3662],
-    Mizoram: [23.1645, 92.9376],
-    Nagaland: [26.1584, 94.5624],
-    Odisha: [20.9517, 85.0985],
-    Puducherry: [11.9416, 79.8083],
-    Punjab: [31.1471, 75.3412],
-    Rajasthan: [27.0238, 74.2179],
-    Sikkim: [27.533, 88.5122],
-    "Tamil Nadu": [11.1271, 78.6569],
-    Telangana: [18.1124, 79.0193],
-    Tripura: [23.9408, 91.9882],
-    "Uttar Pradesh": [26.8467, 80.9462],
-    Uttarakhand: [30.0668, 79.0193],
-    "West Bengal": [22.9868, 87.855],
-  };
-
-  function hash32(str) {
-    let h = 2166136261;
-    const s = String(str);
-    for (let i = 0; i < s.length; i++) {
-      h ^= s.charCodeAt(i);
-      h = Math.imul(h, 16777619);
-    }
-    return h >>> 0;
-  }
-
-  function eventLevelIndexForRow(r) {
-    const key =
-      String(r.kpiKey) +
-      "|" +
-      (r.state || "") +
-      "|" +
-      (r.businessName || "") +
-      "|" +
-      (r.yearMonth || "");
-    return hash32(key) % 7;
-  }
+  /** Category keys with full KPI drill-down: 1 Incident Management, 2 Hazard & Observation Management (Leading). */
+  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2]);
 
   const LS_KPI_PREFIX = "insights-kpi-keys-";
   const LS_TABLE_SCOPE = "insights-table-kpi-scope";
-  /** Chart view vs detail table — shared with index preview (`app.js`). */
-  const LS_CAT_MAIN_VIEW = "adani_cat_main_view";
 
   function loadKpiSelection(catKey, kpisMeta) {
     try {
@@ -242,7 +169,12 @@
     } catch {
       /* ignore */
     }
-    return [defaultKpiKeyForCategory(catKey, kpisMeta)];
+    if (catKey === 1 && kpisMeta.length) {
+      return ["1", "2", "3", "4", "5"];
+    }
+    return kpisMeta
+      .slice(0, Math.min(5, kpisMeta.length))
+      .map((k) => String(k.kpiKey));
   }
 
   function saveKpiSelection(catKey, keys) {
@@ -421,37 +353,38 @@
   function variableFilterFieldHtml() {
     return (
       '<div class="field field--variable field--var-inline">' +
-      '<span class="field-label" id="f-var-lbl">Verticals</span>' +
+      '<span class="field-label" id="f-var-lbl">Variable</span>' +
       '<details class="var-scope var-scope--toolbar" id="f-var-details">' +
       '<summary class="var-scope__summary" aria-labelledby="f-var-lbl">' +
       '<span class="var-scope__summary-text">' +
-      '<span class="var-scope__hint" id="f-var-hint">All checkpoints</span>' +
+      '<span class="var-scope__hint" id="f-var-hint">All</span>' +
       "</span>" +
       '<span class="var-scope__chev" aria-hidden="true"></span>' +
       "</summary>" +
-      '<div class="var-scope__panel" role="group" aria-label="Vertical options">' +
+      '<div class="var-scope__panel" role="group" aria-label="Checkpoint options">' +
+      '<div class="var-scope__panel-head">Checkpoints</div>' +
       '<div class="var-scope__menu">' +
       '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
-      '<input type="checkbox" id="f-var-all" checked />' +
       '<span class="field-variable-check__text">All checkpoints</span>' +
+      '<input type="checkbox" id="f-var-all" checked />' +
       "</label>" +
       '<div class="var-scope__divider" aria-hidden="true"></div>' +
       '<div class="var-scope__options">' +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<input type="checkbox" class="f-var-cb" value="Field Force" />' +
       '<span class="field-variable-check__text">Field Force</span>' +
+      '<input type="checkbox" class="f-var-cb" value="Field Force" />' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<input type="checkbox" class="f-var-cb" value="O and M" />' +
       '<span class="field-variable-check__text">O and M</span>' +
+      '<input type="checkbox" class="f-var-cb" value="O and M" />' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<input type="checkbox" class="f-var-cb" value="Office" />' +
       '<span class="field-variable-check__text">Office</span>' +
+      '<input type="checkbox" class="f-var-cb" value="Office" />' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<input type="checkbox" class="f-var-cb" value="Projects" />' +
       '<span class="field-variable-check__text">Projects</span>' +
+      '<input type="checkbox" class="f-var-cb" value="Projects" />' +
       "</label>" +
       "</div></div></div></details></div>"
     );
@@ -463,15 +396,23 @@
     const cbs = document.querySelectorAll("input.f-var-cb");
     if (!hint || !all) return;
     if (all.checked) {
-      hint.textContent = "All checkpoints";
+      hint.textContent = "All";
       return;
     }
     const sel = [...cbs].filter((cb) => cb.checked).map((cb) => cb.value);
     if (sel.length === 0) {
-      hint.textContent = "All checkpoints";
+      hint.textContent = "All";
       return;
     }
-    hint.textContent = sel.length + " Selected";
+    if (sel.length === 1) {
+      hint.textContent = sel[0];
+      return;
+    }
+    if (sel.length === 2) {
+      hint.textContent = sel.join(", ");
+      return;
+    }
+    hint.textContent = sel.length + " selected";
   }
 
   function readVariableSelectionFromDom() {
@@ -587,7 +528,7 @@
         return svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
       case 4:
         return svg(
-          '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+          '<line x1="12" y1="21" x2="12" y2="7"/><line x1="4" y1="7" x2="20" y2="7"/><path d="M7 7L4.5 14h5L7 7"/><path d="M17 7l2.5 7h-5L17 7"/>'
         );
       case 5:
         return svg(
@@ -595,15 +536,26 @@
         );
       case 6:
         return svg(
-          '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>'
+          '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>'
         );
       case 7:
         return svg(
-          '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'
+          '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
         );
       case 8:
+        /* Leadership & Safety Governance — clear climb + leader w/ flag + follower + idea dots (matches other stroke icons) */
         return svg(
-          '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+          '<path d="M1.5 22h8v-3.5h6.5v-4h7.5v-3.5"/>' +
+            '<path d="M8.5 15.5c2.8-2.2 5.8-4.2 9-5.8" opacity="0.45"/>' +
+            '<circle cx="6.2" cy="13" r="1.75"/>' +
+            '<path d="M3.2 20v-.5a2.6 2.6 0 012.6-2.3h.8a2.6 2.6 0 012.6 2.3v.5"/>' +
+            '<circle cx="17.6" cy="7.2" r="1.85"/>' +
+            '<path d="M14 13.2v-.5a3 3 0 013-2.6h.8a3 3 0 013 2.6v.5"/>' +
+            '<line x1="19.8" y1="8.8" x2="19.8" y2="2.2"/>' +
+            '<path d="M19.8 2.2l3.4 1.5v2.6l-3.4 1.5z"/>' +
+            '<circle cx="3.2" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
+            '<circle cx="5.4" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
+            '<circle cx="7.6" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>'
         );
       case 9:
         return svg(
@@ -721,237 +673,14 @@
     return uniq.length === 1 ? uniq[0] : null;
   }
 
-  function destroySpiLeafletMap() {
-    if (window.__adaniSpiMap) {
-      try {
-        window.__adaniSpiMap.remove();
-      } catch {
-        /* ignore */
-      }
-      window.__adaniSpiMap = null;
-    }
-    const host = document.getElementById("chart-spi-map");
-    if (host) host.innerHTML = "";
-  }
-
   function destroyCharts() {
-    ["chart-trend", "chart-verticals", "chart-biz", "chart-spi-bubble"].forEach(
-      (id) => {
-        const el = document.getElementById(id);
-        if (el && typeof Chart !== "undefined") {
-          const c = Chart.getChart(el);
-          if (c) c.destroy();
-        }
+    ["chart-trend", "chart-kpi-vs", "chart-biz"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && typeof Chart !== "undefined") {
+        const c = Chart.getChart(el);
+        if (c) c.destroy();
       }
-    );
-    destroySpiLeafletMap();
-  }
-
-  function resizeSpiMapIfAny() {
-    if (window.__adaniSpiMap && typeof window.__adaniSpiMap.invalidateSize === "function") {
-      try {
-        window.__adaniSpiMap.invalidateSize();
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
-  function resizeAllChartsModern() {
-    ["chart-trend", "chart-verticals", "chart-biz", "chart-spi-bubble"].forEach(
-      (id) => {
-        const el = document.getElementById(id);
-        if (el && typeof Chart !== "undefined") {
-          const c = Chart.getChart(el);
-          if (c) c.resize();
-        }
-      }
-    );
-    resizeSpiMapIfAny();
-  }
-
-  function renderSpiEventBubbleChart(snapRows) {
-    const el = document.getElementById("chart-spi-bubble");
-    if (!el || typeof Chart === "undefined") return;
-    const prev = Chart.getChart(el);
-    if (prev) prev.destroy();
-    const counts = [0, 0, 0, 0, 0, 0, 0];
-    snapRows.forEach((r) => {
-      counts[eventLevelIndexForRow(r)]++;
     });
-    const bubbleData = counts.map((cnt, xi) => ({
-      x: xi,
-      y: cnt,
-      r: Math.max(6, Math.sqrt(cnt + 1) * 7),
-    }));
-    new Chart(el, {
-      type: "bubble",
-      data: {
-        datasets: [
-          {
-            label: "Rows",
-            data: bubbleData,
-            backgroundColor: "rgba(0, 109, 182, 0.45)",
-            borderColor: "#006DB6",
-            borderWidth: 1.5,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: { padding: { top: 10, right: 12, bottom: 8, left: 8 } },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const raw = ctx.raw;
-                const xi = Math.round(Number(raw.x));
-                const lbl = EVENT_LEVEL_LABELS[xi] || "";
-                return " " + lbl + ": " + raw.y + " rows";
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            type: "linear",
-            min: -0.5,
-            max: 6.5,
-            ticks: {
-              stepSize: 1,
-              font: { size: 8 },
-              maxRotation: 55,
-              minRotation: 35,
-              autoSkip: false,
-              callback(v) {
-                const i = Math.round(Number(v));
-                return i >= 0 && i < EVENT_LEVEL_LABELS.length
-                  ? EVENT_LEVEL_LABELS[i]
-                  : "";
-              },
-            },
-            title: {
-              display: true,
-              text: "Event level",
-              font: { size: 10 },
-              color: "#6D6E71",
-            },
-            grid: { color: "rgba(109, 110, 113, 0.12)" },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: { font: { size: 10 }, color: "#231f20" },
-            title: {
-              display: true,
-              text: "Count (rows)",
-              font: { size: 10 },
-              color: "#6D6E71",
-            },
-            grid: { color: "rgba(109, 110, 113, 0.2)" },
-          },
-        },
-      },
-    });
-  }
-
-  function renderSpiPerformanceMap(snapRows) {
-    const el = document.getElementById("chart-spi-map");
-    if (!el) return;
-    destroySpiLeafletMap();
-    if (typeof L === "undefined") {
-      el.innerHTML =
-        '<p class="chart-spi-map-fallback">Map unavailable. Load Leaflet to see state circles.</p>';
-      return;
-    }
-    const byState = {};
-    snapRows.forEach((r) => {
-      const st = String(r.state || "").trim() || "—";
-      byState[st] = (byState[st] || 0) + 1;
-    });
-    const map = L.map(el, { scrollWheelZoom: false }).setView([22.6, 79.0], 4.5);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
-    const latLngs = [];
-    Object.keys(byState).forEach((st) => {
-      const ll = STATE_CENTROID_BY_STATE[st];
-      if (!ll) return;
-      const n = byState[st];
-      latLngs.push(ll);
-      const rad = Math.max(6, Math.min(32, Math.sqrt(n) * 3.2));
-      L.circleMarker(ll, {
-        radius: rad,
-        color: "#006DB6",
-        fillColor: "#00B16B",
-        fillOpacity: 0.52,
-        weight: 2,
-      })
-        .bindPopup(escapeHtml(st) + ": " + n + " rows (filtered)")
-        .addTo(map);
-    });
-    if (latLngs.length === 1) {
-      map.setView(latLngs[0], 6);
-    } else if (latLngs.length > 1) {
-      map.fitBounds(L.latLngBounds(latLngs), { padding: [28, 28], maxZoom: 7 });
-    }
-    window.__adaniSpiMap = map;
-    setTimeout(() => {
-      try {
-        map.invalidateSize();
-      } catch {
-        /* ignore */
-      }
-    }, 80);
-  }
-
-  function wireCatMainView() {
-    const main = document.getElementById("cat-main-view");
-    if (!main) return;
-    const tabCharts = document.getElementById("view-tab-charts");
-    const tabTable = document.getElementById("view-tab-table");
-    const panelCharts = document.getElementById("view-panel-charts");
-    const panelTable = document.getElementById("view-panel-table");
-    function apply(mode) {
-      const charts = mode === "charts";
-      main.classList.toggle("m2-cat-main--charts", charts);
-      main.classList.toggle("m2-cat-main--table", !charts);
-      main.dataset.view = mode;
-      if (tabCharts) {
-        tabCharts.setAttribute("aria-selected", charts ? "true" : "false");
-        tabCharts.classList.toggle("view-tabs__btn--active", charts);
-        tabCharts.tabIndex = charts ? 0 : -1;
-      }
-      if (tabTable) {
-        tabTable.setAttribute("aria-selected", charts ? "false" : "true");
-        tabTable.classList.toggle("view-tabs__btn--active", !charts);
-        tabTable.tabIndex = charts ? -1 : 0;
-      }
-      if (panelCharts) panelCharts.hidden = !charts;
-      if (panelTable) panelTable.hidden = charts;
-      try {
-        localStorage.setItem(LS_CAT_MAIN_VIEW, mode);
-      } catch {
-        /* ignore */
-      }
-      if (charts) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => resizeAllChartsModern());
-        });
-      }
-    }
-    let initial = "charts";
-    try {
-      const s = localStorage.getItem(LS_CAT_MAIN_VIEW);
-      if (s === "charts" || s === "table") initial = s;
-    } catch {
-      /* ignore */
-    }
-    apply(initial);
-    tabCharts?.addEventListener("click", () => apply("charts"));
-    tabTable?.addEventListener("click", () => apply("table"));
   }
 
   /* Approved palette only: #00B16B #006DB6 #8E278F #F04C23 (+ white/grey backgrounds) */
@@ -967,8 +696,7 @@
   ];
 
   /**
-   * By business: donut chart — share of total (|value|) per business; top slices + Other.
-   * Matches classic preview: legend on the right, same window as filters.
+   * By business: horizontal bars (Chart.js) — top businesses + Other; length = share of total.
    */
   function renderBizBreakdown(bizLabels, bizData, opts) {
     const el = document.getElementById("chart-biz");
@@ -988,120 +716,56 @@
       }
       return;
     }
-
-    const pairs = bizLabels
-      .map((name, i) => ({
-        name,
-        v: Math.abs(Number(bizData[i]) || 0),
-      }))
-      .filter((p) => p.v > 0);
-    if (!pairs.length) {
-      el.hidden = true;
-      if (emptyEl) {
-        emptyEl.hidden = false;
-        emptyEl.textContent = emptyMsg;
-      }
-      return;
-    }
-
     el.hidden = false;
     if (emptyEl) emptyEl.hidden = true;
 
-    pairs.sort((a, b) => b.v - a.v);
-    const maxSlices = 7;
-    let fullNames = [];
-    let labels = [];
-    let values = [];
-    function shortLabel(name) {
-      const s = String(name);
-      return s.length > 12 ? s.slice(0, 11) + "…" : s;
+    const ranked = bizLabels
+      .map((name, i) => ({
+        name: name.length > 18 ? name.slice(0, 16) + "…" : name,
+        fullName: name,
+        v: Math.max(0, Math.abs(Number(bizData[i]) || 0)),
+      }))
+      .sort((a, b) => b.v - a.v);
+    const topN = 8;
+    const top = ranked.slice(0, topN);
+    const otherV = ranked.slice(topN).reduce((a, x) => a + x.v, 0);
+    const rows = top.slice();
+    if (otherV > 1e-12) {
+      rows.push({
+        name: "Other",
+        fullName: "Other (remaining businesses)",
+        v: otherV,
+      });
     }
-    if (pairs.length <= maxSlices) {
-      fullNames = pairs.map((p) => p.name);
-      labels = fullNames.map(shortLabel);
-      values = pairs.map((p) => p.v);
-    } else {
-      const top = pairs.slice(0, maxSlices);
-      const rest = pairs.slice(maxSlices);
-      const other = rest.reduce((s, p) => s + p.v, 0);
-      fullNames = top.map((p) => p.name);
-      labels = fullNames.map(shortLabel);
-      values = top.map((p) => p.v);
-      if (other > 0) {
-        fullNames.push("Other (" + rest.length + " businesses)");
-        labels.push("Other");
-        values.push(other);
-      }
-    }
-
+    const values = rows.map((r) => r.v);
+    const fullNames = rows.map((r) => r.fullName);
+    const labels = rows.map((r) => r.name);
     const total = values.reduce((a, b) => a + b, 0) || 1;
+    const bg = labels.map(
+      (_, i) => chartPaletteColors[i % chartPaletteColors.length]
+    );
 
     new Chart(el, {
-      type: "doughnut",
+      type: "bar",
       data: {
         labels: labels,
         datasets: [
           {
             data: values,
-            backgroundColor: labels.map(
-              (_, i) => chartPaletteColors[i % chartPaletteColors.length]
-            ),
+            backgroundColor: bg,
             borderColor: "#ffffff",
-            borderWidth: 1.5,
-            hoverOffset: 4,
+            borderWidth: 1,
+            borderRadius: 4,
+            maxBarThickness: 14,
           },
         ],
       },
       options: {
+        indexAxis: "y",
         responsive: true,
         maintainAspectRatio: false,
-        radius: "70%",
-        cutout: "55%",
-        layout: {
-          padding: { top: 6, right: 4, bottom: 6, left: 4 },
-        },
         plugins: {
-          legend: {
-            display: true,
-            position: "right",
-            align: "center",
-            labels: {
-              font: {
-                size: 9,
-                family: '"Adani", system-ui, "Segoe UI", sans-serif',
-              },
-              color: "#231f20",
-              boxWidth: 10,
-              boxHeight: 10,
-              padding: 6,
-              maxWidth: 118,
-              usePointStyle: true,
-              generateLabels: function (chart) {
-                const ds = chart.data.datasets[0];
-                const labs = chart.data.labels || [];
-                if (!labs.length || !ds) return [];
-                return labs.map(function (label, i) {
-                  const raw = Number(ds.data[i]) || 0;
-                  const pct =
-                    total > 0
-                      ? ((raw / total) * 100).toFixed(1)
-                      : "0.0";
-                  const bg = Array.isArray(ds.backgroundColor)
-                    ? ds.backgroundColor[i]
-                    : ds.backgroundColor;
-                  return {
-                    text: String(label) + " (" + pct + "%)",
-                    fillStyle: bg,
-                    strokeStyle: "#ffffff",
-                    lineWidth: 1,
-                    hidden: !chart.getDataVisibility(i),
-                    index: i,
-                    datasetIndex: 0,
-                  };
-                });
-              },
-            },
-          },
+          legend: { display: false },
           tooltip: {
             callbacks: {
               title(items) {
@@ -1109,18 +773,28 @@
                 return fullNames[i] != null ? String(fullNames[i]) : "";
               },
               label(ctx) {
-                const raw = ctx.raw;
-                const pct = ((Number(raw) / total) * 100).toFixed(1);
-                const v = Number(raw);
+                const raw = Number(ctx.raw);
+                const pct = ((raw / total) * 100).toFixed(1);
                 const num =
-                  v >= 1e6
-                    ? v.toLocaleString(undefined, {
+                  raw >= 1e6
+                    ? raw.toLocaleString(undefined, {
                         maximumFractionDigits: 0,
                       })
-                    : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+                    : raw.toLocaleString(undefined, { maximumFractionDigits: 2 });
                 return " " + num + " (" + pct + "% of total)";
               },
             },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: "rgba(15,23,42,0.08)" },
+            ticks: { font: { size: 7 }, maxTicksLimit: 6 },
+          },
+          y: {
+            grid: { display: false },
+            ticks: { font: { size: 7 } },
           },
         },
       },
@@ -1226,8 +900,7 @@
   }
 
   /** Checkboxes + summary: which KPIs drive tiles, charts, and evidence cards. */
-  function kpiScopePanelHtml(catKey) {
-    const kpisMeta = kpiListForFilterDropdown(catKey);
+  function kpiScopePanelHtml(catKey, kpisMeta) {
     const sel = loadKpiSelection(catKey, kpisMeta);
     const boxes = kpisMeta
       .map((k) => {
@@ -1245,7 +918,7 @@
           checked +
           "/>" +
           '<span class="m2-kpi-cb__text">' +
-          escapeHtml(kpiDropdownLabel(k)) +
+          escapeHtml(k.kpiName) +
           "</span></label>"
         );
       })
@@ -1254,13 +927,12 @@
       '<details class="m2-kpi-scope m2-kpi-scope--toolbar">' +
       '<summary class="m2-kpi-scope__summary" id="f-kpi-scope-label">' +
       '<span class="m2-kpi-scope__summary-text">' +
-      '<span class="m2-kpi-scope__title">KPIs</span> ' +
+      '<span class="m2-kpi-scope__title">KPIs</span>' +
       '<span class="m2-kpi-scope__count" id="f-kpi-count"></span>' +
-      "</span>" +
-      '<span class="m2-kpi-scope__chev" aria-hidden="true"></span>' +
-      "</summary>" +
+      "</span></summary>" +
       '<div class="m2-kpi-panel" id="f-kpi-panel" role="group" aria-labelledby="f-kpi-scope-label">' +
       '<div class="m2-kpi-panel__bar">' +
+      '<button type="button" class="m2-btn m2-btn--tiny" id="f-kpi-all">All</button>' +
       '<button type="button" class="m2-btn m2-btn--tiny" id="f-kpi-none">None</button>' +
       "</div>" +
       '<div class="m2-kpi-panel__list">' +
@@ -1285,74 +957,17 @@
     return nums.reduce((a, b) => a + b, 0) / nums.length;
   }
 
-  function isTriKpiMeta(k) {
-    return (
-      String(k.kpiKey) === "21" ||
-      /Total Recordable|TRIR|\bTRI\b|Recordable Incident Rate/i.test(
-        k.kpiName || ""
-      )
-    );
-  }
-
-  /** Incident Management: TRI first, then wireframe order (ΔRepeat, ΔFatal, Man-days, Vehicle). */
+  /** Incident Management: wireframe order — chunk 4 = ΔRepeat, ΔFatal, Man-days, Vehicle. */
   const INCIDENT_KPI_ORDER = [
-    21, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
+    1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
   ];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
-    const list = kpisMeta.slice();
     if (catKey === 1) {
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
+      const map = new Map(kpisMeta.map((k) => [k.kpiKey, k]));
       return INCIDENT_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
-    if (catKey === SPI_CATEGORY_KEY) {
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
-      const ordered = SPI_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
-      const rest = list.filter(
-        (k) => !SPI_KPI_ORDER.includes(Number(k.kpiKey))
-      );
-      return ordered.concat(rest);
-    }
-    const tri = list.find((k) => isTriKpiMeta(k));
-    if (!tri) return list;
-    const rest = list.filter((k) => k !== tri);
-    return [tri, ...rest];
-  }
-
-  const TRI_LABEL_FULL = "Total Recordable Incident Rate (TRI)";
-
-  function defaultKpiKeyForCategory(catKey, kpisMetaForUi) {
-    const merged =
-      kpisMetaForUi && kpisMetaForUi.length
-        ? kpisMetaForUi
-        : kpiListForFilterDropdown(catKey);
-    const tri = merged.find((k) => isTriKpiMeta(k));
-    if (tri) return String(tri.kpiKey);
-    const sorted = sortKpisForDisplay(catKey, merged);
-    return sorted.length ? String(sorted[0].kpiKey) : "21";
-  }
-
-  function kpiDropdownLabel(k) {
-    const name = String(k.kpiName || "").trim();
-    if (/^TRIR$/i.test(name) || String(k.kpiKey) === "21") return TRI_LABEL_FULL;
-    return k.kpiName;
-  }
-
-  /** KPI scope / storage: always offer TRI when missing; TRI listed first. */
-  function kpiListForFilterDropdown(catKey) {
-    const m = getKpis(catKey);
-    const hasTri = m.some(isTriKpiMeta);
-    const base = hasTri
-      ? m.slice()
-      : [
-          {
-            kpiKey: 21,
-            kpiName: "TRIR",
-            unitType: "PercentOrRate",
-            latestValue: null,
-          },
-        ].concat(m);
-    return sortKpisForDisplay(catKey, base);
+    return kpisMeta.slice();
   }
 
   function monthAdd(ym, delta) {
@@ -1451,16 +1066,6 @@
     });
   }
 
-  /** Multi-KPI tiles: all KPIs; geography / business / vertical filters only. */
-  function applyNonMonthFiltersAllKpis(rows, f) {
-    return rows.filter((r) => {
-      if (f.state !== "all" && r.state !== f.state) return false;
-      if (f.business !== "all" && r.businessName !== f.business) return false;
-      if (!rowMatchesVariable(r, f.variable)) return false;
-      return true;
-    });
-  }
-
   function pctChange(cur, prev) {
     if (prev == null || cur == null) return null;
     const p = Number(prev);
@@ -1484,8 +1089,15 @@
   }
 
   function buildKpiDetailMetrics(catKey, kpisMeta, f) {
-    const sorted = sortKpisForDisplay(catKey, kpisMeta);
-    const base = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
+    let sorted = sortKpisForDisplay(catKey, kpisMeta);
+    if (f.kpiKeys && f.kpiKeys.length) {
+      sorted = sorted.filter((k) =>
+        f.kpiKeys.includes(String(k.kpiKey))
+      );
+    } else {
+      sorted = [];
+    }
+    const base = applyNonMonthFilters(getRowsForCategory(catKey), f);
     const ref = f.refMonth;
     const mode = f.vsMode || DEFAULT_VS_MODE;
     const m1 = monthAdd(ref, -1);
@@ -1623,13 +1235,7 @@
     board.appendChild(ph);
   }
 
-  function appendM2KpiTile(
-    board,
-    item,
-    refMonth,
-    vsMode,
-    extraClass
-  ) {
+  function appendM2KpiTile(board, item, refMonth, vsMode, extraClass) {
     const tile = document.createElement("div");
     const vDir = item.vsDir || "neutral";
     const dirMod =
@@ -1697,12 +1303,7 @@
     board.appendChild(tile);
   }
 
-  function renderMultiKpiCards(
-    container,
-    aggregatesList,
-    refMonth,
-    vsMode
-  ) {
+  function renderMultiKpiCards(container, aggregatesList, refMonth, vsMode) {
     container.innerHTML = "";
     const sorted = sortKpiTilesForDisplay(aggregatesList);
     if (!sorted.length) return;
@@ -1712,7 +1313,7 @@
     row.setAttribute("role", "group");
     row.setAttribute(
       "aria-label",
-      "KPI metrics for this category"
+      "KPI metrics for the KPIs selected in KPI scope"
     );
 
     function appendMetricCardBlock(startMetric, items, cardMod) {
@@ -1764,7 +1365,10 @@
   }
 
   /**
-   * Charts: line trend (+ for SPI, event-level bubble + India map); else donut + by vertical.
+   * Three distinct stories:
+   * 1) Line — KPI level vs time (same window as filters).
+   * 2) Share list — business composition of value in that window.
+   * 3) Horizontal bars — Vs % change by KPI (same logic as tiles).
    */
   function buildCharts(catKey, f) {
     destroyCharts();
@@ -1827,8 +1431,6 @@
       };
     });
 
-    const utChart = kpiUnitTypeForFilter(catKey, f);
-
     const elTrend = document.getElementById("chart-trend");
     if (elTrend && monthKeys.length) {
       new Chart(elTrend, {
@@ -1840,15 +1442,12 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          layout: {
-            padding: { top: 12, right: 16, bottom: 14, left: 22 },
-          },
           interaction: { mode: "index", intersect: false },
           plugins: {
             legend: {
               display: lineDatasets.length > 1,
               position: "bottom",
-              labels: { font: { size: 9 }, boxWidth: 10 },
+              labels: { font: { size: 7 }, boxWidth: 8 },
             },
             tooltip: {
               callbacks: {
@@ -1860,25 +1459,17 @@
           },
           scales: {
             x: {
-              ticks: { font: { size: 10 }, maxRotation: 40, padding: 4 },
+              ticks: { font: { size: 8 }, maxRotation: 40 },
               grid: { color: "rgba(15,23,42,0.06)" },
             },
             y: {
               beginAtZero: false,
-              grace: "12%",
-              ticks: { font: { size: 10 }, padding: 6 },
+              ticks: { font: { size: 8 } },
               grid: { color: "rgba(15,23,42,0.06)" },
             },
           },
         },
       });
-    }
-
-    if (catKey === SPI_CATEGORY_KEY) {
-      renderSpiEventBubbleChart(snapRows);
-      renderSpiPerformanceMap(snapRows);
-      updateChartHints(f);
-      return;
     }
 
     const byBizVals = {};
@@ -1891,6 +1482,7 @@
       });
     });
     const bizLabels = Object.keys(byBizVals);
+    const utChart = kpiUnitTypeForFilter(catKey, f);
     const bizData = bizLabels.map((b) => {
       const items = byBizVals[b];
       if (utChart && isAdditiveUnit(utChart)) {
@@ -1905,98 +1497,78 @@
 
     renderBizBreakdown(bizLabels, bizData);
 
-    const vertMap = {};
-    snapRows.forEach((r) => {
-      const vx = getRowCheckpoint(r);
-      if (!vertMap[vx]) vertMap[vx] = [];
-      vertMap[vx].push(Number(r.value));
-    });
-    const vertLabelsFull = Object.keys(vertMap).sort((a, b) =>
-      a.localeCompare(b)
-    );
-    function shortVertLabelModern(name) {
-      const s = String(name);
-      return s.length > 14 ? s.slice(0, 13) + "…" : s;
-    }
-    const vertLabels = vertLabelsFull.map(shortVertLabelModern);
-    const vertData = vertLabelsFull.map((label) => {
-      const vals = vertMap[label];
-      if (utChart && isAdditiveUnit(utChart)) {
-        return vals.reduce(
-          (a, x) => a + (Number.isFinite(x) ? x : 0),
-          0
-        );
-      }
-      const nums = vals.filter((x) => Number.isFinite(x));
-      return nums.length ? avg(nums) : 0;
-    });
-
-    const elVert = document.getElementById("chart-verticals");
-    if (elVert && vertLabels.length) {
-      new Chart(elVert, {
-        type: "line",
+    const aggForVs = buildKpiDetailMetrics(catKey, kpisMeta, f);
+    const rankedVs = sortKpiTilesForDisplay(aggForVs);
+    const elKpiVs = document.getElementById("chart-kpi-vs");
+    if (elKpiVs && rankedVs.length) {
+      const kpiLab = rankedVs.map((a) =>
+        a.kpiName.length > 22 ? a.kpiName.slice(0, 20) + "…" : a.kpiName
+      );
+      const vsData = rankedVs.map((a) =>
+        a.vsPct != null && !Number.isNaN(a.vsPct) ? a.vsPct : 0
+      );
+      const vsBg = rankedVs.map((a) => {
+        const p = a.vsPct;
+        if (p == null || Number.isNaN(p)) return "rgba(109, 110, 113, 0.35)";
+        if (p > 0) return "rgba(0, 177, 107, 0.88)";
+        if (p < 0) return "rgba(240, 76, 35, 0.88)";
+        return "rgba(142, 39, 143, 0.55)";
+      });
+      new Chart(elKpiVs, {
+        type: "bar",
         data: {
-          labels: vertLabels,
+          labels: kpiLab,
           datasets: [
             {
-              label: "By vertical",
-              data: vertData,
-              borderColor: "#006DB6",
-              backgroundColor: "rgba(0, 109, 182, 0.18)",
-              fill: true,
-              tension: 0.35,
-              borderWidth: 2,
-              pointRadius: 3,
-              pointBackgroundColor: "#006DB6",
+              label: "Vs %",
+              data: vsData,
+              backgroundColor: vsBg,
+              borderColor: "#FFFFFF",
+              borderWidth: 1,
+              borderRadius: 3,
+              maxBarThickness: 12,
             },
           ],
         },
         options: {
+          indexAxis: "y",
           responsive: true,
           maintainAspectRatio: false,
-          layout: {
-            padding: { top: 12, right: 20, bottom: 16, left: 28 },
-          },
           plugins: {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                title(items) {
+                title: function (items) {
                   const i = items[0].dataIndex;
-                  return vertLabelsFull[i] || "";
+                  return rankedVs[i] ? rankedVs[i].kpiName : "";
+                },
+                label: function (ctx) {
+                  const i = ctx.dataIndex;
+                  const p = rankedVs[i].vsPct;
+                  if (p == null || Number.isNaN(p)) {
+                    return " No Vs % (missing comparison)";
+                  }
+                  return " " + formatSignedPct(p) + " (same as KPI tiles)";
                 },
               },
             },
           },
           scales: {
-            y: {
-              beginAtZero: true,
-              grace: "6%",
+            x: {
               ticks: {
-                font: { size: 10 },
-                color: "#231F20",
-                padding: 6,
+                font: { size: 7 },
+                callback: (v) => v + "%",
               },
               grid: { color: "rgba(109, 110, 113, 0.2)" },
               title: {
                 display: true,
-                text: "Value",
-                font: { size: 10, family: '"Adani", system-ui, sans-serif' },
-                color: "#6D6E71",
-                padding: { top: 0, bottom: 8, left: 0, right: 0 },
+                text: "Vs %",
+                font: { size: 7 },
               },
             },
-            x: {
-              ticks: {
-                font: { size: 9 },
-                maxRotation: 40,
-                minRotation: 0,
-                autoSkip: true,
-                maxTicksLimit: 10,
-                color: "#231F20",
-                padding: 4,
-              },
-              grid: { color: "rgba(109, 110, 113, 0.12)" },
+            y: {
+              ticks: { font: { size: 6 } },
+              grid: { display: false },
             },
           },
         },
@@ -2010,22 +1582,9 @@
     const mode = f.vsMode || DEFAULT_VS_MODE;
     const ref = f.refMonth;
     const trendEl = document.getElementById("chart-trend-hint");
-    const trendTitleEl = document.getElementById("chart-trend-title");
     const bizEl = document.getElementById("chart-biz-hint");
-    const vertHintEl = document.getElementById("chart-vertical-hint");
+    const kpiVsEl = document.getElementById("chart-kpi-vs-hint");
     const n = chartMonthsForVsMode(mode, ref).length;
-    if (trendTitleEl && f && f.catKey != null) {
-      const keys = f.kpiKeys || [];
-      const list = kpiListForFilterDropdown(f.catKey);
-      if (keys.length === 0) {
-        trendTitleEl.textContent = TRI_LABEL_FULL;
-      } else if (keys.length === 1) {
-        const k = list.find((x) => String(x.kpiKey) === String(keys[0]));
-        trendTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
-      } else {
-        trendTitleEl.textContent = "Time series";
-      }
-    }
     if (trendEl) {
       trendEl.textContent =
         mode === "vs_last_year"
@@ -2041,26 +1600,7 @@
     };
     const bh = bizHint[mode] || "(share)";
     if (bizEl) bizEl.textContent = bh;
-    const vertHint = {
-      vs_yesterday: "(vertical · latest mo)",
-      vs_last_month: "(vertical · latest mo)",
-      vs_last_week: "(vertical · 2 mo)",
-      vs_last_quarter: "(vertical · 3 mo)",
-      vs_last_year: "(vertical · YTD window)",
-    };
-    if (vertHintEl) vertHintEl.textContent = vertHint[mode] || "(vertical)";
-    const spiBubbleHint = document.getElementById("chart-spi-bubble-hint");
-    const spiMapHint = document.getElementById("chart-spi-map-hint");
-    const spiRoll =
-      mode === "vs_last_year"
-        ? "(bubble · YTD window)"
-        : "(bubble · same window)";
-    const spiMapRoll =
-      mode === "vs_last_year"
-        ? "(map · YTD window)"
-        : "(map · same window)";
-    if (spiBubbleHint) spiBubbleHint.textContent = spiRoll;
-    if (spiMapHint) spiMapHint.textContent = spiMapRoll;
+    if (kpiVsEl) kpiVsEl.textContent = "(" + vsOptionLabel(mode) + ")";
   }
 
   function sortRows(rows, key, asc, pool, f) {
@@ -2260,12 +1800,8 @@
     const statSt = document.getElementById("ev-st-state");
     const statBiz = document.getElementById("ev-st-biz");
     if (summaryEl) {
-      const summaryFull =
-        total === 0
-          ? "Adjust filters or KPI scope to see rows."
-          : "Detail table for scan-and-compare (IA: same filters as tiles & charts). Per screen and page list support usability testing and accessibility-friendly paging.";
-      summaryEl.textContent = summaryFull;
-      summaryEl.title = summaryFull;
+      summaryEl.textContent = "";
+      summaryEl.removeAttribute("title");
     }
     if (statTotal) statTotal.textContent = total === 0 ? "—" : String(total);
     if (statKpi)
@@ -2278,7 +1814,7 @@
 
     if (!pageRows.length) {
       host.innerHTML =
-        '<p class="m2-detail-empty" role="status">No rows for these filters.</p>';
+        '<div class="m2-detail-empty" role="status"></div>';
     } else {
       const head =
         '<table class="m2-evidence-table">' +
@@ -2357,11 +1893,11 @@
       pageInfo.textContent =
         total === 0
           ? ""
-          : "Rows " +
-            (start + 1) +
+          : start +
+            1 +
             "–" +
             Math.min(start + pageSize, total) +
-            " of " +
+            "/" +
             total;
     }
     const pageSel = document.getElementById("tbl-page-select");
@@ -2469,13 +2005,7 @@
     }).length;
     const cat = getCategory(catKey);
     const label = cat ? cat.categoryName + ". " : "";
-    announce(
-      label +
-        n +
-        " rows in the detail table for " +
-        formatMonthYear(f.refMonth) +
-        ". Sort the list, then pick a page from the dropdown or use arrows."
-    );
+    announce(label.replace(/\.\s*$/, "") + (label ? " · " : "") + String(n));
   }
 
   function refreshCategoryView(catKey) {
@@ -2511,9 +2041,6 @@
 
     buildCharts(catKey, f);
     renderDetailCards(catKey);
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resizeAllChartsModern());
-    });
 
     const cat = getCategory(catKey);
     const ctx = document.getElementById("cat-context");
@@ -2544,13 +2071,12 @@
       history.replaceState(null, "", "#categories");
       renderCategories();
       announce(
-        "This preview includes Incident Management, Hazard and Observation Management (Leading), and Safety Performance Indices. Choose one on the category list."
+        "This preview includes Incident Management and Hazard and Observation Management, Leading. Choose one on the category list."
       );
       return;
     }
 
     const kpisMeta = getKpis(catKey);
-    const kpisForUi = kpiListForFilterDropdown(catKey);
     const rowsForCat = getRowsForCategory(catKey);
     const cfg = getFilterConfig(catKey);
 
@@ -2597,12 +2123,12 @@
     const kpiFieldHtml =
       cfg.showKpi
         ? '<div class="field field--kpi-inline">' +
-          kpiScopePanelHtml(catKey) +
+          kpiScopePanelHtml(catKey, kpisMeta) +
           "</div>"
         : "";
     const filterCore =
       '<div class="field"><label class="field-label" for="f-vs">Vs</label>' +
-      '<select id="f-vs" aria-describedby="filter-hint">' +
+      '<select id="f-vs">' +
       vsOpts +
       "</select></div>" +
       (cfg.showState
@@ -2619,23 +2145,8 @@
         : "") +
       "";
     const variableFieldHtml = variableFilterFieldHtml();
-    const m2LineChartBox =
-      '<div class="chart-box m2-chart-card m2-chart-card--trend"><h3 class="m2-chart-title"><span class="m2-chart-title__label" id="chart-trend-title">' +
-      escapeHtml(TRI_LABEL_FULL) +
-      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines)</span></h3><div class="chart-canvas-wrap m2-chart-canvas"><canvas id="chart-trend" role="img" aria-label="Line chart: one series per KPI over months"></canvas></div></div>';
-    const m2ChartsRowHtml =
-      catKey === SPI_CATEGORY_KEY
-        ? '<div class="m2-charts m2-charts--alt cat-charts cat-charts--spi" role="group" aria-label="Charts: time series, event level, state map">' +
-          m2LineChartBox +
-          '<div class="chart-box m2-chart-card m2-chart-card--spi-bubble"><h3 class="m2-chart-title"><span class="m2-chart-title__label">Event level</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(bubble · count)</span></h3><div class="chart-canvas-wrap m2-chart-canvas chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble chart: row counts by event severity level"></canvas></div></div>' +
-          '<div class="chart-box m2-chart-card m2-chart-card--spi-map"><h3 class="m2-chart-title"><span class="m2-chart-title__label">Safety performance by state</span> <span id="chart-spi-map-hint" class="chart-box__hint">(map · row counts)</span></h3><div class="chart-spi-map-host m2-chart-spi-map" id="chart-spi-map" role="presentation" aria-label="Map of India: circle size by filtered row count per state"></div></div></div>'
-        : '<div class="m2-charts m2-charts--alt cat-charts" role="group" aria-label="Three chart views: time series, business share, by vertical">' +
-          m2LineChartBox +
-          '<div class="chart-box m2-chart-card m2-chart-card--biz"><h3 class="m2-chart-title"><span class="m2-chart-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(share · latest mo)</span></h3><div class="chart-canvas-wrap m2-chart-canvas m2-chart-canvas--wide m2-chart-wrap--biz-list"><canvas id="chart-biz" role="img" aria-label="Donut chart: share of total by business, legend shows each segment"></canvas><p id="chart-biz-empty" class="chart-biz-empty m2-chart-biz-empty" hidden></p></div></div>' +
-          '<div class="chart-box m2-chart-card m2-chart-card--verticals"><h3 class="m2-chart-title"><span class="m2-chart-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span></h3><div class="chart-canvas-wrap m2-chart-canvas"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for KPI scope and Versus window"></canvas></div></div></div>';
     const toolbarInner =
-      '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">User research, information architecture (IA), usability testing, accessibility, consistency, visual hierarchy, and an iterative user-centered process: filters, KPI scope, charts, and the detail table stay aligned for comparable sessions—supporting user-centered design (UCD), human-computer interaction (HCI), and customer experience (CX) review of usability, desirability, accessibility, and usefulness. Refine Versus, geography, business, and checkpoints. One slice across KPI tiles, charts, and detail table. Data is monthly: Today vs yesterday and Current month vs last month both use latest month versus prior month. Current week versus last week uses the last two calendar months versus the two before that. Current quarter vs last quarter uses three-month windows. Current year vs last year uses calendar year-to-date versus the same months in the prior year. Charts and KPI tiles use the same windows.</p>' +
+      '<div class="cat-toolbar__inner" role="group">' +
       '<div class="cat-toolbar__filters-scroll">' +
       kpiFieldHtml +
       '<div class="cat-toolbar__filters-core">' +
@@ -2668,19 +2179,15 @@
       "</div>" +
       '<div id="multi-kpi-wrap"></div>' +
       "</section>" +
-      '<div class="m2-cat-main m2-cat-main--charts" id="cat-main-view" data-view="charts">' +
-      '<div class="view-tabs" role="tablist" aria-label="Chart view or table view">' +
-      '<button type="button" role="tab" id="view-tab-charts" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-charts" data-view="charts">Chart view</button>' +
-      '<button type="button" role="tab" id="view-tab-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-table" tabindex="-1" data-view="table">Table view</button>' +
+      '<div class="m2-charts m2-charts--alt cat-charts" role="group" aria-label="Three chart views: time series, business share list, Vs change by KPI">' +
+      '<div class="chart-box m2-chart-card m2-chart-card--trend"><h3 class="m2-chart-title">Time series <span id="chart-trend-hint" class="chart-box__hint">(lines)</span></h3><div class="chart-canvas-wrap m2-chart-canvas"><canvas id="chart-trend" role="img" aria-label="Line chart: one series per KPI over months"></canvas></div></div>' +
+      '<div class="chart-box m2-chart-card m2-chart-card--biz"><h3 class="m2-chart-title">By business <span id="chart-biz-hint" class="chart-box__hint">(share · latest mo)</span></h3><div class="chart-canvas-wrap m2-chart-canvas m2-chart-canvas--wide m2-chart-wrap--biz-list"><canvas id="chart-biz" role="img" aria-label="Horizontal bars: share of total value by business"></canvas><p id="chart-biz-empty" class="chart-biz-empty m2-chart-biz-empty" hidden></p></div></div>' +
+      '<div class="chart-box m2-chart-card m2-chart-card--kpi-vs"><h3 class="m2-chart-title">Vs change by KPI <span id="chart-kpi-vs-hint" class="chart-box__hint">(Vs)</span></h3><div class="chart-canvas-wrap m2-chart-canvas"><canvas id="chart-kpi-vs" role="img" aria-label="Horizontal bars: percent change versus prior period for each KPI in scope"></canvas></div></div>' +
       "</div>" +
-      '<div id="view-panel-charts" class="view-panel view-panel--charts" role="tabpanel" aria-labelledby="view-tab-charts">' +
-      m2ChartsRowHtml +
-      "</div>" +
-      '<div id="view-panel-table" class="view-panel view-panel--table" role="tabpanel" aria-labelledby="view-tab-table" hidden>' +
       '<div class="table-zone m2-table-zone m2-evidence-zone">' +
       '<div class="table-zone__head m2-evidence-head">' +
       '<div class="m2-evidence-head__row">' +
-      '<span class="table-zone__label m2-evidence-head__label">Detail data</span>' +
+      '<span class="table-zone__label m2-evidence-head__label" id="m2-detail-heading">Detail data</span>' +
       '<span id="tbl-summary" class="m2-evidence-summary" aria-live="polite"></span>' +
       '<div class="m2-evidence-stats" id="evidence-stats" role="group" aria-label="Filtered list summary">' +
       '<div class="m2-evidence-stat"><span id="ev-st-total" class="m2-evidence-stat__val">—</span><span class="m2-evidence-stat__lbl">rows</span></div>' +
@@ -2726,8 +2233,8 @@
       '<span id="tbl-pageinfo" class="m2-evidence-range" aria-live="polite"></span>' +
       '<button type="button" id="tbl-next" class="m2-pager-btn m2-pager-btn--arrow" aria-label="Next page">›</button>' +
       "</div></div></div>" +
-      '<div class="m2-detail-scroll m2-evidence-scroll" role="region" aria-label="Detail data table">' +
-      '<div id="detail-cards" class="m2-evidence-table-host"></div></div></div></div></div>' +
+      '<div class="m2-detail-scroll m2-evidence-scroll" role="region" aria-labelledby="m2-detail-heading" tabindex="0">' +
+      '<div id="detail-cards" class="m2-evidence-table-host"></div></div></div>' +
       '<p class="cat-context m2-cat-context" id="cat-context">' +
       escapeHtml(cat.uxNote) +
       "</p>";
@@ -2783,7 +2290,20 @@
           onFilterChange();
         });
       });
+      const btnAll = document.getElementById("f-kpi-all");
       const btnNone = document.getElementById("f-kpi-none");
+      if (btnAll) {
+        btnAll.addEventListener("click", () => {
+          document
+            .querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]')
+            .forEach((cb) => {
+              cb.checked = true;
+            });
+          saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+          updateKpiScopeCount();
+          onFilterChange();
+        });
+      }
       if (btnNone) {
         btnNone.addEventListener("click", () => {
           document
@@ -2822,7 +2342,7 @@
         } catch {
           /* ignore */
         }
-        const def = loadKpiSelection(catKey, kpisForUi);
+        const def = loadKpiSelection(catKey, kpisMeta);
         document.querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]').forEach((cb) => {
           cb.checked = def.includes(String(cb.value));
         });
@@ -2840,7 +2360,6 @@
     });
 
     wireDetailControls(catKey);
-    wireCatMainView();
     refreshCategoryView(catKey);
     const h = document.getElementById("cat-heading");
     if (h) h.focus();
@@ -2865,7 +2384,7 @@
       '<header class="m2-v3__mast m2-v3__mast--clean">' +
       '<p class="m2-v3__eyebrow" id="landing-h" tabindex="-1">Insights</p>' +
       '<h2 class="m2-v3__headline m2-v3__headline--clean">Explore safety KPIs by domain</h2>' +
-      '<p class="m2-v3__sub m2-v3__sub--clean">Choose a category, set filters and KPI scope, then review tiles, charts, and the detail table. Built for user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX, UCD, HCI, and CX review of usability, desirability, and usefulness. Fixed layout <span class="m2-v3__dim">1280×720</span>. Sample data — confirm in Power BI.</p>' +
+      '<p class="m2-v3__sub m2-v3__sub--clean">Choose a category, set filters and KPI scope, then review tiles, charts, and the detail table. Fixed layout <span class="m2-v3__dim">1280×720</span>. Sample data — confirm in Power BI.</p>' +
       '<div class="m2-v3__stats m2-v3__stats--inline" role="group" aria-label="Snapshot">' +
       '<div class="m2-v3__stat"><span class="m2-v3__stat-num">9</span><span class="m2-v3__stat-lbl">domains</span></div>' +
       '<div class="m2-v3__stat"><span class="m2-v3__stat-num">17</span><span class="m2-v3__stat-lbl">KPIs (Incident, full scope)</span></div>' +
@@ -2877,7 +2396,7 @@
       "</header>" +
       '<ul class="m2-v3__quick" aria-label="What you can do">' +
       "<li><strong>Filter</strong> — Versus window, state, business, checkpoints.</li>" +
-      "<li><strong>Compare</strong> — Time series, by business, by vertical.</li>" +
+      "<li><strong>Compare</strong> — Time series, by business, Vs % by KPI.</li>" +
       "<li><strong>Drill</strong> — Sortable detail table with paging.</li>" +
       "</ul>" +
       "</div>" +
@@ -2895,7 +2414,7 @@
     const hh = document.getElementById("landing-h");
     if (hh) hh.focus();
     announce(
-      "Insights home. User research, IA, usability testing, accessibility, and user-centered design: browse domains to open a category. Incident Management, Hazard and Observation Management (Leading), and Safety Performance Indices are live in this preview."
+      "Insights home. Browse domains to open a category; Incident Management and Hazard and Observation Management, Leading are live in this preview."
     );
     updateHeaderNavState();
   }
@@ -2913,7 +2432,7 @@
       journeyStepsHtml(2) +
       '<div class="m2-cat-dir-intro">' +
       '<h2 id="home-h">Safety domains</h2>' +
-      '<p class="m2-cat-dir-lede">Search by <strong>category or KPI name</strong>. <strong>Live preview</strong>: <strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management (Leading)</strong>. Consistent hierarchy for user research, usability testing, accessibility review, and iterative UCD or CX walkthroughs.</p>' +
+      '<p class="m2-cat-dir-lede">Search by <strong>category or KPI name</strong>. <strong>Live preview</strong>: <strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management (Leading)</strong>.</p>' +
       '<div class="home-tools m2-cat-dir-search" role="search">' +
       '<label class="home-search-label" for="cat-q">Find</label>' +
       '<input id="cat-q" class="home-search home-search--modern" type="search" placeholder="Category or KPI name…" autocomplete="off" />' +

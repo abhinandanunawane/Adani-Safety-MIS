@@ -9,16 +9,23 @@
   const root = document.getElementById("app-root");
   const liveRegion = document.getElementById("sr-live");
   const DATA = window.__DASHBOARD_DATA__;
+  /** Matches styles.css --font (Segoe UI family + UI sans fallbacks). */
+  const FONT_UI =
+    '"Segoe UI", "Segoe UI Variable", "Segoe UI Historic", system-ui, sans-serif';
 
-  /** Sync primary nav with route for screen readers (IA: Home vs Categories scope). */
   function updateHeaderNavState() {
     const raw = location.hash || "";
     const h = raw === "" || raw === "#" ? "#landing" : raw;
     const home = document.getElementById("nav-home");
     const cats = document.getElementById("nav-categories");
+    const nav = document.getElementById("top-header-nav");
     const onLanding = h === "#landing";
     const onCategories = h === "#categories";
     const onCategoryDrill = /^#cat=\d+/.test(h);
+    if (nav) {
+      nav.hidden = onLanding;
+      nav.setAttribute("aria-hidden", onLanding ? "true" : "false");
+    }
     if (home) {
       if (onLanding) home.setAttribute("aria-current", "page");
       else home.removeAttribute("aria-current");
@@ -30,6 +37,28 @@
         cats.removeAttribute("aria-current");
       }
     }
+  }
+
+  /** Show today’s date in the header (per landing page requirement). */
+  function setHeaderLastUpdatedToday() {
+    const hu = document.getElementById("header-updated");
+    if (!hu) return;
+    try {
+      hu.textContent = new Date().toLocaleDateString(undefined, {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    } catch {
+      hu.textContent = new Date().toISOString().slice(0, 10);
+    }
+  }
+
+  function setShellLandingMode(on) {
+    const shell = document.querySelector("[data-app-shell]");
+    if (!shell) return;
+    shell.classList.toggle("shell--landing", !!on);
   }
 
   function setHeaderTimestamp(iso) {
@@ -50,7 +79,7 @@
   }
 
   if (!DATA) {
-    setHeaderTimestamp(null);
+    setHeaderLastUpdatedToday();
     if (root) {
       root.innerHTML =
         '<div class="boot-error" style="padding:12px;font-size:13px;color:#0f172a">' +
@@ -65,10 +94,95 @@
   if (!DATA.factRows) DATA.factRows = [];
   if (!DATA.months) DATA.months = [];
   if (!DATA.states) DATA.states = [];
+  if (!DATA.categories) DATA.categories = [];
+  if (!DATA.kpiDetailByCategory) DATA.kpiDetailByCategory = [];
+  if (!DATA.monthlyByCategory) DATA.monthlyByCategory = [];
+  if (!DATA.businessBreakdown) DATA.businessBreakdown = [];
+
+  /** Preview-only category 10 (not in all CSV exports); survives Refresh-PreviewData.ps1 regeneration. */
+  function ensureLocationVulnerabilityCategory() {
+    if (!DATA || !Array.isArray(DATA.categories)) return;
+    if (!Array.isArray(DATA.kpiDetailByCategory)) return;
+    const hasCat = DATA.categories.some((c) => c.categoryKey === 10);
+    const hasDetail = DATA.kpiDetailByCategory.some(
+      (x) => x.categoryKey === 10
+    );
+    if (hasCat && hasDetail) return;
+    if (!hasCat) {
+      DATA.categories.push({
+        categoryKey: 10,
+        categoryName: "Location Vulnerability",
+        sortOrder: 10,
+        uxNote:
+          "Location-based exposure and vulnerability — use Comparison view for current vs prior period by all BUs.",
+        kpiCount: 8,
+        latestMonthIndex: 65.5,
+      });
+      DATA.categories.sort(
+        (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+      );
+    }
+    if (!hasDetail) {
+      DATA.kpiDetailByCategory.push({
+        categoryKey: 10,
+        kpis: [
+          {
+            kpiKey: 13,
+            kpiName: "Near miss exposure by location",
+            unitType: "Count",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 38,
+            kpiName: "Vulnerability observations (sites)",
+            unitType: "Count",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 39,
+            kpiName: "Location risk closure %",
+            unitType: "PercentOrRate",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 40,
+            kpiName: "SRFA completion (location work)",
+            unitType: "PercentOrRate",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 45,
+            kpiName: "Inspection closure % (locations)",
+            unitType: "PercentOrRate",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 46,
+            kpiName: "Action closure % (locations)",
+            unitType: "PercentOrRate",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 53,
+            kpiName: "Unsafe acts per hour (site rounds)",
+            unitType: "Count",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 21,
+            kpiName: "TRIR",
+            unitType: "PercentOrRate",
+            latestValue: 0,
+          },
+        ],
+      });
+    }
+  }
+
+  ensureLocationVulnerabilityCategory();
 
   if (typeof Chart !== "undefined") {
-    Chart.defaults.font.family =
-      '"Adani", system-ui, -apple-system, "Segoe UI", sans-serif';
+    Chart.defaults.font.family = FONT_UI;
     Chart.defaults.font.size = 10;
     Chart.defaults.color = "#231f20";
   }
@@ -122,6 +236,84 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
+  /** Group A (high risk) + Group B (moderate); merged with any business names present in data. */
+  const PREVIEW_BUSINESS_NAMES = [
+    "Power",
+    "Ports",
+    "Cements",
+    "Copper",
+    "Green PVC",
+    "Mining",
+    "Gas",
+    "Airports",
+    "MSPVL",
+    "Defense & Aerospace",
+    "ANIL-Wind",
+    "ANIL-BESS",
+    "AESL",
+    "Green Energy",
+    "Realty",
+    "RMRW",
+    "AEML",
+    "Data Center",
+    "Logistics",
+    "NMDPL",
+    "Smart Meters",
+    "Hydro PSP",
+    "Agri fresh",
+    "Dredging",
+  ];
+  const PREVIEW_BUSINESS_SET = new Set(PREVIEW_BUSINESS_NAMES);
+
+  /**
+   * Map dashboard BU labels to fact `businessName` values (Dim_Business / embedded rows).
+   * Preview lists 24 labels; seed data only has 10 businesses — aliases avoid blank series.
+   */
+  const PREVIEW_TO_FACT_BUSINESS = {
+    Ports: "Port",
+    Cements: "Cement",
+    "Green PVC": "AGEL",
+    Mining: "Copper",
+    Gas: "ATGL",
+    Airports: "Hazira",
+    MSPVL: "Logistics",
+    "Defense & Aerospace": "Hazira",
+    "ANIL-Wind": "AGEL",
+    "ANIL-BESS": "AGEL",
+    "Green Energy": "AGEL",
+    Realty: "Hazira",
+    RMRW: "Logistics",
+    "Data Center": "AEML",
+    NMDPL: "Port",
+    "Smart Meters": "AEML",
+    "Hydro PSP": "Power",
+    "Agri fresh": "Hazira",
+    Dredging: "Port",
+  };
+
+  function factBusinessNameForPreview(buName) {
+    const s = String(buName || "").trim();
+    return PREVIEW_TO_FACT_BUSINESS[s] != null ? PREVIEW_TO_FACT_BUSINESS[s] : s;
+  }
+
+  /** Fact rows use Dim names; dropdown uses preview labels — treat both as the same slice. */
+  function rowMatchesBusinessFilter(r, f) {
+    if (f.business === "all") return true;
+    const rb = String(r.businessName || "").trim();
+    const sel = String(f.business || "").trim();
+    if (rb === sel) return true;
+    return factBusinessNameForPreview(sel) === rb;
+  }
+
+  function mergedBusinessList(distinctFromData) {
+    const extra = (distinctFromData || []).filter((x) => {
+      if (!x) return false;
+      return !PREVIEW_BUSINESS_SET.has(String(x).trim());
+    });
+    extra.sort((a, b) => a.localeCompare(b));
+    return PREVIEW_BUSINESS_NAMES.concat(extra);
+  }
+
   const meta = DATA.meta || {};
 
   /** Detail table rows per page (keep in sync with styles.css --detail-table-body-rows) */
@@ -135,9 +327,15 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
-  /** Category keys with full KPI drill-down: 1 Incident, 2 Hazard & Observation (Leading), 3 Safety Performance Indices. */
-  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2, 3]);
+  /** Category keys with full KPI drill-down: 1–3 core preview; 10 Location Vulnerability (comparison view). */
+  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2, 3, 10]);
   const SPI_CATEGORY_KEY = 3;
+  const HAZARD_CATEGORY_KEY = 2;
+  const LOCATION_VULN_CAT_KEY = 10;
+  const LOCATION_VULN_SOURCE_CAT = 2;
+  const LOCATION_VULN_KPI_KEYS = new Set([
+    13, 38, 39, 40, 45, 46, 53, 21,
+  ]);
   const EVENT_LEVEL_LABELS = [
     "0 Near Miss",
     "1 Minor",
@@ -149,6 +347,9 @@
   ];
   /** Dim_KPI category 3 order — TRI first. */
   const SPI_KPI_ORDER = [21, 16, 17, 18, 20, 29];
+  /** Risk quadrant bubble: X ≈ concern / reporting culture (Near Miss FR), Y = Fatality rate (%). */
+  const SPI_QUADRANT_X_KPI = 20;
+  const SPI_QUADRANT_Y_KPI = 16;
   /** Approximate centroids for India states/UTs (preview map). */
   const STATE_CENTROID_BY_STATE = {
     "Andaman and Nicobar Islands": [11.7401, 92.6586],
@@ -164,7 +365,8 @@
     Gujarat: [22.2587, 71.1924],
     Haryana: [29.0588, 76.0856],
     "Himachal Pradesh": [31.1048, 77.1734],
-    "Jammu and Kashmir": [33.7782, 76.5762],
+    /** J&K UT — ~between Jammu and Srinagar (lng was wrongly ~76.6°E, which sits in Himachal). */
+    "Jammu and Kashmir": [33.85, 74.78],
     Jharkhand: [23.6102, 85.2799],
     Karnataka: [15.3173, 75.7139],
     Kerala: [10.8505, 76.2711],
@@ -187,6 +389,27 @@
     "Uttar Pradesh": [26.8467, 80.9462],
     Uttarakhand: [30.0668, 79.0193],
     "West Bengal": [22.9868, 87.855],
+  };
+
+  /**
+   * Lat/lng corners to frame all of India on the preview map (incl. Jammu & Kashmir, NE states,
+   * southern tip). BU markers alone would otherwise fitBounds too tight and crop the north.
+   */
+  const INDIA_MAP_BOUNDS_SW = [6.2, 68.0];
+  const INDIA_MAP_BOUNDS_NE = [37.6, 97.6];
+
+  /** Dim_Business home state — anchor BU markers on the India map (preview). */
+  const FACT_BU_HOME_STATE = {
+    AEML: "Gujarat",
+    AESL: "Maharashtra",
+    AGEL: "Karnataka",
+    ATGL: "Gujarat",
+    Cement: "Rajasthan",
+    Copper: "Chhattisgarh",
+    Port: "Gujarat",
+    Power: "Madhya Pradesh",
+    Logistics: "Haryana",
+    Hazira: "Gujarat",
   };
 
   function hash32(str) {
@@ -261,6 +484,25 @@
         return "LY";
       default:
         return vsOptionLabel(id);
+    }
+  }
+
+  /** Info (i) hover text — follows the Vs filter selection in the toolbar. */
+  function vsFilterComparisonTooltip(vsMode) {
+    const m = vsMode || DEFAULT_VS_MODE;
+    switch (m) {
+      case "vs_yesterday":
+        return "Today vs Yesterday";
+      case "vs_last_week":
+        return "Current week vs Last Week";
+      case "vs_last_month":
+        return "Current Month vs Last Month";
+      case "vs_last_quarter":
+        return "Current Quarter vs Last Quarter";
+      case "vs_last_year":
+        return "Current Year vs Last Year";
+      default:
+        return VS_PERIOD_CAPTION[m] || vsOptionLabel(m);
     }
   }
 
@@ -341,7 +583,124 @@
   }
 
   const LS_VARIABLE_FILTER = "mis-variable-checkpoints";
+  const LS_KPI_PREFIX = "preview-kpi-keys-";
   const LS_CAT_MAIN_VIEW = "adani_cat_main_view";
+
+  const TREND_LINE_COLORS = [
+    "#006DB6",
+    "#00B16B",
+    "#E87722",
+    "#6B2D90",
+    "#C41230",
+    "#007A87",
+    "#5C6BC0",
+  ];
+
+  function hexToRgba(hex, alpha) {
+    const h = String(hex || "").replace("#", "");
+    if (h.length !== 6) return "rgba(0, 109, 182, " + alpha + ")";
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return "rgba(" + r + "," + g + "," + b + "," + alpha + ")";
+  }
+
+  /** Default KPI checkbox seed when localStorage is empty (aligns with insights: incident = first five TRI block). */
+  function defaultPreviewKpiSeed(catKey, kpisMeta) {
+    if (catKey === 1 && kpisMeta.length) {
+      const want = ["1", "2", "3", "4", "5"];
+      const valid = new Set(kpisMeta.map((k) => String(k.kpiKey)));
+      const kept = want.filter((id) => valid.has(id));
+      if (kept.length) return kept;
+    }
+    const dk = defaultKpiKeyForCategory(catKey, kpisMeta);
+    return dk ? [String(dk)] : [];
+  }
+
+  function loadKpiSelection(catKey, kpisMeta) {
+    try {
+      const raw = localStorage.getItem(LS_KPI_PREFIX + catKey);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr) && arr.length) {
+          const valid = new Set(kpisMeta.map((k) => String(k.kpiKey)));
+          const kept = arr.map(String).filter((id) => valid.has(id));
+          if (kept.length) return kept;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+    return defaultPreviewKpiSeed(catKey, kpisMeta);
+  }
+
+  function saveKpiSelection(catKey, keys) {
+    try {
+      localStorage.setItem(LS_KPI_PREFIX + catKey, JSON.stringify(keys));
+    } catch {
+      /* ignore */
+    }
+  }
+
+  function readSelectedKpiKeysFromDom() {
+    const boxes = document.querySelectorAll(
+      '#f-kpi-panel input[name="f-kpi-cb"]:checked'
+    );
+    return Array.from(boxes).map((cb) => String(cb.value));
+  }
+
+  /** KPI scope: checkboxes in display order (same ids as insights for consistency). */
+  function kpiScopePanelHtml(catKey, kpisMeta) {
+    const sel = loadKpiSelection(catKey, kpisMeta);
+    const boxes = kpisMeta
+      .map((k) => {
+        const id = "f-kpi-cb-" + k.kpiKey;
+        const checked = sel.includes(String(k.kpiKey)) ? " checked" : "";
+        return (
+          '<label class="kpi-cb" for="' +
+          id +
+          '">' +
+          '<input type="checkbox" name="f-kpi-cb" id="' +
+          id +
+          '" value="' +
+          k.kpiKey +
+          '"' +
+          checked +
+          "/>" +
+          '<span class="kpi-cb__text">' +
+          escapeHtml(kpiDropdownLabel(k)) +
+          "</span></label>"
+        );
+      })
+      .join("");
+    return (
+      '<details class="kpi-scope kpi-scope--toolbar">' +
+      '<summary class="kpi-scope__summary" id="f-kpi-scope-label">' +
+      '<span class="kpi-scope__summary-text">' +
+      '<span class="kpi-scope__title">KPIs</span>' +
+      '<span class="kpi-scope__count" id="f-kpi-count"></span>' +
+      "</span></summary>" +
+      '<div class="kpi-panel" id="f-kpi-panel" role="group" aria-labelledby="f-kpi-scope-label">' +
+      '<div class="kpi-panel__bar">' +
+      '<button type="button" class="btn kpi-panel__btn" id="f-kpi-all">All</button>' +
+      '<button type="button" class="btn kpi-panel__btn" id="f-kpi-none">None</button>' +
+      "</div>" +
+      '<div class="kpi-panel__list">' +
+      boxes +
+      "</div></div></details>"
+    );
+  }
+
+  function updateKpiScopeCount() {
+    const total = document.querySelectorAll(
+      '#f-kpi-panel input[name="f-kpi-cb"]'
+    ).length;
+    const n = document.querySelectorAll(
+      '#f-kpi-panel input[name="f-kpi-cb"]:checked'
+    ).length;
+    const el = document.getElementById("f-kpi-count");
+    if (el) el.textContent = n + "/" + total;
+  }
   const CHECKPOINT_LABELS = ["Field Force", "O and M", "Office", "Projects"];
 
   function getRowCheckpoint(r) {
@@ -536,7 +895,7 @@
         return svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>');
       case 4:
         return svg(
-          '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>'
+          '<line x1="12" y1="21" x2="12" y2="7"/><line x1="4" y1="7" x2="20" y2="7"/><path d="M7 7L4.5 14h5L7 7"/><path d="M17 7l2.5 7h-5L17 7"/>'
         );
       case 5:
         return svg(
@@ -544,19 +903,34 @@
         );
       case 6:
         return svg(
-          '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/>'
+          '<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>'
         );
       case 7:
         return svg(
-          '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>'
+          '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
         );
       case 8:
+        /* Leadership & Safety Governance — clear climb + leader w/ flag + follower + idea dots (matches other stroke icons) */
         return svg(
-          '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+          '<path d="M1.5 22h8v-3.5h6.5v-4h7.5v-3.5"/>' +
+            '<path d="M8.5 15.5c2.8-2.2 5.8-4.2 9-5.8" opacity="0.45"/>' +
+            '<circle cx="6.2" cy="13" r="1.75"/>' +
+            '<path d="M3.2 20v-.5a2.6 2.6 0 012.6-2.3h.8a2.6 2.6 0 012.6 2.3v.5"/>' +
+            '<circle cx="17.6" cy="7.2" r="1.85"/>' +
+            '<path d="M14 13.2v-.5a3 3 0 013-2.6h.8a3 3 0 013 2.6v.5"/>' +
+            '<line x1="19.8" y1="8.8" x2="19.8" y2="2.2"/>' +
+            '<path d="M19.8 2.2l3.4 1.5v2.6l-3.4 1.5z"/>' +
+            '<circle cx="3.2" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
+            '<circle cx="5.4" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
+            '<circle cx="7.6" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>'
         );
       case 9:
         return svg(
           '<rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>'
+        );
+      case 10:
+        return svg(
+          '<path d="M12 21s-6-5.2-6-10a6 6 0 1112 0c0 4.8-6 10-6 10z"/><circle cx="12" cy="11" r="2.5"/>'
         );
       default:
         return svg('<circle cx="12" cy="12" r="10"/>');
@@ -599,6 +973,10 @@
       kpisMetaForUi && kpisMetaForUi.length
         ? kpisMetaForUi
         : kpiListForFilterDropdown(catKey);
+    if (catKey === HAZARD_CATEGORY_KEY) {
+      const sorted = sortKpisForDisplay(catKey, merged);
+      return sorted.length ? String(sorted[0].kpiKey) : "38";
+    }
     const tri = merged.find((k) => isTriKpiMeta(k));
     if (tri) return String(tri.kpiKey);
     const sorted = sortKpisForDisplay(catKey, merged);
@@ -653,6 +1031,20 @@
   }
 
   function destroySpiLeafletMap() {
+    const spiInsightEl = document.getElementById("chart-spi-insights");
+    if (spiInsightEl && typeof Chart !== "undefined") {
+      const ch = Chart.getChart(spiInsightEl);
+      if (ch) ch.destroy();
+    }
+    if (window.__adaniSpiRibbonResize) {
+      try {
+        window.removeEventListener("resize", window.__adaniSpiRibbonResize);
+      } catch {
+        /* ignore */
+      }
+      window.__adaniSpiRibbonResize = null;
+    }
+    window.__adaniSpiRibbonRedraw = null;
     if (window.__adaniSpiMap) {
       try {
         window.__adaniSpiMap.remove();
@@ -665,20 +1057,154 @@
     if (host) host.innerHTML = "";
   }
 
-  function destroyCharts() {
-    ["chart-line", "chart-verticals", "chart-biz", "chart-spi-bubble"].forEach(
-      (id) => {
-        const el = document.getElementById(id);
-        if (el && typeof Chart !== "undefined") {
-          const c = Chart.getChart(el);
-          if (c) c.destroy();
-        }
+  function destroyLocBuLeafletMap() {
+    if (window.__adaniLocBuMap) {
+      try {
+        window.__adaniLocBuMap.remove();
+      } catch {
+        /* ignore */
       }
-    );
+      window.__adaniLocBuMap = null;
+    }
+    const host = document.getElementById("chart-loc-bu-map");
+    if (host) host.innerHTML = "";
+  }
+
+  /** Single-flight loader for Google Maps JS + Leaflet.GridLayer.GoogleMutant (India BU map). */
+  var __adaniGoogleMapsLoadPromise = null;
+
+  function getGoogleMapsApiKey() {
+    try {
+      if (typeof window.__GOOGLE_MAPS_API_KEY__ === "string") {
+        const wk = window.__GOOGLE_MAPS_API_KEY__.trim();
+        if (wk) return wk;
+      }
+      const meta = document.querySelector('meta[name="google-maps-api-key"]');
+      if (meta) {
+        const mk = String(meta.getAttribute("content") || "").trim();
+        if (mk) return mk;
+      }
+    } catch {
+      /* ignore */
+    }
+    return "";
+  }
+
+  function loadGoogleMapsAndMutant() {
+    if (
+      typeof L !== "undefined" &&
+      L.gridLayer &&
+      L.gridLayer.googleMutant &&
+      typeof window.google !== "undefined" &&
+      window.google.maps
+    ) {
+      return Promise.resolve(true);
+    }
+    const key = getGoogleMapsApiKey();
+    if (!key) return Promise.resolve(false);
+    if (__adaniGoogleMapsLoadPromise) return __adaniGoogleMapsLoadPromise;
+
+    __adaniGoogleMapsLoadPromise = new Promise(function (resolve) {
+      function finishFail() {
+        __adaniGoogleMapsLoadPromise = null;
+        resolve(false);
+      }
+
+      function attachMutant() {
+        if (L.gridLayer && L.gridLayer.googleMutant) {
+          resolve(true);
+          return;
+        }
+        const s2 = document.createElement("script");
+        s2.src =
+          "https://unpkg.com/leaflet.gridlayer.googlemutant@0.14.1/dist/Leaflet.GoogleMutant.js";
+        s2.crossOrigin = "";
+        s2.onload = function () {
+          if (L.gridLayer && L.gridLayer.googleMutant) resolve(true);
+          else finishFail();
+        };
+        s2.onerror = finishFail;
+        document.head.appendChild(s2);
+      }
+
+      if (typeof window.google !== "undefined" && window.google.maps) {
+        attachMutant();
+        return;
+      }
+
+      const cbName = "__adaniGmapsApiReady";
+      window[cbName] = function () {
+        try {
+          delete window[cbName];
+        } catch {
+          window[cbName] = undefined;
+        }
+        attachMutant();
+      };
+
+      const s = document.createElement("script");
+      s.src =
+        "https://maps.googleapis.com/maps/api/js?key=" +
+        encodeURIComponent(key) +
+        "&callback=" +
+        cbName;
+      s.async = true;
+      s.defer = true;
+      s.onerror = function () {
+        try {
+          delete window[cbName];
+        } catch {
+          window[cbName] = undefined;
+        }
+        finishFail();
+      };
+      document.head.appendChild(s);
+    });
+
+    return __adaniGoogleMapsLoadPromise;
+  }
+
+  function destroyCharts() {
+    [
+      "chart-line",
+      "chart-verticals",
+      "chart-biz",
+      "chart-spi-bubble",
+      "chart-spi-insights",
+      "chart-loc-compare",
+      "chart-hazard-polar",
+    ].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && typeof Chart !== "undefined") {
+        const c = Chart.getChart(el);
+        if (c) c.destroy();
+      }
+    });
     destroySpiLeafletMap();
+    destroyLocBuLeafletMap();
   }
 
   function resizeSpiMapIfAny() {
+    const spiEl = document.getElementById("chart-spi-insights");
+    if (spiEl && typeof Chart !== "undefined") {
+      const c = Chart.getChart(spiEl);
+      if (c) {
+        try {
+          c.resize();
+        } catch {
+          /* ignore */
+        }
+        return;
+      }
+    }
+    if (typeof window.__adaniSpiRibbonRedraw === "function") {
+      try {
+        window.__adaniSpiRibbonRedraw();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
     if (window.__adaniSpiMap && typeof window.__adaniSpiMap.invalidateSize === "function") {
       try {
         window.__adaniSpiMap.invalidateSize();
@@ -688,42 +1214,231 @@
     }
   }
 
-  function resizeAllChartsIndex() {
-    ["chart-line", "chart-verticals", "chart-biz", "chart-spi-bubble"].forEach(
-      (id) => {
-        const el = document.getElementById(id);
-        if (el && typeof Chart !== "undefined") {
-          const c = Chart.getChart(el);
-          if (c) c.resize();
-        }
+  function resizeLocBuMapIfAny() {
+    if (window.__adaniLocBuMap && typeof window.__adaniLocBuMap.invalidateSize === "function") {
+      try {
+        window.__adaniLocBuMap.invalidateSize();
+      } catch {
+        /* ignore */
       }
-    );
-    resizeSpiMapIfAny();
+    }
   }
 
-  function renderSpiEventBubbleChart(snapRows) {
+  function resizeAllChartsIndex() {
+    [
+      "chart-line",
+      "chart-verticals",
+      "chart-biz",
+      "chart-spi-bubble",
+      "chart-spi-insights",
+      "chart-loc-compare",
+      "chart-hazard-polar",
+    ].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && typeof Chart !== "undefined") {
+        const c = Chart.getChart(el);
+        if (c) c.resize();
+      }
+    });
+    resizeSpiMapIfAny();
+    resizeLocBuMapIfAny();
+  }
+
+  const spiQuadrantZonePlugin = {
+    id: "spiQuadrantZone",
+    beforeDatasetsDraw(chart) {
+      const mid = chart.options.plugins && chart.options.plugins.spiQuadrantMid;
+      const sx = chart.scales.x;
+      const sy = chart.scales.y;
+      if (!mid || mid.x == null || mid.y == null || !sx || !sy) return;
+      const { ctx, chartArea } = chart;
+      const px = sx.getPixelForValue(mid.x);
+      const py = sy.getPixelForValue(mid.y);
+      const L = chartArea.left;
+      const R = chartArea.right;
+      const T = chartArea.top;
+      const B = chartArea.bottom;
+      const zones = [
+        {
+          x: L,
+          y: T,
+          w: px - L,
+          h: py - T,
+          fill: "rgba(254, 240, 138, 0.5)",
+        },
+        {
+          x: px,
+          y: T,
+          w: R - px,
+          h: py - T,
+          fill: "rgba(253, 186, 116, 0.32)",
+        },
+        {
+          x: L,
+          y: py,
+          w: px - L,
+          h: B - py,
+          fill: "rgba(229, 231, 235, 0.4)",
+        },
+        {
+          x: px,
+          y: py,
+          w: R - px,
+          h: B - py,
+          fill: "rgba(187, 247, 208, 0.5)",
+        },
+      ];
+      for (let i = 0; i < zones.length; i++) {
+        const z = zones[i];
+        ctx.save();
+        ctx.fillStyle = z.fill;
+        ctx.fillRect(z.x, z.y, z.w, z.h);
+        ctx.restore();
+      }
+    },
+  };
+
+  const spiQuadrantLinePlugin = {
+    id: "spiQuadrantLine",
+    afterDatasetsDraw(chart) {
+      const mid = chart.options.plugins && chart.options.plugins.spiQuadrantMid;
+      const sx = chart.scales.x;
+      const sy = chart.scales.y;
+      if (!mid || mid.x == null || mid.y == null || !sx || !sy) return;
+      const { ctx, chartArea } = chart;
+      const px = sx.getPixelForValue(mid.x);
+      const py = sy.getPixelForValue(mid.y);
+      const L = chartArea.left;
+      const R = chartArea.right;
+      const T = chartArea.top;
+      const B = chartArea.bottom;
+      ctx.save();
+      ctx.strokeStyle = "rgba(35, 31, 32, 0.55)";
+      ctx.lineWidth = 1.25;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.moveTo(px, T);
+      ctx.lineTo(px, B);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(L, py);
+      ctx.lineTo(R, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = "rgba(35, 31, 32, 0.75)";
+      ctx.font = "600 8px " + FONT_UI;
+      ctx.textAlign = "left";
+      ctx.fillText("Group avg", Math.min(px + 4, R - 52), T + 10);
+      ctx.restore();
+    },
+  };
+
+  /**
+   * SPI cross-plot: Concern-style reporting (Near Miss FR %) vs Fatality rate (%),
+   * bubble size ∝ SPI row volume for that BU; quadrants split at group averages.
+   */
+  function renderSpiRiskQuadrantChart(snapPool, f) {
     const el = document.getElementById("chart-spi-bubble");
     if (!el || typeof Chart === "undefined") return;
     const prev = Chart.getChart(el);
     if (prev) prev.destroy();
-    const counts = [0, 0, 0, 0, 0, 0, 0];
-    snapRows.forEach((r) => {
-      counts[eventLevelIndexForRow(r)]++;
+
+    const winMonths = new Set(
+      bizUnitWindowMonths(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
+    );
+    const rows = snapPool.filter((r) => winMonths.has(r.yearMonth));
+
+    const BU_COLORS = [
+      "rgba(0, 109, 182, 0.55)",
+      "rgba(0, 177, 107, 0.55)",
+      "rgba(142, 39, 143, 0.5)",
+      "rgba(240, 76, 35, 0.5)",
+      "rgba(59, 130, 246, 0.5)",
+      "rgba(234, 179, 8, 0.55)",
+      "rgba(99, 102, 241, 0.5)",
+      "rgba(236, 72, 153, 0.45)",
+    ];
+    const BU_BORDERS = [
+      "#006DB6",
+      "#00a86b",
+      "#8E278F",
+      "#F04C23",
+      "#2563eb",
+      "#ca8a04",
+      "#4f46e5",
+      "#db2777",
+    ];
+
+    const points = [];
+    PREVIEW_BUSINESS_NAMES.forEach((previewBu, bi) => {
+      const buFact = factBusinessNameForPreview(previewBu);
+      const sub = rows.filter(
+        (r) => String(r.businessName || "").trim() === buFact
+      );
+      if (!sub.length) return;
+      const xRows = sub.filter(
+        (r) => String(r.kpiKey) === String(SPI_QUADRANT_X_KPI)
+      );
+      const yRows = sub.filter(
+        (r) => String(r.kpiKey) === String(SPI_QUADRANT_Y_KPI)
+      );
+      const xVals = xRows
+        .map((r) => Number(r.value))
+        .filter((v) => !Number.isNaN(v));
+      const yVals = yRows
+        .map((r) => Number(r.value))
+        .filter((v) => !Number.isNaN(v));
+      const x = xVals.length ? avg(xVals) : null;
+      const y = yVals.length ? avg(yVals) : null;
+      if (x == null || y == null) return;
+      const n = sub.length;
+      const rPx = Math.max(10, Math.min(38, 6 + Math.sqrt(n) * 2.2));
+      points.push({
+        x,
+        y,
+        r: rPx,
+        bu: previewBu,
+        n,
+        bg: BU_COLORS[bi % BU_COLORS.length],
+        bd: BU_BORDERS[bi % BU_BORDERS.length],
+      });
     });
-    const bubbleData = counts.map((cnt, xi) => ({
-      x: xi,
-      y: cnt,
-      r: Math.max(6, Math.sqrt(cnt + 1) * 7),
-    }));
+
+    if (!points.length) {
+      points.push({
+        x: 2.5,
+        y: 0.12,
+        r: 18,
+        bu: "Preview (no BU slice)",
+        n: 0,
+        bg: "rgba(0, 109, 182, 0.35)",
+        bd: "#006DB6",
+      });
+    }
+
+    const xs = points.map((p) => p.x);
+    const ys = points.map((p) => p.y);
+    const midX = avg(xs);
+    const midY = avg(ys);
+    const padX = Math.max(0.4, (Math.max(...xs) - Math.min(...xs)) * 0.12 || 0.5);
+    const padY = Math.max(0.02, (Math.max(...ys) - Math.min(...ys)) * 0.15 || 0.03);
+
     new Chart(el, {
       type: "bubble",
+      plugins: [spiQuadrantZonePlugin, spiQuadrantLinePlugin],
       data: {
         datasets: [
           {
-            label: "Rows",
-            data: bubbleData,
-            backgroundColor: "rgba(0, 109, 182, 0.45)",
-            borderColor: "#006DB6",
+            label: "Business units",
+            data: points.map((p) => ({
+              x: p.x,
+              y: p.y,
+              r: p.r,
+              bu: p.bu,
+              n: p.n,
+            })),
+            backgroundColor: points.map((p) => p.bg),
+            borderColor: points.map((p) => p.bd),
             borderWidth: 1.5,
           },
         ],
@@ -731,16 +1446,26 @@
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        layout: { padding: { top: 10, right: 12, bottom: 8, left: 8 } },
+        layout: { padding: { top: 14, right: 14, bottom: 10, left: 10 } },
         plugins: {
           legend: { display: false },
+          spiQuadrantMid: { x: midX, y: midY },
           tooltip: {
             callbacks: {
               label(ctx) {
                 const raw = ctx.raw;
-                const xi = Math.round(Number(raw.x));
-                const lbl = EVENT_LEVEL_LABELS[xi] || "";
-                return " " + lbl + ": " + raw.y + " rows";
+                const bu = raw.bu || "—";
+                const n = raw.n != null ? raw.n : 0;
+                return (
+                  " " +
+                  bu +
+                  " · Concern rate " +
+                  Number(raw.x).toFixed(2) +
+                  "% · Fatality " +
+                  Number(raw.y).toFixed(3) +
+                  "% · Rows " +
+                  n
+                );
               },
             },
           },
@@ -748,35 +1473,25 @@
         scales: {
           x: {
             type: "linear",
-            min: -0.5,
-            max: 6.5,
-            ticks: {
-              stepSize: 1,
-              font: { size: 8 },
-              maxRotation: 55,
-              minRotation: 35,
-              autoSkip: false,
-              callback(v) {
-                const i = Math.round(Number(v));
-                return i >= 0 && i < EVENT_LEVEL_LABELS.length
-                  ? EVENT_LEVEL_LABELS[i]
-                  : "";
-              },
-            },
+            suggestedMin: Math.max(0, Math.min(...xs) - padX),
+            suggestedMax: Math.max(...xs) + padX,
+            ticks: { font: { size: 9 }, color: "#231F20" },
             title: {
               display: true,
-              text: "Event level",
+              text: "Concern reporting rate (Near Miss FR %)",
               font: { size: 10 },
               color: "#6D6E71",
             },
-            grid: { color: "rgba(109, 110, 113, 0.12)" },
+            grid: { color: "rgba(109, 110, 113, 0.14)" },
           },
           y: {
+            type: "linear",
             beginAtZero: true,
-            ticks: { font: { size: 10 }, color: "#231F20" },
+            suggestedMax: Math.max(...ys) + padY,
+            ticks: { font: { size: 9 }, color: "#231F20" },
             title: {
               display: true,
-              text: "Count (rows)",
+              text: "Fatality rate (%)",
               font: { size: 10 },
               color: "#6D6E71",
             },
@@ -785,57 +1500,321 @@
         },
       },
     });
+    el.setAttribute(
+      "aria-label",
+      "Bubble quadrant chart: concern reporting rate versus fatality rate by business unit; bubble size reflects filtered SPI row volume; yellow top-left is higher risk, green bottom-right is lower risk; dashed lines are group averages."
+    );
   }
 
-  function renderSpiPerformanceMap(snapRows) {
-    const el = document.getElementById("chart-spi-map");
-    if (!el) return;
+  const SPI_INSIGHT_PALETTE = [
+    { fill: "rgba(0, 109, 182, 0.38)", stroke: "#006DB6" },
+    { fill: "rgba(0, 177, 107, 0.42)", stroke: "#00a86b" },
+    { fill: "rgba(142, 39, 143, 0.38)", stroke: "#8E278F" },
+    { fill: "rgba(240, 76, 35, 0.38)", stroke: "#F04C23" },
+    { fill: "rgba(35, 31, 32, 0.22)", stroke: "#231F20" },
+    { fill: "rgba(0, 109, 182, 0.22)", stroke: "#005a94" },
+    { fill: "rgba(0, 177, 107, 0.26)", stroke: "#008f56" },
+    { fill: "rgba(142, 39, 143, 0.24)", stroke: "#6a1f6b" },
+  ];
+
+  function spiChartMonthTick(ym) {
+    if (!ym || ym.length < 7) return String(ym || "");
+    const mons = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    const mo = Number(ym.slice(5, 7));
+    if (Number.isNaN(mo) || mo < 1 || mo > 12) return ym;
+    return mons[mo - 1] + " '" + ym.slice(2, 4);
+  }
+
+  /**
+   * SPI: 100% stacked area (12 mo) — each month’s mix of KPI row counts (raw counts in tooltip).
+   */
+  function renderSpiInsightsChart(snapPool, f) {
+    const host = document.getElementById("chart-spi-map");
+    if (!host) return;
     destroySpiLeafletMap();
-    if (typeof L === "undefined") {
-      el.innerHTML =
-        '<p class="chart-spi-map-fallback">Map unavailable. Load Leaflet to see state circles.</p>';
+
+    const kpisMeta = sortKpisForDisplay(
+      SPI_CATEGORY_KEY,
+      getKpis(SPI_CATEGORY_KEY)
+    ).slice(0, 8);
+    if (!kpisMeta.length) {
+      host.innerHTML =
+        '<p class="chart-spi-map-fallback">No SPI KPIs for this chart.</p>';
       return;
     }
-    const byState = {};
-    snapRows.forEach((r) => {
-      const st = String(r.state || "").trim() || "—";
-      byState[st] = (byState[st] || 0) + 1;
-    });
-    const map = L.map(el, { scrollWheelZoom: false }).setView([22.6, 79.0], 4.5);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
-    const latLngs = [];
-    Object.keys(byState).forEach((st) => {
-      const ll = STATE_CENTROID_BY_STATE[st];
-      if (!ll) return;
-      const n = byState[st];
-      latLngs.push(ll);
-      const rad = Math.max(6, Math.min(32, Math.sqrt(n) * 3.2));
-      L.circleMarker(ll, {
-        radius: rad,
-        color: "#006DB6",
-        fillColor: "#00B16B",
-        fillOpacity: 0.52,
-        weight: 2,
-      })
-        .bindPopup(escapeHtml(st) + ": " + n + " rows (filtered)")
-        .addTo(map);
-    });
-    if (latLngs.length === 1) {
-      map.setView(latLngs[0], 6);
-    } else if (latLngs.length > 1) {
-      map.fitBounds(L.latLngBounds(latLngs), { padding: [28, 28], maxZoom: 7 });
+    if (typeof Chart === "undefined") {
+      host.innerHTML =
+        '<p class="chart-spi-map-fallback">Chart unavailable.</p>';
+      return;
     }
-    window.__adaniSpiMap = map;
-    setTimeout(() => {
-      try {
-        map.invalidateSize();
-      } catch {
-        /* ignore */
+
+    const months = chartMonthKeys(f.refMonth, 12);
+    const labels = months.map(spiChartMonthTick);
+
+    host.innerHTML =
+      '<div class="chart-canvas-wrap chart-canvas-wrap--spi-insights">' +
+      '<canvas id="chart-spi-insights" role="img" aria-label="100 percent stacked SPI KPI mix by month"></canvas></div>';
+    const canvas = document.getElementById("chart-spi-insights");
+    if (!canvas) return;
+    const existing = Chart.getChart(canvas);
+    if (existing) existing.destroy();
+
+    const rawMatrix = kpisMeta.map((k) =>
+      months.map((ym) => {
+        let c = 0;
+        for (let i = 0; i < snapPool.length; i++) {
+          const r = snapPool[i];
+          if (r.yearMonth === ym && String(r.kpiKey) === String(k.kpiKey)) {
+            c += 1;
+          }
+        }
+        return c;
+      })
+    );
+
+    const pctMatrix = rawMatrix.map((row) => row.slice());
+    for (let j = 0; j < months.length; j++) {
+      let T = 0;
+      for (let si = 0; si < rawMatrix.length; si++) T += rawMatrix[si][j];
+      if (T <= 0) continue;
+      for (let si = 0; si < rawMatrix.length; si++) {
+        pctMatrix[si][j] = (rawMatrix[si][j] / T) * 100;
       }
+    }
+
+    const datasets = kpisMeta.map((k, idx) => {
+      const pal = SPI_INSIGHT_PALETTE[idx % SPI_INSIGHT_PALETTE.length];
+      return {
+        label: shortKpiHeaderLabel(k.kpiName),
+        data: pctMatrix[idx],
+        fill: true,
+        stack: "spi",
+        tension: 0.28,
+        borderWidth: 1.25,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        borderColor: pal.stroke,
+        backgroundColor: pal.fill,
+      };
+    });
+
+    new Chart(canvas, {
+      type: "line",
+      data: { labels, datasets },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 10,
+              padding: 10,
+              font: {
+                size: 9,
+                family: FONT_UI,
+              },
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const j = ctx.dataIndex;
+                const si = ctx.datasetIndex;
+                const raw = rawMatrix[si] ? rawMatrix[si][j] : 0;
+                const pct = Number(ctx.parsed.y) || 0;
+                return (
+                  " " +
+                  ctx.dataset.label +
+                  ": " +
+                  pct.toFixed(1) +
+                  "% (" +
+                  raw +
+                  " rows)"
+                );
+              },
+              footer(tooltipItems) {
+                if (!tooltipItems.length) return "";
+                const j = tooltipItems[0].dataIndex;
+                let rawSum = 0;
+                for (let si = 0; si < rawMatrix.length; si++) {
+                  rawSum += rawMatrix[si][j] || 0;
+                }
+                return (
+                  "Total rows: " +
+                  rawSum +
+                  " · height = share of rows per KPI (not KPI value)"
+                );
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: {
+              maxRotation: 50,
+              font: { size: 9 },
+              color: "#231F20",
+            },
+            grid: { color: "rgba(109, 110, 113, 0.1)" },
+          },
+          y: {
+            stacked: true,
+            min: 0,
+            max: 100,
+            ticks: {
+              font: { size: 9 },
+              color: "#231F20",
+              callback(v) {
+                return v + "%";
+              },
+            },
+            title: {
+              display: true,
+              text: "% of rows by KPI (same filters)",
+              font: { size: 10 },
+              color: "#6D6E71",
+            },
+            grid: { color: "rgba(109, 110, 113, 0.16)" },
+          },
+        },
+      },
+    });
+
+    host.setAttribute(
+      "aria-label",
+      "SPI mix chart: percent of filtered fact rows per KPI by month (not KPI numeric values), twelve months."
+    );
+    setTimeout(() => {
+      const ch = Chart.getChart(canvas);
+      if (ch) ch.resize();
     }, 80);
+  }
+
+  /**
+   * Location Vulnerability: India map with one marker per preview BU (24); circle size ∝ row count.
+   */
+  function renderLocationVulnerabilityBuMap(snapRows, f) {
+    const el = document.getElementById("chart-loc-bu-map");
+    if (!el) return;
+    destroyLocBuLeafletMap();
+    const vsShort = vsOptionLabel((f && f.vsMode) || DEFAULT_VS_MODE);
+    const hint = document.getElementById("chart-loc-bu-map-hint");
+    if (hint) hint.textContent = "(map · row counts · 24 BUs · " + vsShort + ")";
+    if (typeof L === "undefined") {
+      el.innerHTML =
+        '<p class="chart-spi-map-fallback">Map unavailable. Load Leaflet to see business unit markers.</p>';
+      return;
+    }
+
+    const bus = PREVIEW_BUSINESS_NAMES.slice();
+    const counts = {};
+    bus.forEach((bu) => {
+      counts[bu] = 0;
+    });
+    snapRows.forEach((r) => {
+      const b = String(r.businessName || "").trim();
+      bus.forEach((bu) => {
+        if (factBusinessNameForPreview(bu) === b) counts[bu] += 1;
+      });
+    });
+
+    loadGoogleMapsAndMutant().then(function (useGoogle) {
+      const host = document.getElementById("chart-loc-bu-map");
+      if (!host || typeof L === "undefined") return;
+
+      const map = L.map(host, { scrollWheelZoom: true }).setView(
+        [22.6, 79.0],
+        4.5
+      );
+      if (
+        useGoogle &&
+        L.gridLayer &&
+        L.gridLayer.googleMutant
+      ) {
+        L.gridLayer
+          .googleMutant({ type: "roadmap" })
+          .addTo(map);
+      } else {
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 19,
+          attribution: "&copy; OpenStreetMap contributors",
+        }).addTo(map);
+      }
+
+      const latLngs = [];
+      const indiaBounds = L.latLngBounds(
+        INDIA_MAP_BOUNDS_SW,
+        INDIA_MAP_BOUNDS_NE
+      );
+      bus.forEach((bu) => {
+        const n = counts[bu] || 0;
+        const fact = factBusinessNameForPreview(bu);
+        const state = FACT_BU_HOME_STATE[fact] || "Gujarat";
+        const base = STATE_CENTROID_BY_STATE[state] || [22.6, 79.0];
+        const h = hash32(bu + "|locbu");
+        const ox = ((h % 200) / 200 - 0.5) * 1.4;
+        const oy = (((h >> 9) % 200) / 200 - 0.5) * 1.4;
+        const ll = [base[0] + ox * 0.42, base[1] + oy * 0.42];
+        latLngs.push(ll);
+        const rad =
+          n === 0 ? 4 : Math.max(5, Math.min(28, Math.sqrt(n) * 2.8));
+        const mk = L.circleMarker(ll, {
+          radius: rad,
+          color: "#8E278F",
+          fillColor: "#006DB6",
+          fillOpacity: n === 0 ? 0.22 : 0.52,
+          weight: 2,
+        }).addTo(map);
+        const title =
+          escapeHtml(bu) + ": " + n + " rows · " + escapeHtml(fact);
+        mk.bindPopup(
+          "<strong>" +
+            escapeHtml(bu) +
+            "</strong><br>" +
+            n +
+            " rows (filtered)<br><span style=\"color:#6d6e71;font-size:11px\">Fact BU: " +
+            escapeHtml(fact) +
+            "</span>"
+        );
+        mk.bindTooltip(title, {
+          sticky: true,
+          direction: "auto",
+          opacity: 0.95,
+          className: "loc-bu-map-tooltip",
+        });
+      });
+      if (latLngs.length) {
+        latLngs.forEach((ll) => {
+          indiaBounds.extend(ll);
+        });
+        map.fitBounds(indiaBounds, { padding: [20, 20], maxZoom: 6 });
+      }
+      window.__adaniLocBuMap = map;
+      setTimeout(() => {
+        try {
+          map.invalidateSize();
+        } catch {
+          /* ignore */
+        }
+      }, 80);
+    });
   }
 
   function wireCatMainViewIndex() {
@@ -843,13 +1822,45 @@
     if (!main) return;
     const tabCharts = document.getElementById("view-tab-charts");
     const tabTable = document.getElementById("view-tab-table");
+    const tabCompare = document.getElementById("view-tab-compare");
     const panelCharts = document.getElementById("view-panel-charts");
     const panelTable = document.getElementById("view-panel-table");
+    const panelCompare = document.getElementById("view-panel-compare");
+    const hasCompare = !!(tabCompare && panelCompare);
+
     function apply(mode) {
+      if (hasCompare && mode === "compare") {
+        main.classList.remove("cat-main-view--charts", "cat-main-view--table");
+        main.classList.add("cat-main-view--compare");
+        main.dataset.view = "compare";
+        tabCharts?.setAttribute("aria-selected", "false");
+        tabTable?.setAttribute("aria-selected", "false");
+        tabCompare?.setAttribute("aria-selected", "true");
+        tabCharts?.classList.remove("view-tabs__btn--active");
+        tabTable?.classList.remove("view-tabs__btn--active");
+        tabCompare?.classList.add("view-tabs__btn--active");
+        if (tabCharts) tabCharts.tabIndex = -1;
+        if (tabTable) tabTable.tabIndex = -1;
+        if (tabCompare) tabCompare.tabIndex = 0;
+        if (panelCharts) panelCharts.hidden = true;
+        if (panelTable) panelTable.hidden = true;
+        if (panelCompare) panelCompare.hidden = false;
+        try {
+          localStorage.setItem(LS_CAT_MAIN_VIEW, "compare");
+        } catch {
+          /* ignore */
+        }
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => resizeAllChartsIndex());
+        });
+        return;
+      }
+
       const charts = mode === "charts";
+      main.classList.remove("cat-main-view--compare");
       main.classList.toggle("cat-main-view--charts", charts);
       main.classList.toggle("cat-main-view--table", !charts);
-      main.dataset.view = mode;
+      main.dataset.view = charts ? "charts" : "table";
       if (tabCharts) {
         tabCharts.setAttribute("aria-selected", charts ? "true" : "false");
         tabCharts.classList.toggle("view-tabs__btn--active", charts);
@@ -860,10 +1871,16 @@
         tabTable.classList.toggle("view-tabs__btn--active", !charts);
         tabTable.tabIndex = charts ? -1 : 0;
       }
+      if (tabCompare) {
+        tabCompare.setAttribute("aria-selected", "false");
+        tabCompare.classList.remove("view-tabs__btn--active");
+        tabCompare.tabIndex = -1;
+      }
       if (panelCharts) panelCharts.hidden = !charts;
       if (panelTable) panelTable.hidden = charts;
+      if (panelCompare) panelCompare.hidden = true;
       try {
-        localStorage.setItem(LS_CAT_MAIN_VIEW, mode);
+        localStorage.setItem(LS_CAT_MAIN_VIEW, charts ? "charts" : "table");
       } catch {
         /* ignore */
       }
@@ -873,36 +1890,48 @@
         });
       }
     }
+
     let initial = "charts";
     try {
       const s = localStorage.getItem(LS_CAT_MAIN_VIEW);
-      if (s === "charts" || s === "table") initial = s;
+      if (s === "charts" || s === "table" || s === "compare") initial = s;
     } catch {
       /* ignore */
     }
+    if (initial === "compare" && !hasCompare) initial = "charts";
+
     apply(initial);
     tabCharts?.addEventListener("click", () => apply("charts"));
     tabTable?.addEventListener("click", () => apply("table"));
+    tabCompare?.addEventListener("click", () => apply("compare"));
+  }
+
+  /** Distinct hues for radar spokes (one color per business unit). */
+  function radarSpokeColors(count) {
+    const n = Math.max(1, Math.min(Number(count) || 1, 48));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const h = Math.round((360 * i) / n + 14) % 360;
+      out.push({
+        stroke: "hsl(" + h + " 72% 34%)",
+        fill: "hsla(" + h + " 68% 46% / 0.9)",
+        fillSoft: "hsla(" + h + " 62% 52% / 0.2)",
+      });
+    }
+    return out;
   }
 
   /**
-   * Adani brand palette (approved — same as styles.css :root).
-   * Green #00B16B · Blue #006DB6 · Purple #8E278F · Orange #F04C23
+   * By business: radar chart — one spoke per preview BU (24); value from filtered rows or 0.
    */
-  const CHART_BRAND_HEX = ["#00B16B", "#006DB6", "#8E278F", "#F04C23"];
-
-  /**
-   * By business: donut chart — share of total (|value|) per business; top slices + Other.
-   * Legend on the right keeps the ring centered vertically and avoids bottom clipping.
-   */
-  function renderBizBreakdown(bizLabels, bizData) {
+  function renderBizBreakdown(fullNames, values, datasetLabel, unitType) {
     const el = document.getElementById("chart-biz");
     const emptyEl = document.getElementById("chart-biz-empty");
     if (!el || typeof Chart === "undefined") return;
     const prev = Chart.getChart(el);
     if (prev) prev.destroy();
 
-    if (!bizLabels.length) {
+    if (!fullNames || !fullNames.length) {
       el.style.display = "none";
       if (emptyEl) {
         emptyEl.hidden = false;
@@ -911,13 +1940,10 @@
       return;
     }
 
-    const pairs = bizLabels
-      .map((name, i) => ({
-        name,
-        v: Math.abs(Number(bizData[i]) || 0),
-      }))
-      .filter((p) => p.v > 0);
-    if (!pairs.length) {
+    const nums = values.map((v) =>
+      Number.isFinite(Number(v)) ? Number(v) : 0
+    );
+    if (!nums.some((v) => v !== 0)) {
       el.style.display = "none";
       if (emptyEl) {
         emptyEl.hidden = false;
@@ -929,117 +1955,193 @@
     el.style.display = "block";
     if (emptyEl) emptyEl.hidden = true;
 
-    pairs.sort((a, b) => b.v - a.v);
-    const maxSlices = 7;
-    let fullNames = [];
-    let labels = [];
-    let values = [];
-    function shortLabel(name) {
-      const s = String(name);
-      return s.length > 12 ? s.slice(0, 11) + "…" : s;
+    function radarBizLabel(name) {
+      const s = String(name).trim();
+      if (s.length <= 11) return s;
+      return s.slice(0, 10) + "\u2026";
     }
-    if (pairs.length <= maxSlices) {
-      fullNames = pairs.map((p) => p.name);
-      labels = fullNames.map(shortLabel);
-      values = pairs.map((p) => p.v);
-    } else {
-      const top = pairs.slice(0, maxSlices);
-      const rest = pairs.slice(maxSlices);
-      const other = rest.reduce((s, p) => s + p.v, 0);
-      fullNames = top.map((p) => p.name);
-      labels = fullNames.map(shortLabel);
-      values = top.map((p) => p.v);
-      if (other > 0) {
-        fullNames.push("Other (" + rest.length + " businesses)");
-        labels.push("Other");
-        values.push(other);
-      }
-    }
+    const shortLabels = fullNames.map(radarBizLabel);
+    const palette = radarSpokeColors(nums.length);
+    const pointStrokes = nums.map((_, i) => palette[i % palette.length].stroke);
+    const pointFills = nums.map((_, i) => palette[i % palette.length].fill);
 
-    const total = values.reduce((a, b) => a + b, 0) || 1;
+    const radarValueLabelPlugin = {
+      id: "radarValueLabels",
+      afterDatasetsDraw(chart) {
+        const ctx = chart.ctx;
+        const meta = chart.getDatasetMeta(0);
+        if (!meta || !meta.data || !meta.data.length) return;
+        const ds = chart.data.datasets[0].data;
+        const { left, right, top, bottom } = chart.chartArea;
+        const cx = (left + right) / 2;
+        const cy = (top + bottom) / 2;
+        ctx.save();
+        ctx.font = "600 10px " + FONT_UI;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        meta.data.forEach((pt, i) => {
+          const v = Number(ds[i]);
+          if (!Number.isFinite(v)) return;
+          const xy = pt.getProps(["x", "y"], true);
+          const x = xy.x;
+          const y = xy.y;
+          const dx = x - cx;
+          const dy = y - cy;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const ox = (dx / len) * 18;
+          const oy = (dy / len) * 18;
+          const txt = formatValue(v, unitType);
+          const ink = palette[i % palette.length].stroke;
+          ctx.lineJoin = "round";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.95)";
+          ctx.lineWidth = 4;
+          ctx.strokeText(txt, x + ox, y + oy);
+          ctx.fillStyle = ink;
+          ctx.fillText(txt, x + ox, y + oy);
+        });
+        ctx.restore();
+      },
+    };
 
     new Chart(el, {
-      type: "doughnut",
+      type: "radar",
+      plugins: [radarValueLabelPlugin],
       data: {
-        labels: labels,
+        labels: shortLabels,
         datasets: [
           {
-            data: values,
-            backgroundColor: labels.map(
-              (_, i) => CHART_BRAND_HEX[i % CHART_BRAND_HEX.length]
-            ),
-            borderColor: "#ffffff",
-            borderWidth: 1.5,
-            hoverOffset: 4,
+            label: datasetLabel || "By business",
+            data: nums,
+            borderColor: pointStrokes[0] || "#006DB6",
+            backgroundColor: "transparent",
+            borderWidth: 2,
+            fill: true,
+            segment: {
+              borderWidth: 2,
+              borderColor: (ctx) =>
+                palette[ctx.p0DataIndex % palette.length].stroke,
+              backgroundColor: (ctx) =>
+                palette[ctx.p0DataIndex % palette.length].fillSoft,
+            },
+            pointRadius: 4,
+            pointHoverRadius: 8,
+            pointBorderWidth: 2,
+            pointBackgroundColor: pointFills,
+            pointBorderColor: pointStrokes,
+            hoverBorderWidth: 2,
+            hoverBackgroundColor: pointFills,
+            hoverBorderColor: pointStrokes,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        /* Keeps donut inside chart area (avoids arc clipped at card bottom) */
-        radius: "70%",
-        cutout: "55%",
+        interaction: {
+          mode: "nearest",
+          intersect: false,
+        },
         layout: {
-          padding: { top: 6, right: 4, bottom: 6, left: 4 },
+          padding: { top: 14, right: 18, bottom: 18, left: 18 },
+        },
+        scales: {
+          r: {
+            beginAtZero: true,
+            suggestedMax:
+              Math.max.apply(
+                null,
+                nums.map((n) => Number(n) || 0)
+              ) * 1.12 || undefined,
+            angleLines: { color: "rgba(109, 110, 113, 0.28)" },
+            grid: { color: "rgba(109, 110, 113, 0.18)" },
+            pointLabels: {
+              font: {
+                size: 8.5,
+                weight: "500",
+                family: FONT_UI,
+              },
+              color: (ctx) => {
+                const i =
+                  ctx.index != null
+                    ? ctx.index
+                    : ctx.tick && ctx.tick.index != null
+                      ? ctx.tick.index
+                      : 0;
+                return palette[i % palette.length].stroke;
+              },
+              padding: 4,
+            },
+            ticks: {
+              display: true,
+              maxTicksLimit: 7,
+              font: { size: 9, family: FONT_UI },
+              backdropColor: "rgba(255,255,255,0.9)",
+              color: "#5a5c5f",
+            },
+          },
         },
         plugins: {
           legend: {
             display: true,
-            position: "right",
-            align: "center",
+            position: "bottom",
             labels: {
+              boxWidth: 0,
+              usePointStyle: false,
+              generateLabels() {
+                return [
+                  {
+                    text: String(datasetLabel || "By business"),
+                    fillStyle: "transparent",
+                    strokeStyle: "transparent",
+                    lineWidth: 0,
+                    hidden: false,
+                    index: 0,
+                    datasetIndex: 0,
+                  },
+                ];
+              },
               font: {
-                size: 9,
-                family: '"Adani", system-ui, "Segoe UI", sans-serif',
+                size: 10,
+                family: FONT_UI,
               },
               color: "#231F20",
-              boxWidth: 10,
-              boxHeight: 10,
-              padding: 6,
-              maxWidth: 118,
-              usePointStyle: true,
-              generateLabels: function (chart) {
-                const ds = chart.data.datasets[0];
-                const labs = chart.data.labels || [];
-                if (!labs.length || !ds) return [];
-                return labs.map(function (label, i) {
-                  const raw = Number(ds.data[i]) || 0;
-                  const pct =
-                    total > 0
-                      ? ((raw / total) * 100).toFixed(1)
-                      : "0.0";
-                  const bg = Array.isArray(ds.backgroundColor)
-                    ? ds.backgroundColor[i]
-                    : ds.backgroundColor;
-                  return {
-                    text: String(label) + " (" + pct + "%)",
-                    fillStyle: bg,
-                    strokeStyle: "#ffffff",
-                    lineWidth: 1,
-                    hidden: !chart.getDataVisibility(i),
-                    index: i,
-                    datasetIndex: 0,
-                  };
-                });
-              },
             },
           },
           tooltip: {
+            enabled: true,
+            backgroundColor: "rgba(35, 31, 32, 0.96)",
+            titleColor: "#ffffff",
+            bodyColor: "#f5f5f5",
+            borderColor: "#006DB6",
+            borderWidth: 1,
+            padding: 12,
+            cornerRadius: 6,
+            caretSize: 7,
+            titleFont: {
+              size: 13,
+              weight: "600",
+              family: FONT_UI,
+            },
+            bodyFont: {
+              size: 12,
+              weight: "500",
+              family: FONT_UI,
+            },
+            titleMarginBottom: 6,
+            boxPadding: 6,
+            displayColors: true,
+            usePointStyle: true,
             callbacks: {
               title(items) {
                 const i = items[0].dataIndex;
                 return fullNames[i] != null ? String(fullNames[i]) : "";
               },
               label(ctx) {
-                const raw = ctx.raw;
-                const pct = ((Number(raw) / total) * 100).toFixed(1);
-                const v = Number(raw);
-                const num =
-                  v >= 1e6
-                    ? v.toLocaleString(undefined, { maximumFractionDigits: 0 })
-                    : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
-                return " " + num + " (" + pct + "% of total)";
+                const v = Number(ctx.raw);
+                const ut = unitType || "";
+                const val = formatValue(v, unitType);
+                const line1 = "Value: " + val;
+                return ut ? [line1, "Unit: " + ut] : line1;
               },
             },
           },
@@ -1048,22 +2150,32 @@
     });
   }
 
+  /** Selected KPI keys in category display order (for charts / table / highlights). */
+  function orderKpiKeysForCharts(catKey, kpiKeysRaw) {
+    const meta = kpiListForFilterDropdown(catKey);
+    const valid = new Set(meta.map((k) => String(k.kpiKey)));
+    const chosen = (kpiKeysRaw || [])
+      .map(String)
+      .filter((id) => valid.has(id));
+    if (!chosen.length) return [];
+    const order = sortKpisForDisplay(catKey, meta).map((k) => String(k.kpiKey));
+    return order.filter((id) => chosen.includes(id));
+  }
+
   function readFilters(catKey) {
-    const elKpi = document.getElementById("f-kpi");
     const elVs = document.getElementById("f-vs");
     const elSt = document.getElementById("f-state");
     if (!elSt) return null;
     const elBiz = document.getElementById("f-biz");
     const kpisMeta = kpiListForFilterDropdown(catKey);
-    const defK = defaultKpiKeyForCategory(catKey, kpisMeta);
-    let kpi = defK;
-    if (elKpi && elKpi.value) {
-      const ok = kpisMeta.some((x) => String(x.kpiKey) === String(elKpi.value));
-      if (ok) kpi = String(elKpi.value);
-    }
+    const rawKeys = readSelectedKpiKeysFromDom();
+    let kpiKeys = orderKpiKeysForCharts(catKey, rawKeys);
+    const dk = defaultKpiKeyForCategory(catKey, kpisMeta);
+    const kpi = kpiKeys.length ? kpiKeys[0] : dk;
     return {
       catKey,
       kpi: kpi,
+      kpiKeys: kpiKeys,
       vsMode: elVs ? elVs.value : DEFAULT_VS_MODE,
       refMonth: getRefMonth(),
       state: elSt.value,
@@ -1075,11 +2187,15 @@
 
   /** Table / KPI tiles: current reference month only (plus non-month filters). */
   function applyRowFilter(rows, f) {
+    const keys =
+      f.kpiKeys && f.kpiKeys.length
+        ? f.kpiKeys.map(String)
+        : [String(f.kpi)];
     return rows.filter((r) => {
-      if (String(r.kpiKey) !== String(f.kpi)) return false;
+      if (!keys.includes(String(r.kpiKey))) return false;
       if (r.yearMonth !== f.refMonth) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
-      if (f.business !== "all" && r.businessName !== f.business) return false;
+      if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
       return true;
@@ -1098,14 +2214,19 @@
   }
 
   function applyChartFilter(rows, f) {
+    const keys =
+      f.kpiKeys && f.kpiKeys.length
+        ? f.kpiKeys.map(String)
+        : [String(f.kpi)];
+    if (!keys.length) return [];
     const range = new Set(
       chartMonthsForVsMode(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
     );
     return rows.filter((r) => {
-      if (String(r.kpiKey) !== String(f.kpi)) return false;
+      if (!keys.includes(String(r.kpiKey))) return false;
       if (!range.has(r.yearMonth)) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
-      if (f.business !== "all" && r.businessName !== f.business) return false;
+      if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
       return true;
@@ -1114,6 +2235,15 @@
 
 
   function getRowsForCategory(catKey) {
+    if (catKey === LOCATION_VULN_CAT_KEY) {
+      return DATA.factRows
+        .filter(
+          (r) =>
+            r.categoryKey === LOCATION_VULN_SOURCE_CAT &&
+            LOCATION_VULN_KPI_KEYS.has(Number(r.kpiKey))
+        )
+        .map((r) => ({ ...r, categoryKey: LOCATION_VULN_CAT_KEY }));
+    }
     return DATA.factRows.filter((r) => r.categoryKey === catKey);
   }
 
@@ -1143,12 +2273,24 @@
   const INCIDENT_KPI_ORDER = [
     21, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
   ];
+  /** Hazard & Observation (leading): activity first; TRIR last for context only. */
+  const HAZARD_KPI_ORDER = [38, 13, 6, 39, 40, 45, 46, 53, 21];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
     const list = kpisMeta.slice();
     if (catKey === 1) {
       const map = new Map(list.map((k) => [k.kpiKey, k]));
       return INCIDENT_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
+    }
+    if (catKey === HAZARD_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [k.kpiKey, k]));
+      const ordered = HAZARD_KPI_ORDER.map((id) => map.get(id)).filter(
+        Boolean
+      );
+      const rest = list.filter(
+        (k) => !HAZARD_KPI_ORDER.includes(Number(k.kpiKey))
+      );
+      return ordered.concat(rest);
     }
     if (catKey === SPI_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [k.kpiKey, k]));
@@ -1157,6 +2299,11 @@
         (k) => !SPI_KPI_ORDER.includes(Number(k.kpiKey))
       );
       return ordered.concat(rest);
+    }
+    if (catKey === LOCATION_VULN_CAT_KEY) {
+      const order = [21, 13, 38, 39, 40, 45, 46, 53];
+      const map = new Map(list.map((k) => [k.kpiKey, k]));
+      return order.map((id) => map.get(id)).filter(Boolean);
     }
     const tri = list.find((k) => isTriKpiMeta(k));
     if (!tri) return list;
@@ -1175,6 +2322,98 @@
       "-" +
       String(d.getMonth() + 1).padStart(2, "0")
     );
+  }
+
+  /**
+   * Preview data: for reference month vs prior month, reshape values per
+   * category × KPI × business so Vs% is in ±5–±20% with mixed signs. Mutates
+   * factRows in place so KPI tiles, charts, and BU matrix stay aligned.
+   */
+  function normalizePreviewFactRowsVsBand() {
+    const data = DATA;
+    if (!data || !Array.isArray(data.factRows) || !data.factRows.length) return;
+    let ref = null;
+    if (data.months && data.months.length) {
+      ref = data.months[data.months.length - 1].yearMonth;
+    }
+    if (!ref && data.meta) ref = data.meta.lastDataMonth;
+    if (!ref) return;
+    const m1 = monthAdd(ref, -1);
+    if (!m1) return;
+
+    function aggRows(rows, ut) {
+      if (!rows || !rows.length) return null;
+      const nums = rows.map((r) => Number(r.value)).filter((v) => !Number.isNaN(v));
+      if (!nums.length) return null;
+      if (isAdditiveUnit(ut)) return nums.reduce((a, b) => a + b, 0);
+      return avg(nums);
+    }
+
+    function applyNewAgg(rows, ut, newAgg) {
+      const n = rows.length;
+      if (!n || newAgg == null || Number.isNaN(Number(newAgg))) return;
+      if (isAdditiveUnit(ut)) {
+        const cur = rows.reduce((a, r) => a + Number(r.value), 0);
+        if (Math.abs(cur) < 1e-9) {
+          const each = Number(newAgg) / n;
+          for (let i = 0; i < n; i++) rows[i].value = each;
+          return;
+        }
+        const f = Number(newAgg) / cur;
+        for (let i = 0; i < n; i++) rows[i].value = Number(rows[i].value) * f;
+        return;
+      }
+      const curAvg = avg(rows.map((r) => Number(r.value)));
+      const delta = Number(newAgg) - curAvg;
+      for (let i = 0; i < n; i++) rows[i].value = Number(rows[i].value) + delta;
+    }
+
+    const index = new Map();
+    for (let i = 0; i < data.factRows.length; i++) {
+      const r = data.factRows[i];
+      if (r.yearMonth !== ref && r.yearMonth !== m1) continue;
+      const bn = String(r.businessName || "").trim();
+      const key = r.categoryKey + "|" + r.kpiKey + "|" + bn + "|" + r.yearMonth;
+      if (!index.has(key)) index.set(key, { rows: [] });
+      index.get(key).rows.push(r);
+    }
+
+    const seriesKeys = new Set();
+    for (const key of index.keys()) {
+      const p = key.split("|");
+      seriesKeys.add(p[0] + "|" + p[1] + "|" + p[2]);
+    }
+
+    for (const ser of seriesKeys) {
+      const kM1 = ser + "|" + m1;
+      const kRef = ser + "|" + ref;
+      const slotM1 = index.get(kM1);
+      const slotRef = index.get(kRef);
+      if (!slotM1 || !slotM1.rows.length || !slotRef || !slotRef.rows.length)
+        continue;
+
+      const ut = slotM1.rows[0].unitType || slotRef.rows[0].unitType;
+      const h = hash32(ser + "|vsband");
+      const mag = 5 + (h % 16);
+      const sign = (h >> 11) % 2 === 0 ? 1 : -1;
+      const p = sign * mag;
+
+      let baseAgg = aggRows(slotM1.rows, ut);
+      if (baseAgg == null || Math.abs(baseAgg) < 1e-9) {
+        const seed = 60 + (Math.abs(h) % 80);
+        if (isAdditiveUnit(ut)) {
+          const each = seed / slotM1.rows.length;
+          for (let i = 0; i < slotM1.rows.length; i++) slotM1.rows[i].value = each;
+        } else {
+          for (let i = 0; i < slotM1.rows.length; i++) slotM1.rows[i].value = seed;
+        }
+        baseAgg = aggRows(slotM1.rows, ut);
+      }
+      if (baseAgg == null || Math.abs(baseAgg) < 1e-9) continue;
+
+      const targetRef = baseAgg * (1 + p / 100);
+      applyNewAgg(slotRef.rows, ut, targetRef);
+    }
   }
 
   /** Jan … ref month (calendar YTD), same month count in prior year. */
@@ -1244,11 +2483,19 @@
     return [ref];
   }
 
-  function applyNonMonthFilters(rows, f) {
+  /**
+   * @param {boolean} [primaryOnly] If true, keep only the first selected KPI (for BU / vertical / radar windows).
+   */
+  function applyNonMonthFilters(rows, f, primaryOnly) {
+    const keys = primaryOnly
+      ? [String(f.kpi)]
+      : f.kpiKeys && f.kpiKeys.length
+        ? f.kpiKeys.map(String)
+        : [String(f.kpi)];
     return rows.filter((r) => {
-      if (String(r.kpiKey) !== String(f.kpi)) return false;
+      if (!keys.includes(String(r.kpiKey))) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
-      if (f.business !== "all" && r.businessName !== f.business) return false;
+      if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
       return true;
@@ -1259,7 +2506,7 @@
   function applyNonMonthFiltersAllKpis(rows, f) {
     return rows.filter((r) => {
       if (f.state !== "all" && r.state !== f.state) return false;
-      if (f.business !== "all" && r.businessName !== f.business) return false;
+      if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
       return true;
@@ -1286,6 +2533,18 @@
     if (p == null || Number.isNaN(p)) return "—";
     const sign = p >= 0 ? "+" : "";
     return sign + p.toFixed(1) + "%";
+  }
+
+  /** KPI tile Vs line: same signed % and direction as buildKpiDetailMetrics (matches table when one BU is filtered). */
+  function tileVsDisplay(item) {
+    const raw = item.vsPct;
+    if (raw == null || Number.isNaN(Number(raw))) {
+      return { dir: "na", pct: "—" };
+    }
+    let d = item.vsDir;
+    if (d === "neutral") d = "same";
+    if (d !== "up" && d !== "down" && d !== "same") d = "na";
+    return { dir: d, pct: formatSignedPct(Number(raw)) };
   }
 
   function buildKpiDetailMetrics(catKey, kpisMeta, f) {
@@ -1385,6 +2644,167 @@
     });
   }
 
+  /** Vs % for one BU × KPI (same windows as KPI tiles), using filtered pool. */
+  function buKpiVsPct(basePool, buName, kpiMeta, f) {
+    const kk = kpiMeta.kpiKey;
+    const ut = kpiMeta.unitType;
+    const add = isAdditiveUnit(ut);
+    const ref = f.refMonth;
+    const mode = f.vsMode || DEFAULT_VS_MODE;
+    const m1 = monthAdd(ref, -1);
+    const m2 = monthAdd(ref, -2);
+    const m3 = monthAdd(ref, -3);
+    const m4 = monthAdd(ref, -4);
+    const m5 = monthAdd(ref, -5);
+    const bu = factBusinessNameForPreview(buName);
+
+    function aggMonth(ym) {
+      if (!ym) return null;
+      const rows = basePool.filter(
+        (r) =>
+          r.kpiKey === kk &&
+          r.yearMonth === ym &&
+          String(r.businessName || "").trim() === bu
+      );
+      if (!rows.length) return null;
+      if (add) {
+        return rows.reduce((a, r) => a + Number(r.value), 0);
+      }
+      return avg(rows.map((r) => r.value));
+    }
+
+    function aggMonthsRolling(endYm, numMonths) {
+      const yms = rollingMonthsFrom(endYm, numMonths);
+      const vals = yms.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+      if (!vals.length) return null;
+      if (add) return vals.reduce((a, b) => a + b, 0);
+      return avg(vals);
+    }
+
+    function avgMonthsList(yms) {
+      const vals = yms.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+      if (!vals.length) return null;
+      return avg(vals);
+    }
+
+    let cur;
+    let baseVal;
+    if (mode === "vs_last_month" || mode === "vs_yesterday") {
+      cur = aggMonth(ref);
+      baseVal = aggMonth(m1);
+    } else if (mode === "vs_last_year") {
+      const ytdM = monthsYtdThrough(ref);
+      const pyM = priorYearYtdMonths(ref);
+      if (add) {
+        const cv = ytdM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        const bv = pyM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        cur = cv.length ? cv.reduce((a, b) => a + b, 0) : null;
+        baseVal = bv.length ? bv.reduce((a, b) => a + b, 0) : null;
+      } else {
+        const cv = ytdM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        const bv = pyM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        cur = cv.length ? avg(cv) : null;
+        baseVal = bv.length ? avg(bv) : null;
+      }
+    } else if (mode === "vs_last_week") {
+      if (add) {
+        cur = aggMonthsRolling(ref, 2);
+        baseVal = aggMonthsRolling(m2, 2);
+      } else {
+        cur = avgMonthsList([ref, m1]);
+        baseVal = avgMonthsList([m2, m3]);
+      }
+    } else if (mode === "vs_last_quarter") {
+      if (add) {
+        cur = aggMonthsRolling(ref, 3);
+        baseVal = aggMonthsRolling(m3, 3);
+      } else {
+        cur = avgMonthsList([ref, m1, m2]);
+        baseVal = avgMonthsList([m3, m4, m5]);
+      }
+    } else {
+      cur = aggMonth(ref);
+      baseVal = aggMonth(m1);
+    }
+
+    return {
+      pct: pctChange(cur, baseVal),
+      cur: cur,
+      baseVal: baseVal,
+    };
+  }
+
+  function isLowerIsBetterKpiName(name) {
+    const n = String(name || "").toLowerCase();
+    return (
+      n.includes("trir") ||
+      n.includes("ltifr") ||
+      n.includes("lti") ||
+      n.includes("fatal") ||
+      n.includes("recordable incident") ||
+      n.includes("incident rate") ||
+      n.includes("lost time")
+    );
+  }
+
+  function matrixCellGoodClass(pct, kpiName) {
+    if (pct == null || Number.isNaN(Number(pct))) return "bu-cell__bar--na";
+    const p = Number(pct);
+    if (Math.abs(p) < 1e-9) return "bu-cell__bar--neutral";
+    if (isLowerIsBetterKpiName(kpiName)) {
+      return p < 0 ? "bu-cell__bar--good" : "bu-cell__bar--bad";
+    }
+    return p > 0 ? "bu-cell__bar--good" : "bu-cell__bar--bad";
+  }
+
+  /**
+   * When Vs % cannot be computed (no rows), use a stable preview value so every matrix cell
+   * shows a number + bar (Power BI: replace with BLANK() or alternate measure as needed).
+   */
+  function matrixFallbackPct(catKey, bu, kpiKey, f) {
+    const h = hash32(
+      String(catKey) +
+        "|" +
+        bu +
+        "|" +
+        String(kpiKey) +
+        "|" +
+        (f.refMonth || "") +
+        "|" +
+        (f.vsMode || "") +
+        "|" +
+        (f.state || "") +
+        "|" +
+        (f.business || "")
+    );
+    const x = (h % 20001) / 20001;
+    return Math.round((x * 70 - 35) * 10) / 10;
+  }
+
+  function matrixEffectivePct(pct, catKey, bu, kpiKey, f) {
+    if (pct != null && !Number.isNaN(Number(pct))) {
+      return { value: Number(pct), imputed: false };
+    }
+    return {
+      value: matrixFallbackPct(catKey, bu, kpiKey, f),
+      imputed: true,
+    };
+  }
+
+  /**
+   * Diverging bar: width % within left or right half (0–100), from center axis.
+   * Negative → left (red); positive → right (green). Scaled to max |%| in the matrix.
+   */
+  function matrixBarDivergingWidths(signedValue, maxAbs) {
+    if (Math.abs(signedValue) < 1e-9) return { left: 0, right: 0 };
+    if (maxAbs < 1e-12) return { left: 0, right: 0 };
+    const t = Math.min(1, Math.abs(signedValue) / maxAbs);
+    const w = t * 100;
+    if (signedValue < 0) return { left: w, right: 0 };
+    if (signedValue > 0) return { left: 0, right: w };
+    return { left: 0, right: 0 };
+  }
+
   function chunkArray(arr, size) {
     const out = [];
     for (let i = 0; i < arr.length; i += size) {
@@ -1407,16 +2827,73 @@
     return "—";
   }
 
-  /** Short KPI names first; long names (likely two lines in the tile) sort to the bottom. */
-  function sortKpiTilesForDisplay(items) {
-    return items.slice().sort((a, b) => {
-      const la = (a.kpiName || "").length;
-      const lb = (b.kpiName || "").length;
-      const longA = la > 26 ? 1 : 0;
-      const longB = lb > 26 ? 1 : 0;
-      if (longA !== longB) return longA - longB;
-      return la - lb;
-    });
+  function cmpArrowWrapClass(dir) {
+    if (dir === "up") {
+      return "multi-kpi-tile__arrow-wrap multi-kpi-tile__arrow-wrap--up";
+    }
+    if (dir === "down") {
+      return "multi-kpi-tile__arrow-wrap multi-kpi-tile__arrow-wrap--down";
+    }
+    if (dir === "same") {
+      return "multi-kpi-tile__arrow-wrap multi-kpi-tile__arrow-wrap--same";
+    }
+    return "multi-kpi-tile__arrow-wrap multi-kpi-tile__arrow-wrap--na";
+  }
+
+  function arrowSvgHtml(dir) {
+    const a =
+      'class="multi-kpi-tile__arrow-svg" width="18" height="18" viewBox="0 0 24 24" focusable="false" aria-hidden="true"';
+    if (dir === "up") {
+      return (
+        "<svg " +
+        a +
+        '><path fill="currentColor" d="M12 6L4 15h16L12 6z"/></svg>'
+      );
+    }
+    if (dir === "down") {
+      return (
+        "<svg " +
+        a +
+        '><path fill="currentColor" d="M12 18l8-9H4l8 9z"/></svg>'
+      );
+    }
+    if (dir === "same") {
+      return (
+        "<svg " +
+        a +
+        '><path fill="currentColor" d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>'
+      );
+    }
+    return (
+      "<svg " +
+      a +
+      "><path fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" d=\"M6 12h12\"/></svg>"
+    );
+  }
+
+  function shortBizChartLabel(name) {
+    const s = String(name);
+    if (s.length <= 10) return s;
+    return s.slice(0, 9) + "\u2026";
+  }
+
+  /** Location compare chart: readable axis text (multiline for long names). */
+  function locCompareBizLabel(name) {
+    const s = String(name).trim();
+    if (s.length <= 14) return s;
+    const mid = Math.floor(s.length / 2);
+    let cut = s.lastIndexOf(" ", mid + 5);
+    if (cut < 4) cut = s.indexOf(" ", 10);
+    if (cut > 0 && cut < s.length - 1) {
+      return [s.slice(0, cut).trim(), s.slice(cut + 1).trim()];
+    }
+    return s.length <= 18 ? s : s.slice(0, 16) + "\u2026";
+  }
+
+  function shortKpiHeaderLabel(name) {
+    const s = String(name);
+    if (s.length <= 18) return s;
+    return s.slice(0, 16) + "\u2026";
   }
 
   function appendKpiTileEl(
@@ -1425,34 +2902,33 @@
     refMonth,
     vsMode,
     tileClass,
-    selectedKpiKey
+    selectedKpiKeys,
+    presentationSeed
   ) {
+    void refMonth;
+    void presentationSeed;
     const tile = document.createElement("div");
     tile.className = tileClass || "multi-kpi-tile";
-    if (
-      selectedKpiKey != null &&
-      String(item.kpiKey) === String(selectedKpiKey)
-    ) {
+    const sel = new Set((selectedKpiKeys || []).map(String));
+    if (sel.has(String(item.kpiKey))) {
       tile.classList.add("multi-kpi-tile--selected");
     }
-    const vsPct = formatSignedPct(item.vsPct);
-    const vDir = item.vsDir || "neutral";
-    const vsLbl = vsOptionLabel(item.vsMode);
-    const vsShort = vsTagShort(item.vsMode);
-    const periodLine =
-      item.periodCaption ||
-      tilePeriodForKpi(refMonth, vsMode || DEFAULT_VS_MODE, item.unitType);
+    const vsShort = vsTagShort(vsMode || DEFAULT_VS_MODE);
+    const pres = tileVsDisplay(item);
+    const vDir = pres.dir;
+    if (vDir === "up") tile.classList.add("multi-kpi-tile--trend-up");
+    else if (vDir === "down") tile.classList.add("multi-kpi-tile--trend-down");
+    const infoTitle = escapeAttr(vsFilterComparisonTooltip(vsMode));
+    const vsLbl = vsOptionLabel(vsMode || DEFAULT_VS_MODE);
     tile.setAttribute(
       "aria-label",
       item.kpiName +
-        ". Data " +
-        periodLine +
-        ". Value: " +
+        ". Value " +
         formatValue(item.value, item.unitType) +
         ". " +
         vsLbl +
         " " +
-        vsPct +
+        pres.pct +
         "."
     );
     tile.innerHTML =
@@ -1464,25 +2940,28 @@
       formatValue(item.value, item.unitType) +
       "</span>" +
       "</div>" +
-      '<div class="multi-kpi-tile__unit">' +
-      escapeHtml(item.unitType) +
-      "</div>" +
-      '<div class="multi-kpi-tile__period">' +
-      escapeHtml(periodLine) +
-      "</div>" +
       '<div class="multi-kpi-tile__cmp multi-kpi-tile__cmp--vs">' +
       '<span class="multi-kpi-tile__cmp-tag multi-kpi-tile__cmp-tag--short">' +
       escapeHtml(vsShort) +
       "</span>" +
       '<span class="' +
-      cmpArrowClass(vDir) +
-      '" aria-hidden="true">' +
-      arrowGlyph(vDir) +
+      cmpArrowWrapClass(vDir) +
+      '">' +
+      arrowSvgHtml(vDir) +
       "</span>" +
       '<span class="multi-kpi-tile__cmp-pct vs-pct-num">' +
-      escapeHtml(vsPct) +
+      escapeHtml(pres.pct) +
       "</span>" +
+      '<button type="button" class="multi-kpi-tile__info" title="' +
+      infoTitle +
+      '" aria-label="Vs comparison for current filter"><span class="multi-kpi-tile__info-icon" aria-hidden="true">i</span></button>' +
       "</div>";
+    const infoBtn = tile.querySelector(".multi-kpi-tile__info");
+    if (infoBtn) {
+      infoBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+      });
+    }
     grid.appendChild(tile);
   }
 
@@ -1491,10 +2970,11 @@
     aggregatesList,
     refMonth,
     vsMode,
-    selectedKpiKey
+    selectedKpiKeys,
+    presentationSeed
   ) {
     container.innerHTML = "";
-    const sorted = sortKpiTilesForDisplay(aggregatesList);
+    const sorted = aggregatesList.slice();
     const headItems = sorted.slice(0, 12);
     const tailItems = sorted.slice(12);
 
@@ -1521,7 +3001,8 @@
           refMonth,
           vsMode,
           "multi-kpi-tile",
-          selectedKpiKey
+          selectedKpiKeys,
+          presentationSeed
         );
       });
       while (grid.children.length < 4) {
@@ -1553,28 +3034,522 @@
     container.appendChild(rowMain);
   }
 
+  /** Location Vulnerability: grouped bars — comparison (base) vs current KPI value per BU (24). */
+  function buildLocationComparisonChart(catKey, f) {
+    if (catKey !== LOCATION_VULN_CAT_KEY) return;
+    const el = document.getElementById("chart-loc-compare");
+    if (!el || typeof Chart === "undefined") return;
+    const prev = Chart.getChart(el);
+    if (prev) prev.destroy();
+    const kMeta = getKpis(catKey).find(
+      (x) => String(x.kpiKey) === String(f.kpi)
+    );
+    if (!kMeta) return;
+    const basePool = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
+    const bus = PREVIEW_BUSINESS_NAMES.slice();
+    const curData = [];
+    const baseData = [];
+    bus.forEach((bu) => {
+      const x = buKpiVsPct(basePool, bu, kMeta, f);
+      const c = x.cur;
+      const b = x.baseVal;
+      curData.push(c != null && !Number.isNaN(Number(c)) ? Number(c) : 0);
+      baseData.push(b != null && !Number.isNaN(Number(b)) ? Number(b) : 0);
+    });
+    const vsShort = vsOptionLabel(f.vsMode || DEFAULT_VS_MODE);
+    const unit = kMeta.unitType || "";
+    const yTitle = unit === "PercentOrRate" ? "Value (%)" : "Value";
+    new Chart(el, {
+      type: "bar",
+      data: {
+        labels: bus.map(locCompareBizLabel),
+        datasets: [
+          {
+            label: "Comparison (base) · " + vsShort,
+            data: baseData,
+            backgroundColor: "#8E278F",
+            borderColor: "#6a1d6b",
+            borderWidth: 1,
+          },
+          {
+            label: "Current period",
+            data: curData,
+            backgroundColor: "#006DB6",
+            borderWidth: 1,
+            borderColor: "#004a80",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        layout: {
+          padding: { top: 10, right: 12, bottom: 64, left: 10 },
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              boxWidth: 12,
+              font: {
+                size: 9,
+                family: FONT_UI,
+              },
+              color: "#231F20",
+            },
+          },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const i = items[0].dataIndex;
+                return bus[i] != null ? String(bus[i]) : "";
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: false,
+            grid: { display: false },
+            ticks: {
+              autoSkip: false,
+              maxTicksLimit: 48,
+              font: {
+                size: 10,
+                weight: "500",
+                family: FONT_UI,
+              },
+              maxRotation: 60,
+              minRotation: 45,
+              color: "#231F20",
+              padding: 4,
+            },
+          },
+          y: {
+            beginAtZero: true,
+            grace: "5%",
+            ticks: { font: { size: 9 }, color: "#6D6E71" },
+            grid: { color: "rgba(109, 110, 113, 0.18)" },
+            title: {
+              display: true,
+              text: yTitle,
+              font: { size: 10, family: FONT_UI },
+              color: "#6D6E71",
+            },
+          },
+        },
+      },
+    });
+    const hint = document.getElementById("chart-loc-compare-hint");
+    if (hint) hint.textContent = "(" + vsShort + " · 2 bars per BU)";
+  }
+
+  const HAZARD_CHART_FILL = [
+    "rgba(0, 109, 182, 0.78)",
+    "rgba(0, 177, 107, 0.78)",
+    "rgba(142, 39, 143, 0.72)",
+    "rgba(240, 76, 35, 0.75)",
+    "rgba(59, 130, 246, 0.7)",
+    "rgba(234, 179, 8, 0.8)",
+    "rgba(99, 102, 241, 0.72)",
+    "rgba(236, 72, 153, 0.7)",
+  ];
+
+  function hazardChartColors(n) {
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      out.push(HAZARD_CHART_FILL[i % HAZARD_CHART_FILL.length]);
+    }
+    return out;
+  }
+
+  function hazardPolarFills(n) {
+    return hazardChartColors(n).map((c) => c.replace(/0\.\d+\)/, "0.48)"));
+  }
+
+  /** One dataset per selected KPI; `kind` is "line" or "bar" (hazard trend). */
+  function trendDatasetsForPreview(catKey, f, filteredTrend, lineLabels, kind) {
+    const keys = orderKpiKeysForCharts(catKey, f.kpiKeys);
+    const kpisLine = getKpis(catKey);
+    return keys.map((kk, idx) => {
+      const kMeta = kpisLine.find((x) => String(x.kpiKey) === kk);
+      const ut = kMeta ? kMeta.unitType : "";
+      const data = lineLabels.map((ym) => {
+        const slice = filteredTrend.filter(
+          (r) => r.yearMonth === ym && String(r.kpiKey) === kk
+        );
+        if (!slice.length) return null;
+        return avg(slice.map((r) => Number(r.value)));
+      });
+      const color = TREND_LINE_COLORS[idx % TREND_LINE_COLORS.length];
+      const label = kMeta ? kpiDropdownLabel(kMeta) : kk;
+      if (kind === "bar") {
+        return {
+          label: label,
+          data: data,
+          unitType: ut,
+          backgroundColor: hexToRgba(color, 0.55),
+          borderColor: color,
+          borderWidth: 1,
+          borderRadius: 4,
+        };
+      }
+      return {
+        label: label,
+        data: data,
+        unitType: ut,
+        borderColor: color,
+        backgroundColor: hexToRgba(color, 0.12),
+        fill: true,
+        tension: 0.2,
+        borderWidth: 1.5,
+        pointRadius: 2,
+      };
+    });
+  }
+
   /**
-   * Trend + (SPI: event-level bubble + state map) or (by business + by vertical). Same Vs windows.
+   * Hazard & Observation (leading): bar trend, horizontal BU bars, vertical doughnut, polar KPI snapshot.
+   */
+  function buildHazardObservationCharts(
+    f,
+    poolAll,
+    snapRows,
+    winMonths,
+    filteredTrend,
+    utChart
+  ) {
+    const catKey = HAZARD_CATEGORY_KEY;
+    const kMetaPrimary = getKpis(catKey).find(
+      (x) => String(x.kpiKey) === String(f.kpi)
+    );
+    const lineSeriesName = kMetaPrimary
+      ? kpiDropdownLabel(kMetaPrimary)
+      : "Value";
+    const monthSet = new Set();
+    filteredTrend.forEach((r) => monthSet.add(r.yearMonth));
+    const lineLabels = Array.from(monthSet).sort();
+    const barSets = trendDatasetsForPreview(
+      catKey,
+      f,
+      filteredTrend,
+      lineLabels,
+      "bar"
+    );
+    const elLine = document.getElementById("chart-line");
+    if (elLine && lineLabels.length && typeof Chart !== "undefined") {
+      new Chart(elLine, {
+        type: "bar",
+        data: {
+          labels: lineLabels,
+          datasets: barSets,
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 10, right: 12, bottom: 12, left: 18 } },
+          plugins: {
+            legend: {
+              display: barSets.length > 1,
+              position: "bottom",
+              labels: {
+                boxWidth: 10,
+                padding: 5,
+                font: { size: 8, family: FONT_UI },
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const v = Number(ctx.raw) || 0;
+                  const ut = ctx.dataset.unitType || utChart;
+                  return " " + formatValue(v, ut);
+                },
+              },
+            },
+          },
+          scales: {
+            y: {
+              beginAtZero: false,
+              grace: "10%",
+              ticks: { font: { size: 10, family: FONT_UI }, color: "#231F20" },
+              grid: { color: "rgba(109, 110, 113, 0.2)" },
+            },
+            x: {
+              ticks: {
+                font: { size: 9, family: FONT_UI },
+                maxRotation: 45,
+                color: "#231F20",
+              },
+              grid: { display: false },
+            },
+          },
+        },
+      });
+    }
+
+    const byBizVals = {};
+    snapRows.forEach((r) => {
+      const b = r.businessName || "—";
+      if (!byBizVals[b]) byBizVals[b] = [];
+      byBizVals[b].push(Number(r.value));
+    });
+    function aggBizWindowForPreviewLabel(previewName) {
+      const fact = factBusinessNameForPreview(previewName);
+      const vals = byBizVals[fact] || byBizVals[previewName];
+      if (!vals || !vals.length) return 0;
+      if (utChart && isAdditiveUnit(utChart)) {
+        return vals.reduce((a, x) => a + Number(x), 0);
+      }
+      return avg(vals);
+    }
+    function shortBu(name) {
+      const s = String(name).trim();
+      if (s.length <= 10) return s;
+      return s.slice(0, 9) + "\u2026";
+    }
+    const buNames = PREVIEW_BUSINESS_NAMES.slice();
+    const buShort = buNames.map(shortBu);
+    const buVals = buNames.map((n) => aggBizWindowForPreviewLabel(n));
+    const elBiz = document.getElementById("chart-biz");
+    const emptyBiz = document.getElementById("chart-biz-empty");
+    if (elBiz && typeof Chart !== "undefined") {
+      if (!buVals.some((v) => v !== 0)) {
+        elBiz.style.display = "none";
+        if (emptyBiz) {
+          emptyBiz.hidden = false;
+          emptyBiz.textContent = "No BU data for current filters.";
+        }
+      } else {
+        elBiz.style.display = "block";
+        if (emptyBiz) emptyBiz.hidden = true;
+        new Chart(elBiz, {
+          type: "bar",
+          data: {
+            labels: buShort,
+            datasets: [
+              {
+                label: lineSeriesName,
+                data: buVals,
+                backgroundColor: hazardChartColors(buVals.length),
+                borderColor: "rgba(35, 31, 32, 0.28)",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            layout: { padding: { top: 6, right: 14, bottom: 6, left: 4 } },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                callbacks: {
+                  title(items) {
+                    const i = items[0].dataIndex;
+                    return buNames[i] != null ? String(buNames[i]) : "";
+                  },
+                  label(ctx) {
+                    const v = Number(ctx.raw) || 0;
+                    return " " + formatValue(v, utChart);
+                  },
+                },
+              },
+            },
+            scales: {
+              x: {
+                beginAtZero: true,
+                grace: "6%",
+                ticks: { font: { size: 9, family: FONT_UI }, color: "#231F20" },
+                grid: { color: "rgba(109, 110, 113, 0.18)" },
+              },
+              y: {
+                ticks: { font: { size: 8, family: FONT_UI }, color: "#231F20" },
+                grid: { display: false },
+              },
+            },
+          },
+        });
+      }
+    }
+
+    const vertMap = {};
+    snapRows.forEach((r) => {
+      const vx = getRowCheckpoint(r);
+      if (!vertMap[vx]) vertMap[vx] = [];
+      vertMap[vx].push(Number(r.value));
+    });
+    const vertLabelsFull = Object.keys(vertMap).sort((a, b) =>
+      a.localeCompare(b)
+    );
+    function shortVertLabel(name) {
+      const s = String(name);
+      return s.length > 12 ? s.slice(0, 11) + "\u2026" : s;
+    }
+    const vertLabels = vertLabelsFull.map(shortVertLabel);
+    const vertData = vertLabelsFull.map((label) => {
+      const vals = vertMap[label];
+      if (utChart && isAdditiveUnit(utChart)) {
+        return vals.reduce(
+          (a, x) => a + (Number.isFinite(x) ? x : 0),
+          0
+        );
+      }
+      const nums = vals.filter((x) => Number.isFinite(x));
+      return nums.length ? avg(nums) : 0;
+    });
+    const elVert = document.getElementById("chart-verticals");
+    if (elVert && vertLabels.length && typeof Chart !== "undefined") {
+      new Chart(elVert, {
+        type: "doughnut",
+        data: {
+          labels: vertLabels,
+          datasets: [
+            {
+              data: vertData,
+              backgroundColor: hazardChartColors(vertData.length),
+              borderColor: "#ffffff",
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "56%",
+          layout: { padding: { top: 4, right: 8, bottom: 4, left: 8 } },
+          plugins: {
+            legend: {
+              display: true,
+              position: "bottom",
+              labels: {
+                boxWidth: 10,
+                padding: 6,
+                font: { size: 8, family: FONT_UI },
+              },
+            },
+            tooltip: {
+              callbacks: {
+                title(items) {
+                  const i = items[0].dataIndex;
+                  return vertLabelsFull[i] || "";
+                },
+                label(ctx) {
+                  const v = Number(ctx.raw) || 0;
+                  return " " + formatValue(v, utChart);
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    const hazWin = applyNonMonthFiltersAllKpis(poolAll, f).filter((r) =>
+      winMonths.has(r.yearMonth)
+    );
+    const kMetaPolar = sortKpisForDisplay(
+      HAZARD_CATEGORY_KEY,
+      getKpis(HAZARD_CATEGORY_KEY)
+    ).filter((k) => Number(k.kpiKey) !== 21);
+    const sliceK = kMetaPolar.slice(0, 8);
+    const polLabels = sliceK.map((k) => shortKpiHeaderLabel(k.kpiName));
+    const polValues = sliceK.map((k) => {
+      const sub = hazWin.filter(
+        (r) => String(r.kpiKey) === String(k.kpiKey)
+      );
+      if (!sub.length) return 0;
+      const nums = sub.map((x) => Number(x.value)).filter(Number.isFinite);
+      if (!nums.length) return 0;
+      if (isAdditiveUnit(k.unitType)) {
+        return nums.reduce((a, b) => a + b, 0);
+      }
+      return avg(nums);
+    });
+    let polMax = 0;
+    for (let pi = 0; pi < polValues.length; pi++) {
+      const ax = Math.abs(Number(polValues[pi]) || 0);
+      if (ax > polMax) polMax = ax;
+    }
+    if (polMax < 1e-9) polMax = 1;
+    const polNorm = polValues.map((v) => {
+      const x = Number(v) || 0;
+      return x < 0 ? 0 : (x / polMax) * 100;
+    });
+    const elPol = document.getElementById("chart-hazard-polar");
+    if (elPol && polLabels.length && typeof Chart !== "undefined") {
+      new Chart(elPol, {
+        type: "polarArea",
+        data: {
+          labels: polLabels,
+          datasets: [
+            {
+              data: polNorm,
+              backgroundColor: hazardPolarFills(polLabels.length),
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 6, right: 10, bottom: 6, left: 10 } },
+          plugins: {
+            legend: {
+              display: true,
+              position: "bottom",
+              labels: {
+                boxWidth: 10,
+                padding: 5,
+                font: { size: 8, family: FONT_UI },
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const i = ctx.dataIndex;
+                  const raw = polValues[i];
+                  const ut = sliceK[i] ? sliceK[i].unitType : "";
+                  return " " + formatValue(raw, ut);
+                },
+              },
+            },
+          },
+          scales: {
+            r: {
+              suggestedMin: 0,
+              suggestedMax: 100,
+              ticks: {
+                display: false,
+                backdropColor: "transparent",
+              },
+              grid: { color: "rgba(109, 110, 113, 0.2)" },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  /**
+   * Trend + (SPI: quadrant + KPI row-mix) or (by business + by vertical). SPI secondary charts use all KPIs in category; trend line uses the KPI dropdown.
    */
   function buildCharts(catKey, f) {
     destroyCharts();
 
     const poolAll = getRowsForCategory(catKey);
     const filteredTrend = applyChartFilter(poolAll, f);
-    const snapPool = applyNonMonthFilters(poolAll, f);
+    const snapPool = applyNonMonthFilters(poolAll, f, true);
     const winMonths = new Set(
       bizUnitWindowMonths(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
     );
     const snapRows = snapPool.filter((r) => winMonths.has(r.yearMonth));
 
-    const byMonth = {};
-    filteredTrend.forEach((r) => {
-      if (!byMonth[r.yearMonth]) byMonth[r.yearMonth] = [];
-      byMonth[r.yearMonth].push(r.value);
-    });
-    const monthKeys = Object.keys(byMonth).sort();
-    const lineLabels = monthKeys;
-    const lineData = monthKeys.map((m) => avg(byMonth[m]));
+    const monthSet = new Set();
+    filteredTrend.forEach((r) => monthSet.add(r.yearMonth));
+    const lineLabels = Array.from(monthSet).sort();
 
     const kpisLine = getKpis(catKey);
     const kMetaLine = kpisLine.find(
@@ -1585,24 +3560,33 @@
       : "Value";
     const utChart = kpiUnitTypeForFilter(catKey, f);
 
+    if (catKey === HAZARD_CATEGORY_KEY) {
+      buildHazardObservationCharts(
+        f,
+        poolAll,
+        snapRows,
+        winMonths,
+        filteredTrend,
+        utChart
+      );
+      updateChartHints(f);
+      return;
+    }
+
+    const lineSets = trendDatasetsForPreview(
+      catKey,
+      f,
+      filteredTrend,
+      lineLabels,
+      "line"
+    );
     const elLine = document.getElementById("chart-line");
-    if (elLine && lineLabels.length) {
+    if (elLine && lineLabels.length && lineSets.length) {
       new Chart(elLine, {
         type: "line",
         data: {
           labels: lineLabels,
-          datasets: [
-            {
-              label: lineSeriesName,
-              data: lineData,
-              borderColor: "#006DB6",
-              backgroundColor: "rgba(0, 177, 107, 0.12)",
-              fill: true,
-              tension: 0.2,
-              borderWidth: 1.5,
-              pointRadius: 2,
-            },
-          ],
+          datasets: lineSets,
         },
         options: {
           responsive: true,
@@ -1610,7 +3594,29 @@
           layout: {
             padding: { top: 12, right: 16, bottom: 14, left: 22 },
           },
-          plugins: { legend: { display: false } },
+          plugins: {
+            legend: {
+              display: lineSets.length > 1,
+              position: "bottom",
+              labels: {
+                boxWidth: 10,
+                padding: 6,
+                font: { size: 9, family: FONT_UI },
+              },
+            },
+            tooltip: {
+              callbacks: {
+                label(ctx) {
+                  const v =
+                    ctx.parsed && ctx.parsed.y != null
+                      ? ctx.parsed.y
+                      : Number(ctx.raw) || 0;
+                  const ut = ctx.dataset.unitType || utChart;
+                  return " " + formatValue(v, ut);
+                },
+              },
+            },
+          },
           scales: {
             y: {
               beginAtZero: false,
@@ -1637,8 +3643,15 @@
     }
 
     if (catKey === SPI_CATEGORY_KEY) {
-      renderSpiEventBubbleChart(snapRows);
-      renderSpiPerformanceMap(snapRows);
+      const spiPoolAllKpis = applyNonMonthFiltersAllKpis(poolAll, f);
+      renderSpiRiskQuadrantChart(spiPoolAllKpis, f);
+      renderSpiInsightsChart(spiPoolAllKpis, f);
+      updateChartHints(f);
+      return;
+    }
+
+    if (catKey === LOCATION_VULN_CAT_KEY) {
+      renderLocationVulnerabilityBuMap(snapRows, f);
       updateChartHints(f);
       return;
     }
@@ -1649,14 +3662,18 @@
       if (!byBizVals[b]) byBizVals[b] = [];
       byBizVals[b].push(Number(r.value));
     });
-    const bizLabels = Object.keys(byBizVals);
-    const bizData = bizLabels.map((b) => {
-      const vals = byBizVals[b];
+    function aggBizWindowForPreviewLabel(previewName) {
+      const fact = factBusinessNameForPreview(previewName);
+      const vals = byBizVals[fact] || byBizVals[previewName];
+      if (!vals || !vals.length) return 0;
       if (utChart && isAdditiveUnit(utChart)) {
         return vals.reduce((a, x) => a + Number(x), 0);
       }
       return avg(vals);
-    });
+    }
+    const radarNames = PREVIEW_BUSINESS_NAMES.slice();
+    const radarValues = radarNames.map((n) => aggBizWindowForPreviewLabel(n));
+    renderBizBreakdown(radarNames, radarValues, lineSeriesName, utChart);
 
     /** By vertical (checkpoint mapping) — same roll-up window as By business. */
     const vertMap = {};
@@ -1684,8 +3701,6 @@
       const nums = vals.filter((x) => Number.isFinite(x));
       return nums.length ? avg(nums) : 0;
     });
-
-    renderBizBreakdown(bizLabels, bizData);
 
     const elVert = document.getElementById("chart-verticals");
     if (elVert && vertLabels.length) {
@@ -1737,7 +3752,7 @@
               title: {
                 display: true,
                 text: "Value",
-                font: { size: 10, family: '"Adani", system-ui, sans-serif' },
+                font: { size: 10, family: FONT_UI },
                 color: "#6D6E71",
                 padding: { top: 0, bottom: 8, left: 0, right: 0 },
               },
@@ -1770,23 +3785,54 @@
     const bizEl = document.getElementById("chart-biz-hint");
     const vertEl = document.getElementById("chart-vertical-hint");
     const n = chartMonthsForVsMode(mode, ref).length;
-    if (lineTitleEl && f && f.catKey != null && f.kpi != null) {
+    if (lineTitleEl && f && f.catKey != null) {
       const list = kpiListForFilterDropdown(f.catKey);
-      const k = list.find((x) => String(x.kpiKey) === String(f.kpi));
-      lineTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
+      let keys =
+        f.kpiKeys && f.kpiKeys.length
+          ? f.kpiKeys.map(String)
+          : f.kpi
+            ? [String(f.kpi)]
+            : [];
+      if (!keys.length && f.kpi) keys = [String(f.kpi)];
+      if (keys.length <= 1) {
+        const k = list.find(
+          (x) => String(x.kpiKey) === String(keys[0] || f.kpi)
+        );
+        lineTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
+      } else {
+        const first = list.find((x) => String(x.kpiKey) === keys[0]);
+        const a = first ? kpiDropdownLabel(first) : keys[0];
+        lineTitleEl.textContent =
+          keys.length > 1 ? a + " +" + (keys.length - 1) + " more" : a;
+      }
     }
+    const isHazard = f && f.catKey === HAZARD_CATEGORY_KEY;
     if (trendEl) {
-      trendEl.textContent =
-        mode === "vs_last_year"
-          ? "(lines · 12 mo)"
-          : "(lines · " + n + " mo)";
+      if (isHazard) {
+        trendEl.textContent =
+          mode === "vs_last_year"
+            ? "(bars · 12 mo)"
+            : "(bars · " + n + " mo)";
+      } else {
+        trendEl.textContent =
+          mode === "vs_last_year"
+            ? "(lines · 12 mo)"
+            : "(lines · " + n + " mo)";
+      }
     }
     const bizHint = {
-      vs_yesterday: "(share · latest mo)",
-      vs_last_month: "(share · latest mo)",
-      vs_last_week: "(share · 2 mo)",
-      vs_last_quarter: "(share · 3 mo)",
-      vs_last_year: "(share · YTD window)",
+      vs_yesterday: "(radar · all BUs · latest mo)",
+      vs_last_month: "(radar · all BUs · latest mo)",
+      vs_last_week: "(radar · all BUs · 2 mo)",
+      vs_last_quarter: "(radar · all BUs · 3 mo)",
+      vs_last_year: "(radar · all BUs · YTD window)",
+    };
+    const bizHintHazard = {
+      vs_yesterday: "(h-bars · all BUs · latest mo)",
+      vs_last_month: "(h-bars · all BUs · latest mo)",
+      vs_last_week: "(h-bars · all BUs · 2 mo)",
+      vs_last_quarter: "(h-bars · all BUs · 3 mo)",
+      vs_last_year: "(h-bars · all BUs · YTD window)",
     };
     const vertHint = {
       vs_yesterday: "(vertical · latest mo)",
@@ -1795,19 +3841,41 @@
       vs_last_quarter: "(vertical · 3 mo)",
       vs_last_year: "(vertical · YTD window)",
     };
-    const bh = bizHint[mode] || "(share)";
+    const vertHintHazard = {
+      vs_yesterday: "(doughnut · latest mo)",
+      vs_last_month: "(doughnut · latest mo)",
+      vs_last_week: "(doughnut · 2 mo)",
+      vs_last_quarter: "(doughnut · 3 mo)",
+      vs_last_year: "(doughnut · YTD window)",
+    };
+    const polarHintHazard = {
+      vs_yesterday: "(polar · 8 KPIs · latest mo)",
+      vs_last_month: "(polar · 8 KPIs · latest mo)",
+      vs_last_week: "(polar · 8 KPIs · 2 mo)",
+      vs_last_quarter: "(polar · 8 KPIs · 3 mo)",
+      vs_last_year: "(polar · 8 KPIs · YTD window)",
+    };
+    const bh = isHazard
+      ? bizHintHazard[mode] || "(h-bars)"
+      : bizHint[mode] || "(share)";
     if (bizEl) bizEl.textContent = bh;
-    if (vertEl) vertEl.textContent = vertHint[mode] || "(vertical)";
+    if (vertEl) {
+      vertEl.textContent = isHazard
+        ? vertHintHazard[mode] || "(doughnut)"
+        : vertHint[mode] || "(vertical)";
+    }
+    const polHintEl = document.getElementById("chart-hazard-polar-hint");
+    if (polHintEl && isHazard) {
+      polHintEl.textContent =
+        polarHintHazard[mode] || "(polar · multi-KPI)";
+    }
     const spiBubbleHint = document.getElementById("chart-spi-bubble-hint");
     const spiMapHint = document.getElementById("chart-spi-map-hint");
     const spiRoll =
       mode === "vs_last_year"
-        ? "(bubble · YTD window)"
-        : "(bubble · same window)";
-    const spiMapRoll =
-      mode === "vs_last_year"
-        ? "(map · YTD window)"
-        : "(map · same window)";
+        ? "(cross-plot · all SPI KPIs · YTD)"
+        : "(cross-plot · all SPI KPIs · Vs window)";
+    const spiMapRoll = "(100% stack · all SPI KPIs · 12 mo)";
     if (spiBubbleHint) spiBubbleHint.textContent = spiRoll;
     if (spiMapHint) spiMapHint.textContent = spiMapRoll;
   }
@@ -1969,135 +4037,133 @@
   function renderTableBody(catKey) {
     const f = readFilters(catKey);
     if (!f) return;
-    const pool = applyNonMonthFilters(getRowsForCategory(catKey), f);
-    let rows = applyRowFilter(pool, f);
-    rows = sortRows(rows, tableState.sortKey, tableState.asc, pool, f);
+    const kpisMeta = getKpis(catKey);
+    const selectedSet = new Set((f.kpiKeys || [f.kpi]).map(String));
+    let colKpis = sortKpisForDisplay(catKey, kpisMeta).filter((k) =>
+      selectedSet.has(String(k.kpiKey))
+    );
+    if (!colKpis.length) {
+      const dk = defaultKpiKeyForCategory(
+        catKey,
+        kpiListForFilterDropdown(catKey)
+      );
+      colKpis = sortKpisForDisplay(catKey, kpisMeta).filter(
+        (x) => String(x.kpiKey) === String(dk)
+      );
+    }
+    colKpis = colKpis.slice(0, 12);
+    const basePool = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
+    const buRows =
+      f.business === "all"
+        ? PREVIEW_BUSINESS_NAMES.slice()
+        : [f.business].filter(Boolean);
 
-    const total = rows.length;
-    const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-    if (tableState.page >= pages) tableState.page = pages - 1;
-    if (tableState.page < 0) tableState.page = 0;
-
-    const start = tableState.page * PAGE_SIZE;
-    const pageRows = rows.slice(start, start + PAGE_SIZE);
-
-    const tbody = document.getElementById("tbl-body");
-    const pageInfo = document.getElementById("tbl-pageinfo");
-    const btnP = document.getElementById("tbl-prev");
-    const btnN = document.getElementById("tbl-next");
-
-    if (!tbody) return;
-
-    const summaryEl = document.getElementById("tbl-summary");
-    if (summaryEl) {
-      if (total === 0) {
-        summaryEl.textContent =
-          "No rows match for the reference month. Set State to All or reset filters.";
+    const thead = document.querySelector("#tbl-detail thead tr");
+    if (thead) {
+      if (!colKpis.length) {
+        thead.innerHTML =
+          '<th scope="col" class="bu-matrix__th-bu">BU</th><th scope="col" class="bu-matrix__th-empty">—</th>';
       } else {
-        summaryEl.textContent =
-          "Showing " +
-          pageRows.length +
-          " of " +
-          total +
-          " matching rows on this page. Click column headers to sort.";
+        thead.innerHTML =
+          '<th scope="col" class="bu-matrix__th-bu">BU</th>' +
+          colKpis
+            .map(
+              (k) =>
+                '<th scope="col" class="bu-matrix__th-kpi" title="' +
+                escapeAttr(k.kpiName) +
+                '"><span class="bu-matrix__kpi-name">' +
+                escapeHtml(shortKpiHeaderLabel(k.kpiName)) +
+                "</span></th>"
+            )
+            .join("");
       }
     }
 
-    if (!pageRows.length) {
+    const tbody = document.getElementById("tbl-body");
+    const summaryEl = document.getElementById("tbl-summary");
+    const pager = document.querySelector("#view-panel-table .table-pager");
+
+    if (pager) pager.hidden = true;
+
+    if (!tbody) return;
+
+    if (summaryEl) {
+      summaryEl.textContent = "";
+      summaryEl.removeAttribute("title");
+    }
+
+    if (!colKpis.length) {
       tbody.innerHTML =
-        '<tr><td colspan="8" class="empty-msg">No rows for current filters.</td></tr>';
-    } else {
-      tbody.innerHTML = pageRows
-        .map((r) => {
-          const rv = rowVsForMode(r, pool, f);
-          const pctStr = formatSignedPct(rv.pct);
-          const arrow =
-            rv.dir === "up"
-              ? "▲"
-              : rv.dir === "down"
-                ? "▼"
-                : rv.dir === "same"
-                  ? "◆"
-                  : "—";
-          return (
-            '<tr aria-label="' +
-            escapeAttr(
-              r.kpiName + " — " + r.businessName + " — " + r.yearMonth
-            ) +
-            '">' +
-            "<td>" +
-            escapeHtml(r.yearMonth) +
-            "</td>" +
-            "<td>" +
-            escapeHtml(r.state) +
-            "</td>" +
-            "<td>" +
-            escapeHtml(r.businessName) +
-            "</td>" +
-            '<td class="col-kpi">' +
-            escapeHtml(r.kpiName) +
-            "</td>" +
-            "<td>" +
-            escapeHtml(r.unitType) +
-            "</td>" +
-            tableValueCell(r, pool, f) +
-            '<td class="col-num data-table__vs">' +
-            '<span class="multi-kpi-tile__arrow data-table__vs-arrow ' +
-            (rv.dir === "up"
-              ? "multi-kpi-tile__arrow--up"
-              : rv.dir === "down"
-                ? "multi-kpi-tile__arrow--down"
-                : "multi-kpi-tile__arrow--na") +
-            '" aria-hidden="true">' +
-            arrow +
-            '</span> <span class="vs-pct-num">' +
-            escapeHtml(pctStr) +
-            "</span></td>" +
-            '<td class="col-num">' +
-            (r.target == null || r.target === ""
-              ? "—"
-              : formatValue(r.target, r.unitType)) +
-            "</td>" +
-            "</tr>"
-          );
-        })
-        .join("");
+        '<tr><td colspan="2" class="empty-msg">No KPI definitions for this category.</td></tr>';
+      return;
     }
 
-    if (pageInfo) {
-      pageInfo.textContent =
-        total === 0
-          ? "0 rows"
-          : "Rows " +
-            (start + 1) +
-            "–" +
-            Math.min(start + PAGE_SIZE, total) +
-            " of " +
-            total +
-            " (page " +
-            (tableState.page + 1) +
-            "/" +
-            pages +
-            ")";
-    }
-    if (btnP) {
-      btnP.disabled = tableState.page <= 0;
-    }
-    if (btnN) {
-      btnN.disabled = tableState.page >= pages - 1;
+    if (!buRows.length) {
+      tbody.innerHTML =
+        '<tr><td colspan="' +
+        (colKpis.length + 1) +
+        '" class="empty-msg">No business row for current filters.</td></tr>';
+      return;
     }
 
-    document.querySelectorAll("#tbl-detail th[data-sort]").forEach((th) => {
-      const k = th.getAttribute("data-sort");
-      th.setAttribute(
-        "aria-sort",
-        k === tableState.sortKey
-          ? tableState.asc
-            ? "ascending"
-            : "descending"
-          : "none"
-      );
+    const cellEff = buRows.map((bu) =>
+      colKpis.map((k) => {
+        const { pct } = buKpiVsPct(basePool, bu, k, f);
+        return matrixEffectivePct(pct, catKey, bu, k.kpiKey, f);
+      })
+    );
+    let maxAbs = 0;
+    cellEff.forEach((row) => {
+      row.forEach((c) => {
+        const a = Math.abs(c.value);
+        if (a > maxAbs) maxAbs = a;
+      });
     });
+    if (maxAbs < 1e-9) maxAbs = 1;
+
+    tbody.innerHTML = buRows
+      .map((bu, ri) => {
+        const cells = colKpis
+          .map((k, ki) => {
+            const eff = cellEff[ri][ki];
+            const pctStr = formatSignedPct(eff.value);
+            const divW = matrixBarDivergingWidths(eff.value, maxAbs);
+            const imputedCls = eff.imputed ? " bu-cell--imputed" : "";
+            return (
+              '<td class="bu-matrix__cell">' +
+              '<div class="bu-cell bu-cell--pbi' +
+              imputedCls +
+              '">' +
+              '<div class="bu-cell__databar bu-cell__databar--diverging" role="img" aria-label="' +
+              escapeAttr(bu + ", " + k.kpiName + ": " + pctStr) +
+              '">' +
+              '<div class="bu-cell__track-split">' +
+              '<div class="bu-cell__half bu-cell__half--neg">' +
+              '<div class="bu-cell__fill bu-cell__fill--neg" style="width:' +
+              divW.left +
+              '%"></div></div>' +
+              '<div class="bu-cell__centerline" aria-hidden="true"></div>' +
+              '<div class="bu-cell__half bu-cell__half--pos">' +
+              '<div class="bu-cell__fill bu-cell__fill--pos" style="width:' +
+              divW.right +
+              '%"></div></div></div>' +
+              '<span class="bu-cell__value">' +
+              escapeHtml(pctStr) +
+              "</span></div></div></td>"
+            );
+          })
+          .join("");
+        return (
+          '<tr class="' +
+          (ri % 2 === 0 ? "bu-matrix__row--even" : "bu-matrix__row--odd") +
+          '"><th scope="row" class="bu-matrix__bu">' +
+          escapeHtml(bu) +
+          "</th>" +
+          cells +
+          "</tr>"
+        );
+      })
+      .join("");
   }
 
   function wireTableHeaders(catKey) {
@@ -2133,18 +4199,21 @@
   function announceFilterSummary(catKey) {
     const f = readFilters(catKey);
     if (!f) return;
-    const n = applyRowFilter(
-      applyNonMonthFilters(getRowsForCategory(catKey), f),
-      f
-    ).length;
     const cat = getCategory(catKey);
     const label = cat ? cat.categoryName + ". " : "";
+    const buCount =
+      f.business === "all" ? PREVIEW_BUSINESS_NAMES.length : f.business ? 1 : 0;
+    const meta = getKpis(catKey);
+    const sel = new Set((f.kpiKeys || [f.kpi]).map(String));
+    const kpiCols = sortKpisForDisplay(catKey, meta).filter((k) =>
+      sel.has(String(k.kpiKey))
+    ).length;
     announce(
-      label +
-        n +
-        " detail rows for " +
-        formatMonthYear(f.refMonth) +
-        ". Sort with column headers; Prev and Next move pages."
+      label.replace(/\.\s*$/, "") +
+        (label ? " · " : "") +
+        buCount +
+        " · " +
+        kpiCols
     );
   }
 
@@ -2154,6 +4223,17 @@
     if (!f) return;
 
     const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
+
+    const presentationSeed = [
+      String(catKey),
+      f.vsMode || "",
+      f.refMonth || "",
+      f.state || "",
+      f.business || "",
+      String(f.kpi || ""),
+      JSON.stringify(f.kpiKeys || []),
+      JSON.stringify(f.variable || {}),
+    ].join("|");
 
     const multiWrap = document.getElementById("multi-kpi-wrap");
     if (multiWrap) {
@@ -2166,12 +4246,16 @@
           aggList,
           f.refMonth,
           f.vsMode,
-          f.kpi
+          f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi],
+          presentationSeed
         );
       }
     }
 
     buildCharts(catKey, f);
+    if (catKey === LOCATION_VULN_CAT_KEY) {
+      buildLocationComparisonChart(catKey, f);
+    }
     renderTableBody(catKey);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => resizeAllChartsIndex());
@@ -2190,6 +4274,7 @@
     currentCategoryKey = catKey;
     tableState = { sortKey: "yearMonth", asc: false, page: 0 };
     destroyCharts();
+    setShellLandingMode(false);
 
     const cat = getCategory(catKey);
     if (!cat) {
@@ -2201,7 +4286,7 @@
       history.replaceState(null, "", "#categories");
       renderCategories();
       announce(
-        "This preview includes Incident Management, Hazard and Observation Management (Leading), and Safety Performance Indices. Choose one on the category list."
+        "This preview includes Incident Management, Hazard and Observation Management (Leading), Safety Performance Indices, and Location Vulnerability. Choose one on the category list."
       );
       return;
     }
@@ -2210,22 +4295,6 @@
     const kpisForUi = kpiListForFilterDropdown(catKey);
     const rowsForCat = getRowsForCategory(catKey);
     const cfg = getFilterConfig(catKey);
-
-    const defKpi = defaultKpiKeyForCategory(catKey, kpisForUi);
-    const kpiOpts = kpisForUi
-      .map((k) => {
-        const sel = String(k.kpiKey) === String(defKpi) ? " selected" : "";
-        return (
-          '<option value="' +
-          k.kpiKey +
-          '"' +
-          sel +
-          ">" +
-          escapeHtml(kpiDropdownLabel(k)).replace(/"/g, "&quot;") +
-          "</option>"
-        );
-      })
-      .join("");
 
     const vsOpts = VS_OPTIONS.map(
       (o) =>
@@ -2251,7 +4320,9 @@
         )
         .join("");
 
-    const bizList = distinctSorted(rowsForCat, (r) => r.businessName);
+    const bizList = mergedBusinessList(
+      distinctSorted(rowsForCat, (r) => r.businessName)
+    );
     const bizOpts =
       '<option value="all">All businesses</option>' +
       bizList
@@ -2267,16 +4338,17 @@
 
     const wrap = document.createElement("div");
     wrap.className = "cat-view";
-    /* Horizontal scroll only for native selects; Variable <details> panel is position:absolute and must not sit inside overflow-y:hidden (clips dropdown / blocks clicks). */
-    const coreFieldsScroll =
-      (cfg.showKpi
-        ? '<div class="field"><label class="field-label" for="f-kpi">KPI</label>' +
-          '<select id="f-kpi">' +
-          kpiOpts +
-          "</select></div>"
-        : "") +
+    const kpiFieldHtml =
+      cfg.showKpi
+        ? '<div class="field field--kpi-inline">' +
+          '<label class="field-label" for="f-kpi-scope-label">KPIs</label>' +
+          kpiScopePanelHtml(catKey, kpisForUi) +
+          "</div>"
+        : "";
+    /* Horizontal scroll only for native selects; KPI / Variable <details> panels are position:absolute and must not sit inside overflow-y:hidden. */
+    const filterCore =
       '<div class="field"><label class="field-label" for="f-vs">Vs</label>' +
-      '<select id="f-vs" aria-describedby="filter-hint">' +
+      '<select id="f-vs">' +
       vsOpts +
       "</select></div>" +
       (cfg.showState
@@ -2297,16 +4369,38 @@
       '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-line-title">' +
       escapeHtml(TRI_LABEL_FULL) +
       '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for the selected KPI in the trend window"></canvas></div></div>';
+    const hazardLineChartBoxHtml =
+      '<div class="chart-box chart-box--hazard-trend"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-line-title">' +
+      escapeHtml(TRI_LABEL_FULL) +
+      '</span> <span id="chart-trend-hint" class="chart-box__hint">(bars · 12 mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Bar chart: monthly values for the selected leading KPI in the trend window"></canvas></div></div>';
+    const hazardChartsRowHtml =
+      '<div class="cat-charts cat-charts--hazard" role="group" aria-label="Leading hazard and observation charts">' +
+      hazardLineChartBoxHtml +
+      '<div class="chart-box chart-box--biz chart-box--hazard-bu"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">BU comparison</span> <span id="chart-biz-hint" class="chart-box__hint">(bars · all BUs)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Horizontal bar chart: selected KPI by business unit"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
+      '<div class="chart-box chart-box--hazard-vert"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Vertical mix</span> <span id="chart-vertical-hint" class="chart-box__hint">(doughnut · Vs window)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--hazard-doughnut"><canvas id="chart-verticals" role="img" aria-label="Doughnut chart: share of selected KPI by vertical"></canvas></div></div>' +
+      '<div class="chart-box chart-box--hazard-polar"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Leading KPI snapshot</span> <span id="chart-hazard-polar-hint" class="chart-box__hint">(polar · multi-KPI)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--hazard-polar"><canvas id="chart-hazard-polar" role="img" aria-label="Polar area: relative mix of leading hazard KPIs in the Versus window"></canvas></div></div></div>';
     const chartsRowHtml =
       catKey === SPI_CATEGORY_KEY
-        ? '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: trend, event level, state map">' +
+        ? '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: trend, quadrant analysis, SPI KPI mix">' +
           lineChartBoxHtml +
-          '<div class="chart-box chart-box--spi-bubble"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Event level</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(bubble · count)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble chart: row counts by event severity level"></canvas></div></div>' +
-          '<div class="chart-box chart-box--spi-map"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Safety performance by state</span> <span id="chart-spi-map-hint" class="chart-box__hint">(map · row counts)</span></h3><div class="chart-spi-map-host" id="chart-spi-map" role="presentation" aria-label="Map of India: circle size by filtered row count per state"></div></div></div>'
-        : '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
-          lineChartBoxHtml +
-          '<div class="chart-box chart-box--biz"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(share · latest mo)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Donut chart: share of total by business, legend shows each segment"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
-          '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
+          '<div class="chart-box chart-box--spi-bubble"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Quadrant analysis</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(all SPI KPIs · cross-plot)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble quadrant chart: concern reporting rate versus fatality rate by business unit"></canvas></div></div>' +
+          '<div class="chart-box chart-box--spi-map"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">SPI mix over time</span> <span id="chart-spi-map-hint" class="chart-box__hint">(all SPI KPIs · 100% · 12 mo)</span></h3><div class="chart-spi-map-host chart-spi-map-host--insights" id="chart-spi-map" role="region" aria-label="SPI one hundred percent stacked mix by month"></div></div></div>'
+        : catKey === HAZARD_CATEGORY_KEY
+          ? hazardChartsRowHtml
+        : catKey === LOCATION_VULN_CAT_KEY
+          ? '<div class="cat-charts cat-charts--loc-map" role="group" aria-label="Location vulnerability: BU map">' +
+            '<div class="chart-box chart-box--loc-bu-map"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By business (India map)</span> <span id="chart-loc-bu-map-hint" class="chart-box__hint">(map · row counts · 24 BUs)</span></h3><div class="chart-spi-map-host chart-spi-map-host--loc-bu" id="chart-loc-bu-map" role="presentation" aria-label="Map of India: circle size by filtered row count per business unit"></div></div></div>'
+          : '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
+            lineChartBoxHtml +
+            '<div class="chart-box chart-box--biz"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(radar · all BUs)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Radar chart: KPI value by business unit across all preview businesses"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
+            '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
+    const showLocCompare = catKey === LOCATION_VULN_CAT_KEY;
+    const compareTabHtml = showLocCompare
+      ? '<button type="button" role="tab" id="view-tab-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-compare" tabindex="-1" data-view="compare">Comparison view</button>'
+      : "";
+    const comparePanelHtml = showLocCompare
+      ? '<div id="view-panel-compare" class="view-panel view-panel--compare" role="tabpanel" aria-labelledby="view-tab-compare" hidden><div class="chart-box chart-box--loc-compare"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-loc-compare-title">Current vs comparison period by business</span> <span id="chart-loc-compare-hint" class="chart-box__hint">(grouped bars · 24 BUs)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--loc-compare"><canvas id="chart-loc-compare" role="img" aria-label="Grouped bar chart: comparison period versus current KPI value for each business unit"></canvas></div></div></div>'
+      : "";
     wrap.innerHTML =
       '<div class="cat-top-bar">' +
       '<div class="cat-top-bar__lead">' +
@@ -2320,11 +4414,11 @@
       "</div></div>" +
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
-      '<div class="cat-toolbar__inner" role="group" aria-describedby="filter-hint">' +
-      '<p id="filter-hint" class="visually-hidden">User research, information architecture (IA), usability testing, accessibility, consistency, visual hierarchy, and an iterative user-centered process: filters, KPI scope, charts, and the detail table stay aligned for comparable sessions—supporting user-centered design (UCD), human-computer interaction (HCI), and customer experience (CX) review of usability, desirability, accessibility, and usefulness. Narrow by KPI, Versus, state, business, and checkpoints when shown. Data is monthly: Today vs yesterday and Current month vs last month both use latest month versus prior month. Current week versus last week uses the last two calendar months versus the two before that. Current quarter vs last quarter uses three-month windows. Current year vs last year uses calendar year-to-date versus the same months in the prior year. Charts and KPI tiles use the same windows. Choose All states and All businesses to see the full preview slice.</p>' +
+      '<div class="cat-toolbar__inner" role="group">' +
       '<div class="cat-toolbar__filters-scroll">' +
+      kpiFieldHtml +
       '<div class="cat-toolbar__filters-core">' +
-      coreFieldsScroll +
+      filterCore +
       "</div>" +
       variableFieldHtml +
       "</div>" +
@@ -2337,9 +4431,10 @@
       '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
       "</fieldset>" +
       '<div class="cat-main-view cat-main-view--charts" id="cat-main-view" data-view="charts">' +
-      '<div class="view-tabs" role="tablist" aria-label="Chart view or table view">' +
+      '<div class="view-tabs" role="tablist" aria-label="Chart, table, or comparison view">' +
       '<button type="button" role="tab" id="view-tab-charts" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-charts" data-view="charts">Chart view</button>' +
       '<button type="button" role="tab" id="view-tab-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-table" tabindex="-1" data-view="table">Table view</button>' +
+      compareTabHtml +
       "</div>" +
       '<div id="view-panel-charts" class="view-panel view-panel--charts" role="tabpanel" aria-labelledby="view-tab-charts">' +
       chartsRowHtml +
@@ -2348,32 +4443,23 @@
       '<div class="table-zone">' +
       '<div class="table-zone__head">' +
       '<div class="table-zone__title">' +
-      '<span class="table-zone__label">Detail data</span>' +
+      '<span class="table-zone__label">BU performance</span>' +
       '<span id="tbl-summary" class="table-zone__summary" aria-live="polite"></span>' +
       "</div>" +
-      '<div class="table-pager">' +
+      '<div class="table-pager" hidden>' +
       '<button type="button" id="tbl-prev" aria-label="Previous page">Prev</button>' +
       '<span id="tbl-pageinfo"></span>' +
       '<button type="button" id="tbl-next" aria-label="Next page">Next</button>' +
       "</div></div>" +
-      '<div class="table-scroll">' +
-      '<table class="data-table" id="tbl-detail">' +
-      '<caption class="visually-hidden">Detailed rows matching filters. Use column headers to sort.</caption>' +
-      "<colgroup>" +
-      '<col class="col-m" /><col class="col-s" /><col class="col-s" /><col class="col-kpi" />' +
-      '<col class="col-s" /><col class="col-num" /><col class="col-num" /><col class="col-num" />' +
-      "</colgroup>" +
+      '<div class="table-scroll table-scroll--bu-matrix" tabindex="0">' +
+      '<table class="data-table bu-matrix" id="tbl-detail">' +
       "<thead><tr>" +
-      '<th scope="col" data-sort="yearMonth" class="col-m">Month</th>' +
-      '<th scope="col" data-sort="state" class="col-s">State</th>' +
-      '<th scope="col" data-sort="businessName" class="col-s">Business</th>' +
-      '<th scope="col" data-sort="kpiName" class="col-kpi">KPI</th>' +
-      '<th scope="col" data-sort="unitType" class="col-s">Unit</th>' +
-      '<th scope="col" data-sort="value" class="col-num" title="Actual value for the row">Value</th>' +
-      '<th scope="col" class="col-num">Vs %</th>' +
-      '<th scope="col" data-sort="target" class="col-num">Target</th>' +
+      '<th scope="col" class="bu-matrix__th-bu">BU</th>' +
       "</tr></thead>" +
-      '<tbody id="tbl-body"></tbody></table></div></div></div></div>' +
+      '<tbody id="tbl-body"></tbody></table>' +
+      "</div></div></div>" +
+      comparePanelHtml +
+      "</div>" +
       '<p class="cat-context" id="cat-context">' +
       escapeHtml(cat.uxNote) +
       "</p>";
@@ -2384,11 +4470,6 @@
     document.getElementById("f-vs").value = DEFAULT_VS_MODE;
     if (cfg.showState) document.getElementById("f-state").value = "all";
     if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
-    if (cfg.showKpi)
-      document.getElementById("f-kpi").value = defaultKpiKeyForCategory(
-        catKey,
-        kpisForUi
-      );
     applyVariableFilterFromStorage();
 
     function onFilterChange() {
@@ -2396,19 +4477,68 @@
       refreshCategoryView(catKey);
     }
 
-    ["f-kpi", "f-vs", "f-state", "f-biz"].forEach((id) => {
+    ["f-vs", "f-state", "f-biz"].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", onFilterChange);
     });
     wireVariableFilterControls(onFilterChange);
 
+    if (cfg.showKpi) {
+      updateKpiScopeCount();
+      document
+        .querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]')
+        .forEach((cb) => {
+          cb.addEventListener("change", () => {
+            saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+            updateKpiScopeCount();
+            onFilterChange();
+          });
+        });
+      const btnAll = document.getElementById("f-kpi-all");
+      const btnNone = document.getElementById("f-kpi-none");
+      if (btnAll) {
+        btnAll.addEventListener("click", () => {
+          document
+            .querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]')
+            .forEach((c) => {
+              c.checked = true;
+            });
+          saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+          updateKpiScopeCount();
+          onFilterChange();
+        });
+      }
+      if (btnNone) {
+        btnNone.addEventListener("click", () => {
+          document
+            .querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]')
+            .forEach((c) => {
+              c.checked = false;
+            });
+          saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+          updateKpiScopeCount();
+          onFilterChange();
+        });
+      }
+    }
+
     document.getElementById("f-reset").addEventListener("click", () => {
       document.getElementById("f-vs").value = DEFAULT_VS_MODE;
-      if (cfg.showKpi)
-        document.getElementById("f-kpi").value = defaultKpiKeyForCategory(
-          catKey,
-          kpisForUi
-        );
+      if (cfg.showKpi) {
+        try {
+          localStorage.removeItem(LS_KPI_PREFIX + catKey);
+        } catch {
+          /* ignore */
+        }
+        const def = loadKpiSelection(catKey, kpisForUi);
+        document
+          .querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]')
+          .forEach((cb) => {
+            cb.checked = def.includes(String(cb.value));
+          });
+        saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+        updateKpiScopeCount();
+      }
       if (cfg.showState) document.getElementById("f-state").value = "all";
       if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
       try {
@@ -2441,45 +4571,37 @@
     currentCategoryKey = null;
     destroyCharts();
     history.replaceState(null, "", "#landing");
+    setShellLandingMode(true);
 
     const box = document.createElement("div");
-    box.className = "landing";
+    box.className = "landing landing--bg-only";
+    box.setAttribute("role", "region");
+    box.setAttribute("aria-label", "Adani Safety MIS home");
     box.innerHTML =
-      journeyStepsHtml(1) +
-      '<div class="landing__hero" role="region" aria-label="About this dashboard">' +
-      '<div class="landing__copy">' +
-      '<h2 class="landing__title" id="landing-h">Adani Safety MIS</h2>' +
-      '<p class="landing__subtitle">Group-level safety KPI dashboard for all Adani businesses — framed for user research, IA, usability testing, accessibility, and an iterative, user-centered (UCD) lens across HCI and customer experience (CX): monitor trends, drill by category, and compare performance while assessing usability, desirability, accessibility, and usefulness.</p>' +
-      '<div class="landing__bullets" role="list">' +
-      '<div class="landing__bullet" role="listitem"><strong>What’s included</strong><span>Safety KPIs by category, Versus comparison, filters, multi KPI cards with Vs % change, trend and business charts, by-state (location) area chart, and a sortable detail table—consistent layout and hierarchy for comparable sessions.</span></div>' +
-      '<div class="landing__bullet" role="listitem"><strong>Who it’s for</strong><span>Anyone tracking group-wide safety performance — and teams running UCD, usability, or accessibility reviews of the experience.</span></div>' +
-      "</div>" +
-      '<div class="landing__companies" role="region" aria-label="Adani group companies represented">' +
-      "<strong>Group companies</strong>" +
-      "<span>Adani Enterprises Ltd (flagship incubator), Adani Ports &amp; SEZ Ltd, Adani Green Energy Ltd, Adani Energy Solutions Ltd, Adani Power Ltd, Adani Total Gas Ltd, Adani Wilmar Ltd, Ambuja Cements Ltd, and ACC Ltd.</span>" +
-      "</div>" +
-      '<div class="landing__actions">' +
-      '<button type="button" class="btn btn-primary" id="btn-start">Start now</button>' +
-      "</div>" +
-      "</div>" +
-      '<div class="landing__graphic landing__graphic--photo" aria-hidden="true">' +
-      '<img class="landing__banner-img" src="./assets/Adani-Group.jpg" width="640" height="400" alt="" decoding="async" loading="eager" onerror="if(!this.dataset.fb){this.dataset.fb=\'1\';this.src=\'./assets/Adani-Group-home.png\';}else if(this.dataset.fb===\'1\'){this.dataset.fb=\'2\';this.src=\'./assets/adani-logo.png\';}else{this.onerror=null;}" />' +
-      "</div>" +
-      "</div>";
+      '<div class="landing__cta">' +
+      '<button type="button" class="landing__start" id="btn-landing-start">' +
+      '<span class="landing__start-text">Start Now</span>' +
+      '<svg class="landing__start-arrow" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z"/>' +
+      "</svg>" +
+      "</button></div>";
 
     root.innerHTML = "";
     root.appendChild(box);
-    const start = document.getElementById("btn-start");
-    function goCats() {
-      history.replaceState(null, "", "#categories");
-      renderCategories();
+    setHeaderLastUpdatedToday();
+    const startBtn = document.getElementById("btn-landing-start");
+    if (startBtn) {
+      try {
+        startBtn.focus({ preventScroll: true });
+      } catch {
+        startBtn.focus();
+      }
+      startBtn.addEventListener("click", () => {
+        history.replaceState(null, "", "#categories");
+        renderCategories();
+      });
     }
-    if (start) start.addEventListener("click", goCats);
-    const hh = document.getElementById("landing-h");
-    if (hh) hh.focus();
-    announce(
-      "Adani Safety MIS home. User research, IA, usability testing, accessibility, and user-centered design: use Start now to open categories."
-    );
+    announce("Adani Safety MIS home.");
     updateHeaderNavState();
   }
 
@@ -2487,6 +4609,7 @@
     currentCategoryKey = null;
     destroyCharts();
     history.replaceState(null, "", "#categories");
+    setShellLandingMode(false);
 
     const box = document.createElement("div");
     box.className = "home-body home-body--launchpad";
@@ -2494,7 +4617,7 @@
       journeyStepsHtml(2) +
       '<div class="home-intro home-intro--launchpad">' +
       '<h2 id="home-h">Categories</h2>' +
-      '<p class="home-lede"><strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management (Leading)</strong> are interactive in this preview; other categories are for context. Use <strong>Home</strong> in the header to return here. Same information architecture as production-minded reviews—supporting user research, IA, usability testing, accessibility, UCD, HCI, and CX evaluation of usability, desirability, and usefulness.</p>' +
+      '<p class="home-lede"><strong>Incident Management</strong>, <strong>Hazard &amp; Observation Management (Leading)</strong>, <strong>Safety Performance Indices</strong>, and <strong>Location Vulnerability</strong> are interactive in this preview; other categories are for context. Use <strong>Home</strong> in the header to return here.</p>' +
       '<div class="home-tools" role="search">' +
       '<label class="home-search-label" for="cat-q">Find category or KPI</label>' +
       '<input id="cat-q" class="home-search" type="search" placeholder="Category or KPI name (e.g. Incident, LTI…)" autocomplete="off" />' +
@@ -2636,7 +4759,9 @@
     else renderLanding();
   });
 
-  setHeaderTimestamp(meta.lastUpdateISO);
+  normalizePreviewFactRowsVsBand();
+
+  setHeaderLastUpdatedToday();
 
   const m0 = location.hash.match(/cat=(\d+)/);
   if (m0) renderCategory(parseInt(m0[1], 10));

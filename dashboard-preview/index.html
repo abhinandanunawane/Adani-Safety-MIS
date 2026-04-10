@@ -10,26 +10,31 @@
     />
     <meta name="theme-color" content="#006db6" />
     <meta name="color-scheme" content="light" />
+    <!-- Google Maps (India BU map): enable “Maps JavaScript API”, restrict key by HTTP referrer, then set content or window.__GOOGLE_MAPS_API_KEY__ -->
+    <meta name="google-maps-api-key" content="" />
     <!-- Critical: header always paints even if styles.css is blocked or 404 -->
     <style>
+      html {
+        font-family: "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
+      }
       .top-header {
         display: flex !important;
         flex-shrink: 0;
         align-items: stretch;
         justify-content: space-between;
-        min-height: 52px;
-        height: 52px;
+        min-height: 58px;
+        height: 58px;
         padding: 0 14px 0 0;
         background: #006db6;
         color: #ffffff;
       }
       .top-header__logo-wrap {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        align-items: flex-start;
+        justify-content: flex-start;
         flex-shrink: 0;
         height: 100%;
-        padding: 0 14px;
+        padding: 4px 12px 4px 10px;
         background: #ffffff;
         border-radius: 0 8px 8px 0;
         box-sizing: border-box;
@@ -42,16 +47,41 @@
         justify-content: center;
         padding: 0 10px 0 14px;
       }
+      .top-header__title-line {
+        margin: 0;
+        font-size: 0.8125rem;
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #ffffff;
+      }
+      .top-header__brand {
+        font-weight: 700;
+      }
+      .top-header__desc {
+        font-weight: 400;
+        opacity: 0.92;
+      }
       .top-header__logo-wrap img {
-        height: 26px;
+        height: 50px;
         width: auto;
-        max-height: calc(52px - 8px);
+        max-height: 50px;
         object-fit: contain;
         display: block;
       }
+      .top-header__meta--trailing {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        padding-right: 4px;
+      }
+      .last-updated {
+        font-size: 12px;
+        white-space: nowrap;
+      }
     </style>
-    <link rel="stylesheet" href="adani-fonts.css?v=20260452" />
-    <link rel="stylesheet" href="styles.css?v=20260509" />
+    <link rel="stylesheet" href="styles.css?v=20260618" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -66,27 +96,25 @@
       <header class="top-header" role="banner">
         <div class="top-header__logo-wrap">
           <img
-            src="./assets/adani-logo.png"
-            width="140"
-            height="26"
-            alt="Adani Group logo"
+            src="./assets/logo11.png"
+            width="200"
+            height="50"
+            alt="Adani safetyverse"
             decoding="async"
-            onerror="this.onerror=null;this.src='../PowerBI_Assets/Adani_logo_2012.png';"
           />
         </div>
         <div class="top-header__titles">
-          <h1>Adani Safety MIS</h1>
-          <p class="top-header__subtitle">
-            Group Safety KPI · User research, IA, usability testing, accessibility, UCD, HCI &amp; CX
+          <p class="top-header__title-line" id="header-title-line">
+            <strong class="top-header__brand">Adani Safety MIS</strong
+            ><span class="top-header__sep" aria-hidden="true"> — </span
+            ><span class="top-header__desc">Group Safety KPI dashboard</span>
           </p>
         </div>
-        <div class="top-header__meta">
-          <nav class="top-header__nav" aria-label="Primary">
+        <div class="top-header__meta top-header__meta--trailing">
+          <nav id="top-header-nav" class="top-header__nav" hidden aria-label="Primary">
             <a class="top-nav-link" id="nav-home" href="#landing">Home</a>
-            <span class="header-sep" aria-hidden="true">|</span>
             <a class="top-nav-link" id="nav-categories" href="#categories">Categories</a>
           </nav>
-          <span class="header-sep" aria-hidden="true">|</span>
           <span class="last-updated"
             >Last updated <time id="header-updated">-</time></span
           >
@@ -116,6 +144,31 @@
       aria-atomic="true"
     ></div>
 
+    <!-- Fallback before deferred scripts: if embedded-data.js fails (file://, 404, blocked), app still boots -->
+    <script>
+      (function () {
+        if (typeof window.__GOOGLE_MAPS_API_KEY__ === "undefined") {
+          window.__GOOGLE_MAPS_API_KEY__ = "";
+        }
+        if (typeof window.__DASHBOARD_DATA__ !== "undefined") return;
+        window.__DASHBOARD_DATA__ = {
+          meta: {
+            dashboardTitle: "Adani Safety MIS",
+            subtitle: "Group Safety KPI Dashboard",
+            dataNote: "Placeholder until embedded-data.js loads or is regenerated.",
+            lastDataMonth: "2024-01",
+            lastUpdateISO: new Date().toISOString(),
+          },
+          categories: [],
+          kpiDetailByCategory: [],
+          monthlyByCategory: [],
+          businessBreakdown: [],
+          factRows: [],
+          months: [],
+          states: [],
+        };
+      })();
+    </script>
     <script
       defer
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
@@ -126,7 +179,7 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
-    <script defer src="embedded-data.js?v=20260505"></script>
-    <script defer src="app.js?v=20260509"></script>
+    <script defer src="embedded-data.js?v=20260611"></script>
+    <script defer src="app.js?v=20260618"></script>
   </body>
 </html>

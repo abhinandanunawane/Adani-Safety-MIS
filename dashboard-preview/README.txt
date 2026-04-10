@@ -30,7 +30,7 @@ index.html          — Shell, header, meta bar (last updated)
 styles.css          — Layout, focus states, responsive grid
 app.js              — Home → category navigation, Chart.js charts, table
 embedded-data.js    — KPI aggregates (generated)
-assets/adani-logo.png — Logo copy for header
+assets/logo11.png — Header logo
 
 FEEDBACK
 --------

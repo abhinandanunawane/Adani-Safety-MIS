@@ -2,33 +2,36 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Adani Safety MIS — Insights · User research, IA &amp; UCD</title>
+    <title>Adani Safety MIS — Insights</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Adani Safety MIS Insights preview: user research, information architecture (IA), usability testing, accessibility, consistency, hierarchy, iterative UX, user-centered design (UCD), human–computer interaction (HCI), and customer experience (CX)—review usability, desirability, and usefulness against safety KPIs. Power BI–style drill: domains, filters, tiles, charts, detail table. Fixed 1280×720. Sample data."
+      content="Adani Safety MIS — Insights preview for Power BI: domains, filters, KPI tiles, charts, and detail table. Fixed 1280×720. Sample data."
     />
     <meta name="theme-color" content="#006db6" />
-    <!-- Brand palette: #00B16B #006DB6 #8E278F #F04C23 · header gradient in styles-alt.css -->
+    <!-- Brand palette: #00B16B #006DB6 #8E278F #F04C23 — solid fills in styles-alt.css -->
     <meta name="color-scheme" content="light" />
     <link rel="canonical" href="insights.html" />
     <style>
+      html {
+        font-family: "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
+      }
       .top-header {
         display: flex !important;
         flex-shrink: 0;
         align-items: stretch;
         justify-content: space-between;
-        min-height: 52px;
-        height: 52px;
+        min-height: 58px;
+        height: 58px;
         padding: 0 14px 0 0;
       }
       .top-header__logo-wrap {
         display: flex;
-        align-items: center;
-        justify-content: center;
+        align-items: flex-start;
+        justify-content: flex-start;
         flex-shrink: 0;
         height: 100%;
-        padding: 0 14px;
+        padding: 4px 12px 4px 10px;
         background: #ffffff;
         border-radius: 0 8px 8px 0;
         box-sizing: border-box;
@@ -42,21 +45,15 @@
         padding: 0 10px 0 14px;
       }
       .top-header__logo-wrap img {
-        height: 26px;
+        height: 50px;
         width: auto;
-        max-height: calc(52px - 8px);
+        max-height: 50px;
         object-fit: contain;
         display: block;
       }
     </style>
-    <link rel="stylesheet" href="adani-fonts.css?v=20260452" />
-    <link rel="stylesheet" href="styles.css?v=20260509" />
-    <link rel="stylesheet" href="styles-alt.css?v=20260509" />
-    <link
-      rel="stylesheet"
-      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-      crossorigin=""
-    />
+    <link rel="stylesheet" href="styles.css?v=20260618" />
+    <link rel="stylesheet" href="styles-alt.css?v=20260618" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   </head>
   <body>
@@ -66,19 +63,16 @@
       <header class="top-header" role="banner">
         <div class="top-header__logo-wrap">
           <img
-            src="./assets/adani-logo.png"
-            width="140"
-            height="26"
-            alt="Adani Group logo"
+            src="./assets/logo11.png"
+            width="200"
+            height="50"
+            alt="Adani safetyverse"
             decoding="async"
-            onerror="this.onerror=null;this.src='../PowerBI_Assets/Adani_logo_2012.png';"
           />
         </div>
         <div class="top-header__titles">
           <h1>Adani Safety MIS</h1>
-          <p class="top-header__subtitle">
-            Insights · User research, IA, usability, accessibility, UCD, HCI &amp; CX
-          </p>
+          <p class="top-header__subtitle">Insights · KPI exploration</p>
         </div>
         <div class="top-header__meta">
           <nav class="top-header__nav" aria-label="Primary">
@@ -98,12 +92,12 @@
         class="viewport__main viewport__main--modern"
         role="main"
         tabindex="-1"
-        aria-label="Adani Safety MIS Insights: safety KPI exploration for user research, IA, usability testing, accessibility, iterative UX, UCD, HCI, and CX design"
+        aria-label="Adani Safety MIS Insights: safety KPI exploration and detail data"
       ></main>
 
       <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
         <p class="app-footer__text">
-          <strong>Disclaimer:</strong> Sample data for user research, information architecture, usability testing, accessibility review, iterative UX validation, and UCD or HCI/CX design exploration—not operational reporting. Confirm figures in your governed Power BI workspace.
+          <strong>Disclaimer:</strong> Sample data for preview—not operational reporting. Confirm figures in your governed Power BI workspace.
         </p>
       </footer>
     </div>
@@ -121,12 +115,7 @@
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
       crossorigin="anonymous"
     ></script>
-    <script defer src="embedded-data.js?v=20260505"></script>
-    <script
-      defer
-      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-      crossorigin=""
-    ></script>
-    <script defer src="app-modern.js?v=20260509"></script>
+    <script defer src="embedded-data.js?v=20260412"></script>
+    <script defer src="app-modern.js?v=20260618"></script>
   </body>
 </html>

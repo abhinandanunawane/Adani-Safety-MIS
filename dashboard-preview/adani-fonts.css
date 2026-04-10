@@ -1,4 +1,4 @@
-/* Adani corporate typeface — same family as https://www.adani.com/ (bundle.css). Local woff2 only. */
+/* Adani corporate @font-face bundle (optional). Preview pages use Segoe UI via styles.css; link this file only if you want the Adani family. */
 @font-face {
   font-family: Adani;
   src: url("assets/fonts/adani/Adani-ExtraLight.woff2") format("woff2");
