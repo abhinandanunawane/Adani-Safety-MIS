@@ -1,4 +1,4 @@
-Adani Safety MIS — Dashboard preview: UX, IA, and Power BI alignment
+Adani Safety Performance Profile — Dashboard preview: UX, IA, and Power BI alignment
 ====================================================================
 This static preview is a user-centered prototype for stakeholder review, usability testing, and iterative refinement before or alongside Power BI report development.
 

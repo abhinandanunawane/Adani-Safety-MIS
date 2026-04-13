@@ -4105,7 +4105,7 @@
     });
   }
 
-  /** SPI first panel: hazard spotting & closure heatmap (week or month columns). */
+  /** Leading Hazard (and shared markup): hazard spotting & closure heatmap (week or month columns). */
   function renderSpiHazardHeatmap(f) {
     const host = document.getElementById("spi-hazard-heatmap-host");
     const foot = document.getElementById("spi-hazard-heatmap-foot");
@@ -4692,7 +4692,6 @@
     }
 
     if (catKey === SPI_CATEGORY_KEY) {
-      renderSpiHazardHeatmap(f);
       const spiPoolAllKpis = applyNonMonthFiltersAllKpis(poolAll, f);
       renderSpiRiskQuadrantChart(spiPoolAllKpis, f);
       renderSpiInsightsChart(spiPoolAllKpis, f);
@@ -4977,11 +4976,7 @@
       }
     }
     const isHazard = f && f.catKey === HAZARD_CATEGORY_KEY;
-    if (
-      hmHintEl &&
-      f &&
-      (f.catKey === SPI_CATEGORY_KEY || f.catKey === HAZARD_CATEGORY_KEY)
-    ) {
+    if (hmHintEl && f && f.catKey === HAZARD_CATEGORY_KEY) {
       const modeBtn = document.querySelector(
         ".spi-hm-period-btn.spi-hm-period-btn--active"
       );
@@ -5909,25 +5904,6 @@
       '<div id="spi-hazard-heatmap-host" class="spi-hazard-heatmap-host"></div>' +
       '<p class="spi-hazard-heatmap-foot" id="spi-hazard-heatmap-foot" aria-live="polite"></p>' +
       "</div></div>";
-    const spiHazardHeatmapBoxHtml =
-      '<div class="chart-box chart-box--spi-hazard-hm">' +
-      chartBlockTitleHtml(
-        '<span class="spi-hm-chart-title" id="spi-hm-heading">Hazard category</span> ' +
-        '<span class="chart-box__hint" id="chart-hm-hint">(heatmap · week)</span>',
-        "spi-hazard-heatmap-capture",
-        "spi-hazard-heatmap"
-      ) +
-      '<div class="spi-hm-period-bar">' +
-      '<span class="spi-hm-period-label">Period</span>' +
-      '<div class="spi-hm-period-toggle" role="group" aria-label="Heat map period">' +
-      '<button type="button" class="spi-hm-period-btn spi-hm-period-btn--active" data-spi-hm-period="week">Week</button>' +
-      '<button type="button" class="spi-hm-period-btn" data-spi-hm-period="month">Month</button>' +
-      "</div></div>" +
-      '<div class="spi-hazard-heatmap-rule" aria-hidden="true"></div>' +
-      '<div id="spi-hazard-heatmap-capture" class="spi-hazard-heatmap-capture">' +
-      '<div id="spi-hazard-heatmap-host" class="spi-hazard-heatmap-host"></div>' +
-      '<p class="spi-hazard-heatmap-foot" id="spi-hazard-heatmap-foot" aria-live="polite"></p>' +
-      "</div></div>";
     const hazardChartsRowHtml =
       '<div class="cat-charts cat-charts--hazard" role="group" aria-label="Leading hazard and observation charts: hazard heat map, BU comparison, vertical mix">' +
       hazardLeadingHeatmapBoxHtml +
@@ -5947,9 +5923,8 @@
       '<div class="chart-canvas-wrap chart-canvas-wrap--hazard-doughnut"><canvas id="chart-verticals" role="img" aria-label="Doughnut chart: share of selected KPI by vertical"></canvas></div></div></div>';
     const chartsRowHtml =
       catKey === SPI_CATEGORY_KEY
-        ? '<div class="cat-charts-wrap cat-charts-wrap--spi">' +
-          '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: hazard heat map, quadrant analysis, SPI KPI mix">' +
-          spiHazardHeatmapBoxHtml +
+        ? '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: SPI KPI trends, quadrant analysis, SPI KPI mix">' +
+          spiLineChartBoxHtml +
           '<div class="chart-box chart-box--spi-bubble">' +
           chartBlockTitleHtml(
             '<span class="chart-analytics-title__label">Quadrant analysis</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(all SPI KPIs · cross-plot)</span>',
@@ -5963,10 +5938,7 @@
             "chart-spi-insights",
             "spi-kpi-mix"
           ) +
-          '<div class="chart-spi-map-host chart-spi-map-host--insights" id="chart-spi-map" role="region" aria-label="SPI one hundred percent stacked mix by month"></div></div></div>' +
-          '<div class="cat-charts cat-charts--spi-trend" role="group" aria-label="SPI KPI trends: monthly line chart for all indices; click a series to focus a KPI">' +
-          spiLineChartBoxHtml +
-          "</div></div>"
+          '<div class="chart-spi-map-host chart-spi-map-host--insights" id="chart-spi-map" role="region" aria-label="SPI one hundred percent stacked mix by month"></div></div></div>'
         : catKey === HAZARD_CATEGORY_KEY
           ? hazardChartsRowHtml
         : catKey === LOCATION_VULN_CAT_KEY
@@ -6126,7 +6098,7 @@
     wireVariableFilterControls(onFilterChange);
     wireToolbarScopeScrollPanels(wrap);
 
-    if (catKey === SPI_CATEGORY_KEY || catKey === HAZARD_CATEGORY_KEY) {
+    if (catKey === HAZARD_CATEGORY_KEY) {
       wrap.querySelectorAll(".spi-hm-period-btn").forEach((btn) => {
         btn.addEventListener("click", () => {
           wrap.querySelectorAll(".spi-hm-period-btn").forEach((b) => {

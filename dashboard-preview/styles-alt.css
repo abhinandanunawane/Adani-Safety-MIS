@@ -2343,25 +2343,6 @@ button.m2-cat-row {
 .shell--modern[data-layout="insights"]
   .cat-main-view--charts
   .view-panel--charts
-  .cat-charts-wrap--spi {
-  flex: 1 1 0 !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  gap: var(--space-grid, 8px) !important;
-}
-
-.shell--modern[data-layout="insights"]
-  .cat-main-view--charts
-  .view-panel--charts
-  .cat-charts-wrap--spi .cat-charts--spi-trend {
-  min-height: min(160px, 26vh) !important;
-  max-height: none !important;
-}
-
-.shell--modern[data-layout="insights"]
-  .cat-main-view--charts
-  .view-panel--charts
   .cat-charts--spi,
 .shell--modern[data-layout="insights"]
   .cat-main-view--charts
