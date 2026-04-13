@@ -54,31 +54,7 @@ body:has(.shell.shell--modern) {
   height: var(--viewport-h, 720px);
 }
 
-/* Header: Adani blue spectrum (overrides insights.html inline chrome) */
-.shell--modern .top-header {
-  background: var(--adani-blue) !important;
-  border-bottom: 3px solid var(--adani-green);
-  color: var(--adani-white) !important;
-  box-shadow:
-    0 3px 18px rgba(0, 109, 182, 0.22),
-    0 1px 0 rgba(255, 255, 255, 0.12) inset;
-}
-
-.shell--modern .top-header__logo-wrap {
-  background: var(--adani-white) !important;
-  box-shadow: inset -1px 0 0 rgba(0, 109, 182, 0.1);
-}
-
-.shell--modern .top-nav-link {
-  color: rgba(255, 255, 255, 0.92) !important;
-}
-
-.shell--modern .top-nav-link:hover,
-.shell--modern .top-nav-link:focus-visible {
-  color: #fff !important;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
+/* Header: same white bar + purple rule as dashboard (styles.css .top-header) */
 
 .shell--modern .viewport__main--modern {
   flex: 1;
@@ -95,11 +71,11 @@ body:has(.shell.shell--modern) {
   background: var(--m2-grad-page-landing);
 }
 
-/* insights.html home — full-bleed background (assets/home-bg-2.png) */
+/* insights.html home — same hero image as dashboard (assets/home-1.png) */
 .shell--modern[data-layout="insights"]
   .viewport__main--modern:has(.landing--modern) {
-  background-color: #e8eef4;
-  background-image: url("assets/home-bg-2.png");
+  background-color: #0c4a6e;
+  background-image: url("assets/home-1.png");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -786,6 +762,9 @@ button.m2-cat-row {
 .m2-cat-row--k9 .m2-cat-row__rail {
   background: var(--adani-blue);
 }
+.m2-cat-row--k10 .m2-cat-row__rail {
+  background: var(--adani-purple);
+}
 
 .m2-cat-row__index {
   flex: 0 0 auto;
@@ -912,6 +891,22 @@ button.m2-cat-row {
   letter-spacing: 0.04em;
 }
 
+.m2-cat-row--disabled {
+  opacity: 0.78;
+  cursor: default;
+  pointer-events: none;
+}
+
+.m2-cat-row__chip--live {
+  background: var(--adani-blue);
+  color: #fff;
+}
+
+.m2-cat-row__chip--muted {
+  background: #6b7280;
+  color: #f9fafb;
+}
+
 .shell--modern .home-grid--modern .category-card {
   min-height: 0;
   padding: 4px 6px;
@@ -959,72 +954,23 @@ button.m2-cat-row {
   overflow: hidden;
 }
 
-/* Top band: journey + breadcrumb left; filters centered in remaining space (wider box) */
-.m2-cat-top {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: flex-start;
-  justify-content: flex-start;
-  gap: 8px 10px;
-  min-width: 0;
-  flex: 0 0 auto;
+/* Same top band as Dashboard Preview (index): journey + title left, filter fieldset right */
+.shell--modern .cat-view--modern > .cat-top-bar {
   position: relative;
   z-index: 6;
   overflow: visible;
 }
 
-/* Float above KPI strip / charts — no layout shift (do not add padding when open) */
-.m2-cat-top:has(.m2-kpi-scope[open]) {
+.shell--modern .cat-view--modern > .cat-top-bar:has(.m2-kpi-scope[open]) {
   z-index: 40;
 }
 
-.m2-cat-top__lead {
-  flex: 0 1 auto;
-  max-width: min(30%, 300px);
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.m2-cat-top__lead .route-steps--modern {
-  flex-shrink: 0;
-}
-
-.m2-cat-top .m2-cat-head__title {
-  min-width: 0;
-}
-
-.m2-cat-top .m2-breadcrumb {
+.shell--modern .cat-view--modern > .cat-top-bar .m2-breadcrumb {
   margin: 0 0 1px;
 }
 
-.m2-toolbar-shell--cat-top {
-  flex: 1 1 0;
-  min-width: 0;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  align-self: stretch;
-  overflow: visible;
-}
-
-.m2-toolbar-shell--cat-top .m2-toolbar--beside-rail {
-  width: 100%;
-  max-width: min(100%, 940px);
-  margin: 0 auto;
-}
-
-/* Align Insights category filters with Dashboard Preview: shared cat-toolbar pattern */
-.m2-toolbar-shell--cat-top .cat-toolbar.cat-toolbar--compact {
-  width: 100%;
-  max-width: min(100%, 940px);
-  margin: 0 auto;
-}
-
 /* Match index `fieldset.cat-toolbar--compact`: readable labels + selects (avoid sub-10px rem blur) */
-.shell--modern .m2-toolbar-shell--cat-top .cat-toolbar--compact select {
+.shell--modern .cat-view--modern fieldset.cat-toolbar--compact select {
   font-size: 0.68rem !important;
   padding: 2px 6px !important;
   color: var(--text) !important;
@@ -1032,7 +978,7 @@ button.m2-cat-row {
   border: 1px solid var(--border) !important;
 }
 
-.shell--modern .m2-toolbar-shell--cat-top .cat-toolbar .field-label {
+.shell--modern .cat-view--modern fieldset.cat-toolbar .field-label {
   font-size: 0.62rem !important;
   font-weight: 500 !important;
   color: var(--text-muted) !important;
@@ -1040,16 +986,11 @@ button.m2-cat-row {
   text-transform: none !important;
 }
 
-/* KPI lives on .filters-scroll (sibling of .filters-core); do not cap width — clips the popover */
-.shell--modern .m2-toolbar-shell--cat-top .cat-toolbar__filters-scroll > .field--kpi-inline {
+/* KPI scope block inside unified filter scroll strip */
+.shell--modern .cat-view--modern .cat-toolbar__kpi-surface {
   max-width: none;
   flex-shrink: 0;
   overflow: visible;
-}
-
-.shell--modern .m2-toolbar-shell--cat-top .toolbar-actions .m2-btn--compact {
-  padding: 4px 12px !important;
-  font-size: 0.58rem !important;
 }
 
 .m2-toolbar--beside-rail .m2-toolbar__inner {
@@ -1275,13 +1216,13 @@ button.m2-cat-row {
   z-index: 40;
 }
 
-.cat-toolbar__filters-scroll > .field--kpi-inline .m2-kpi-scope--toolbar {
+.cat-toolbar__kpi-surface .m2-kpi-scope--toolbar {
   max-width: none;
   min-width: 5.5rem;
 }
 
 /* KPI scope — same trigger + panel language as Variable dropdown (Insights) */
-.shell--modern .cat-view .field--kpi-inline .m2-kpi-scope--toolbar {
+.shell--modern .cat-view .cat-toolbar__kpi-surface .m2-kpi-scope--toolbar {
   position: relative;
   border: none;
   background: transparent;
@@ -2376,4 +2317,62 @@ button.m2-cat-row {
     var(--viz-footer-fs-max)
   );
   line-height: 1.35;
+}
+
+/* Insights uses shared app.js DOM: align default 3-chart row with m2 grid rhythm */
+.shell--modern[data-layout="insights"]
+  .cat-main-view--charts
+  .view-panel--charts
+  .cat-charts:not(.cat-charts--spi):not(.cat-charts--hazard):not(
+    .cat-charts--loc-map
+  ) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.05fr) minmax(0, 0.95fr) !important;
+  grid-template-rows: 1fr !important;
+  gap: var(--space-grid, 8px) !important;
+  flex: 1 1 0 !important;
+  min-height: min(300px, 45vh) !important;
+  height: auto !important;
+  max-height: none !important;
+}
+
+.shell--modern[data-layout="insights"] .cat-main-view--charts .chart-canvas-wrap {
+  min-height: 0;
+}
+
+.shell--modern[data-layout="insights"]
+  .cat-main-view--charts
+  .view-panel--charts
+  .cat-charts-wrap--spi {
+  flex: 1 1 0 !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-grid, 8px) !important;
+}
+
+.shell--modern[data-layout="insights"]
+  .cat-main-view--charts
+  .view-panel--charts
+  .cat-charts-wrap--spi .cat-charts--spi-trend {
+  min-height: min(160px, 26vh) !important;
+  max-height: none !important;
+}
+
+.shell--modern[data-layout="insights"]
+  .cat-main-view--charts
+  .view-panel--charts
+  .cat-charts--spi,
+.shell--modern[data-layout="insights"]
+  .cat-main-view--charts
+  .view-panel--charts
+  .cat-charts--hazard {
+  min-height: min(300px, 45vh) !important;
+}
+
+.shell--modern[data-layout="insights"]
+  .cat-main-view--charts
+  .view-panel--charts
+  .cat-charts--loc-map {
+  min-height: min(320px, 48vh) !important;
 }

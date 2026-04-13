@@ -1,5 +1,5 @@
 /**
- * Adani Safety MIS — Insights layout: same data as classic; copy foregrounds user research, IA, usability testing,
+ * Adani Safety Performance Profile — Insights layout: same data as classic; copy foregrounds user research, IA, usability testing,
  * accessibility, consistency, user-centered approach, consistency & hierarchy, iterative process, UCD, HCI,
  * customer experience (CX) design, usability, desirability, usefulness. Maps to Power BI bookmarks + pages.
  */
@@ -353,38 +353,37 @@
   function variableFilterFieldHtml() {
     return (
       '<div class="field field--variable field--var-inline">' +
-      '<span class="field-label" id="f-var-lbl">Variable</span>' +
+      '<span class="field-label" id="f-var-lbl">Vertical</span>' +
       '<details class="var-scope var-scope--toolbar" id="f-var-details">' +
-      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl">' +
+      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl" title="Vertical (checkpoints)">' +
       '<span class="var-scope__summary-text">' +
-      '<span class="var-scope__hint" id="f-var-hint">All</span>' +
+      '<span class="var-scope__hint" id="f-var-hint">All verticals</span>' +
       "</span>" +
       '<span class="var-scope__chev" aria-hidden="true"></span>' +
       "</summary>" +
-      '<div class="var-scope__panel" role="group" aria-label="Checkpoint options">' +
-      '<div class="var-scope__panel-head">Checkpoints</div>' +
+      '<div class="var-scope__panel" role="group" aria-label="Vertical filter options">' +
       '<div class="var-scope__menu">' +
       '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
-      '<span class="field-variable-check__text">All checkpoints</span>' +
       '<input type="checkbox" id="f-var-all" checked />' +
+      '<span class="field-variable-check__text">All checkpoints</span>' +
       "</label>" +
       '<div class="var-scope__divider" aria-hidden="true"></div>' +
       '<div class="var-scope__options">' +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">Field Force</span>' +
       '<input type="checkbox" class="f-var-cb" value="Field Force" />' +
+      '<span class="field-variable-check__text">Field Force</span>' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">O and M</span>' +
       '<input type="checkbox" class="f-var-cb" value="O and M" />' +
+      '<span class="field-variable-check__text">O and M</span>' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">Office</span>' +
       '<input type="checkbox" class="f-var-cb" value="Office" />' +
+      '<span class="field-variable-check__text">Office</span>' +
       "</label>" +
       '<label class="field-variable-check field-variable-check--row">' +
-      '<span class="field-variable-check__text">Projects</span>' +
       '<input type="checkbox" class="f-var-cb" value="Projects" />' +
+      '<span class="field-variable-check__text">Projects</span>' +
       "</label>" +
       "</div></div></div></details></div>"
     );
@@ -396,23 +395,15 @@
     const cbs = document.querySelectorAll("input.f-var-cb");
     if (!hint || !all) return;
     if (all.checked) {
-      hint.textContent = "All";
+      hint.textContent = "All verticals";
       return;
     }
     const sel = [...cbs].filter((cb) => cb.checked).map((cb) => cb.value);
     if (sel.length === 0) {
-      hint.textContent = "All";
+      hint.textContent = "All verticals";
       return;
     }
-    if (sel.length === 1) {
-      hint.textContent = sel[0];
-      return;
-    }
-    if (sel.length === 2) {
-      hint.textContent = sel.join(", ");
-      return;
-    }
-    hint.textContent = sel.length + " selected";
+    hint.textContent = sel.length + " Selected";
   }
 
   function readVariableSelectionFromDom() {
@@ -509,6 +500,63 @@
     updateVariableSummary();
   }
 
+  /** Single filter scroll strip: fixed-position <details> panels while open (avoids overflow clip). */
+  function wireToolbarScopeScrollPanels(host) {
+    const scope = host.querySelector(".cat-toolbar__filters-all-scroll");
+    if (!scope) return;
+    const pairs = [];
+    [
+      ["details.var-scope--toolbar", ".var-scope__panel"],
+      ["details.m2-kpi-scope--toolbar", ".m2-kpi-panel"],
+    ].forEach(([dSel, pSel]) => {
+      scope.querySelectorAll(dSel).forEach((det) => {
+        const panel = det.querySelector(pSel);
+        if (panel) pairs.push([det, panel]);
+      });
+    });
+    if (!pairs.length) return;
+
+    function placePair(det, panel) {
+      if (!det.open) {
+        panel.style.position = "";
+        panel.style.top = "";
+        panel.style.left = "";
+        panel.style.right = "";
+        panel.style.width = "";
+        panel.style.zIndex = "";
+        return;
+      }
+      const summary = det.querySelector("summary");
+      if (!summary) return;
+      const r = summary.getBoundingClientRect();
+      const estW = panel.offsetWidth || 280;
+      let left = r.left;
+      const maxL = window.innerWidth - estW - 8;
+      if (left > maxL) left = Math.max(8, maxL);
+      if (left < 8) left = 8;
+      panel.style.position = "fixed";
+      panel.style.left = left + "px";
+      panel.style.top = r.bottom + 6 + "px";
+      panel.style.right = "auto";
+      panel.style.zIndex = "200";
+    }
+
+    function syncAll() {
+      pairs.forEach(([d, p]) => placePair(d, p));
+    }
+
+    pairs.forEach(([det]) => {
+      det.addEventListener("toggle", () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(syncAll);
+        });
+      });
+    });
+    scope.addEventListener("scroll", syncAll, { passive: true });
+    window.addEventListener("resize", syncAll);
+    window.addEventListener("scroll", syncAll, true);
+  }
+
   /** Decorative icons for category cards (list context; button has aria-label). */
   function categoryIconSvg(categoryKey) {
     const svg = (paths) =>
@@ -543,19 +591,15 @@
           '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
         );
       case 8:
-        /* Leadership & Safety Governance — clear climb + leader w/ flag + follower + idea dots (matches other stroke icons) */
+        /* Leadership & Safety Governance — large front leader, two teammates, up-chevron (clear at 22px) */
         return svg(
-          '<path d="M1.5 22h8v-3.5h6.5v-4h7.5v-3.5"/>' +
-            '<path d="M8.5 15.5c2.8-2.2 5.8-4.2 9-5.8" opacity="0.45"/>' +
-            '<circle cx="6.2" cy="13" r="1.75"/>' +
-            '<path d="M3.2 20v-.5a2.6 2.6 0 012.6-2.3h.8a2.6 2.6 0 012.6 2.3v.5"/>' +
-            '<circle cx="17.6" cy="7.2" r="1.85"/>' +
-            '<path d="M14 13.2v-.5a3 3 0 013-2.6h.8a3 3 0 013 2.6v.5"/>' +
-            '<line x1="19.8" y1="8.8" x2="19.8" y2="2.2"/>' +
-            '<path d="M19.8 2.2l3.4 1.5v2.6l-3.4 1.5z"/>' +
-            '<circle cx="3.2" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
-            '<circle cx="5.4" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
-            '<circle cx="7.6" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>'
+          '<path d="M3.8 22V16.2Q6.5 13.8 9.2 16.2V22"/>' +
+            '<circle cx="6.5" cy="10.5" r="1.45"/>' +
+            '<path d="M14.8 22V16.2Q17.5 13.8 20.2 16.2V22"/>' +
+            '<circle cx="17.5" cy="10.5" r="1.45"/>' +
+            '<path d="M6.2 22V14.8Q12 11.2 17.8 14.8V22"/>' +
+            '<circle cx="12" cy="7.3" r="2.35"/>' +
+            '<path d="M8.5 3.4L12 1L15.5 3.4"/>'
         );
       case 9:
         return svg(
@@ -804,7 +848,6 @@
   function readFilters(catKey) {
     const elVs = document.getElementById("f-vs");
     const elSt = document.getElementById("f-state");
-    if (!elSt) return null;
     const elBiz = document.getElementById("f-biz");
     const elTblScope = document.getElementById("tbl-kpi-scope");
     const kpiKeys = readSelectedKpiKeysFromDom();
@@ -815,7 +858,7 @@
       kpiKeys: kpiKeys,
       vsMode: elVs ? elVs.value : DEFAULT_VS_MODE,
       refMonth: getRefMonth(),
-      state: elSt.value,
+      state: elSt ? elSt.value : "all",
       business: elBiz ? elBiz.value : "all",
       unitType: "all",
       variable: readVariableSelectionFromDom(),
@@ -2120,59 +2163,62 @@
 
     const wrap = document.createElement("div");
     wrap.className = "cat-view cat-view--modern";
-    const kpiFieldHtml =
-      cfg.showKpi
-        ? '<div class="field field--kpi-inline">' +
-          kpiScopePanelHtml(catKey, kpisMeta) +
-          "</div>"
-        : "";
-    const filterCore =
+    const businessFieldHtml = cfg.showBusiness
+      ? '<div class="field"><label class="field-label" for="f-biz">Business unit</label>' +
+        '<select id="f-biz">' +
+        bizOpts +
+        "</select></div>"
+      : "";
+    const vsFieldHtml =
       '<div class="field"><label class="field-label" for="f-vs">Vs</label>' +
       '<select id="f-vs">' +
       vsOpts +
-      "</select></div>" +
-      (cfg.showState
-        ? '<div class="field"><label class="field-label" for="f-state">State</label>' +
-          '<select id="f-state">' +
-          stateOpts +
-          "</select></div>"
-        : "") +
-      (cfg.showBusiness
-        ? '<div class="field"><label class="field-label" for="f-biz">Business</label>' +
-          '<select id="f-biz">' +
-          bizOpts +
-          "</select></div>"
-        : "") +
-      "";
+      "</select></div>";
+    const stateFieldHtml = cfg.showState
+      ? '<div class="field"><label class="field-label" for="f-state">State</label>' +
+        '<select id="f-state">' +
+        stateOpts +
+        "</select></div>"
+      : "";
+    const filterCore = businessFieldHtml + vsFieldHtml + stateFieldHtml;
     const variableFieldHtml = variableFilterFieldHtml();
+    const kpiSurfaceHtml =
+      cfg.showKpi
+        ? '<div class="cat-toolbar__kpi-surface" role="group" aria-labelledby="f-kpi-surface-lbl">' +
+          '<span id="f-kpi-surface-lbl" class="cat-toolbar__kpi-surface__lbl">KPI list</span>' +
+          '<div class="cat-toolbar__kpi-surface__control">' +
+          kpiScopePanelHtml(catKey, kpisMeta) +
+          "</div></div>"
+        : "";
+    const filtersAllScrollHtml =
+      '<div class="cat-toolbar__filters-all-scroll">' +
+      variableFieldHtml +
+      filterCore +
+      kpiSurfaceHtml +
+      "</div>";
     const toolbarInner =
       '<div class="cat-toolbar__inner" role="group">' +
       '<div class="cat-toolbar__filters-scroll">' +
-      kpiFieldHtml +
-      '<div class="cat-toolbar__filters-core">' +
-      filterCore +
-      "</div>" +
-      variableFieldHtml +
+      filtersAllScrollHtml +
       "</div>" +
       '<div class="toolbar-actions">' +
-      '<button type="button" class="btn m2-btn m2-btn--ghost m2-btn--compact" id="f-reset">Reset</button>' +
+      '<button type="button" class="btn btn--reset-compact" id="f-reset">Reset</button>' +
       "</div></div>";
     wrap.innerHTML =
-      '<div class="m2-cat-top">' +
-      '<div class="m2-cat-top__lead">' +
+      '<div class="cat-top-bar">' +
+      '<div class="cat-top-bar__lead">' +
       journeyStepsHtml(3) +
-      '<div class="m2-cat-head__title">' +
+      '<div class="cat-top-bar__title">' +
       '<nav class="breadcrumb m2-breadcrumb" aria-label="Breadcrumb">' +
       '<ol><li><a href="#categories" id="bc-cats">Categories</a></li><li aria-current="page">' +
       '<h2 class="cat-heading m2-cat-heading" id="cat-heading" tabindex="-1">' +
       escapeHtml(cat.categoryName) +
       "</h2></li></ol></nav>" +
       "</div></div>" +
-      '<div class="m2-toolbar-shell m2-toolbar-shell--cat-top">' +
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       toolbarInner +
-      "</fieldset></div></div>" +
+      "</fieldset></div>" +
       '<section class="m2-kpi-block" aria-labelledby="m2-kpi-h">' +
       '<div class="m2-kpi-block__head">' +
       '<h3 id="m2-kpi-h" class="m2-section-title">KPI metrics</h3>' +
@@ -2266,6 +2312,7 @@
       if (el) el.addEventListener("change", onFilterChange);
     });
     wireVariableFilterControls(onFilterChange);
+    wireToolbarScopeScrollPanels(wrap);
 
     const tblScope = document.getElementById("tbl-kpi-scope");
     if (tblScope) {

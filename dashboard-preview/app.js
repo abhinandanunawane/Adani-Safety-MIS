@@ -1,5 +1,5 @@
 /**
- * Adani Safety MIS — fixed 1280×720 preview (no page scroll). Copy and structure support
+ * Adani Safety Performance Profile — fixed 1280×720 preview (no page scroll). Copy and structure support
  * user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX,
  * UCD, HCI, and CX review (usability, desirability, accessibility, usefulness).
  */
@@ -168,18 +168,17 @@
             unitType: "Count",
             latestValue: 0,
           },
-          {
-            kpiKey: 21,
-            kpiName: "TRIR",
-            unitType: "PercentOrRate",
-            latestValue: 0,
-          },
         ],
       });
     }
   }
 
   ensureLocationVulnerabilityCategory();
+
+  /** Insights shell (`insights.html`): modern chrome + directory home; same logic as dashboard. */
+  const insightShell =
+    typeof document !== "undefined" &&
+    document.querySelector('.shell--modern[data-layout="insights"]') != null;
 
   if (typeof Chart !== "undefined") {
     Chart.defaults.font.family = FONT_UI;
@@ -316,6 +315,384 @@
 
   const meta = DATA.meta || {};
 
+  /** Synthetic preview category (replaces former Workforce cat 5 in bootstrap). */
+  const ASSURANCE_CATEGORY_KEY = 5;
+  /** Incident-only additions (Dim keys 18 / 19 are used elsewhere — 56 / 57 here). */
+  const INCIDENT_FIRE_KPI_KEY = 56;
+  const INCIDENT_PROPERTY_DAMAGE_KPI_KEY = 57;
+
+  /** Align packaged JSON meta with header product name (avoid editing embedded-data.js). */
+  function previewApplyDataMetaTitles() {
+    if (!DATA || !DATA.meta) return;
+    DATA.meta.dashboardTitle = "Adani Safety Performance Profile";
+    DATA.meta.subtitle =
+      "Safety performance indicators — Interactive Preview";
+  }
+
+  /**
+   * Incident Management: add Fire + Property Damage (19 KPIs total). Seeded fact rows.
+   */
+  function previewAddIncidentFirePropertyKpis() {
+    if (!DATA || !Array.isArray(DATA.factRows)) return;
+    const INCIDENT_CAT = 1;
+    const detail = DATA.kpiDetailByCategory.find(
+      (x) => x.categoryKey === INCIDENT_CAT
+    );
+    if (!detail || !Array.isArray(detail.kpis)) return;
+    const have = new Set(detail.kpis.map((k) => Number(k.kpiKey)));
+    if (have.has(INCIDENT_FIRE_KPI_KEY)) return;
+
+    function ymToDateKey(ym) {
+      return Number(String(ym).replace("-", "").slice(0, 6) + "01");
+    }
+    function seedValue(seedStr, min, max) {
+      let h = 2166136261;
+      const s = String(seedStr);
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      const u = (h >>> 0) / 4294967296;
+      return min + u * (max - min);
+    }
+
+    const extraMeta = [
+      {
+        kpiKey: INCIDENT_FIRE_KPI_KEY,
+        kpiName: "Fire",
+        unitType: "Count",
+        latestValue: 0,
+      },
+      {
+        kpiKey: INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
+        kpiName: "Property Damage",
+        unitType: "Count",
+        latestValue: 0,
+      },
+    ];
+    detail.kpis.push(extraMeta[0], extraMeta[1]);
+    const cat = DATA.categories.find((c) => c.categoryKey === INCIDENT_CAT);
+    if (cat) cat.kpiCount = detail.kpis.length;
+
+    const monthKeys = (DATA.months || [])
+      .map((m) => m.yearMonth)
+      .filter(Boolean)
+      .sort();
+    if (!monthKeys.length) return;
+
+    const businesses = [];
+    const seen = new Set();
+    for (let i = 0; i < DATA.factRows.length; i++) {
+      const r = DATA.factRows[i];
+      const b = String(r.businessName || "").trim();
+      if (!b || seen.has(b)) continue;
+      seen.add(b);
+      businesses.push({
+        businessName: b,
+        businessKey: r.businessKey,
+        state: String(r.state || "Maharashtra").trim() || "Maharashtra",
+      });
+      if (businesses.length >= 14) break;
+    }
+    if (!businesses.length) {
+      businesses.push({
+        businessName: "Power",
+        businessKey: 1,
+        state: "Madhya Pradesh",
+      });
+    }
+
+    const newRows = [];
+    for (let mi = 0; mi < monthKeys.length; mi++) {
+      const ym = monthKeys[mi];
+      const dk = ymToDateKey(ym);
+      for (let bi = 0; bi < businesses.length; bi++) {
+        const biz = businesses[bi];
+        for (let ki = 0; ki < extraMeta.length; ki++) {
+          const kpi = extraMeta[ki];
+          const v = Math.round(
+            seedValue(ym + "|" + biz.businessName + "|" + kpi.kpiKey, 0, 12)
+          );
+          newRows.push({
+            yearMonth: ym,
+            dateKey: dk,
+            businessKey: biz.businessKey,
+            businessName: biz.businessName,
+            state: biz.state,
+            kpiKey: kpi.kpiKey,
+            kpiName: kpi.kpiName,
+            categoryKey: INCIDENT_CAT,
+            unitType: kpi.unitType,
+            value: v,
+            target: null,
+          });
+        }
+      }
+    }
+    DATA.factRows.push(...newRows);
+  }
+
+  /**
+   * Remove Risk Control Programs (7): S-4 / S-5 SRFA → Hazard (2); other KPIs → Consequence (4).
+   * Idempotent if category 7 is already absent.
+   */
+  function previewStripRiskControlPrograms() {
+    const RISK_CONTROL_CATEGORY_KEY = 7;
+    const HAZARD_CAT = 2;
+    const CONSEQUENCE_CAT = 4;
+    const KPIS_TO_HAZARD = new Set([41, 42]);
+    const KPIS_TO_CONSEQUENCE = new Set([51, 52, 54]);
+    if (
+      !DATA ||
+      !Array.isArray(DATA.categories) ||
+      !DATA.categories.some((c) => c.categoryKey === RISK_CONTROL_CATEGORY_KEY)
+    ) {
+      return;
+    }
+    const riskDetail = DATA.kpiDetailByCategory.find(
+      (x) => x.categoryKey === RISK_CONTROL_CATEGORY_KEY
+    );
+    DATA.categories = DATA.categories.filter(
+      (c) => c.categoryKey !== RISK_CONTROL_CATEGORY_KEY
+    );
+    DATA.kpiDetailByCategory = DATA.kpiDetailByCategory.filter(
+      (x) => x.categoryKey !== RISK_CONTROL_CATEGORY_KEY
+    );
+    if (DATA.monthlyByCategory) {
+      DATA.monthlyByCategory = DATA.monthlyByCategory.filter(
+        (x) => x.categoryKey !== RISK_CONTROL_CATEGORY_KEY
+      );
+    }
+    if (DATA.businessBreakdown) {
+      DATA.businessBreakdown = DATA.businessBreakdown.filter(
+        (x) => x.categoryKey !== RISK_CONTROL_CATEGORY_KEY
+      );
+    }
+    if (riskDetail && Array.isArray(riskDetail.kpis)) {
+      const hazardBlock = DATA.kpiDetailByCategory.find(
+        (x) => x.categoryKey === HAZARD_CAT
+      );
+      const consBlock = DATA.kpiDetailByCategory.find(
+        (x) => x.categoryKey === CONSEQUENCE_CAT
+      );
+      const seenH = new Set(
+        (hazardBlock && hazardBlock.kpis
+          ? hazardBlock.kpis
+          : []
+        ).map((k) => k.kpiKey)
+      );
+      const seenC = new Set(
+        (consBlock && consBlock.kpis ? consBlock.kpis : []).map((k) => k.kpiKey)
+      );
+      for (let i = 0; i < riskDetail.kpis.length; i++) {
+        const k = riskDetail.kpis[i];
+        if (KPIS_TO_HAZARD.has(k.kpiKey) && hazardBlock && !seenH.has(k.kpiKey)) {
+          hazardBlock.kpis.push(k);
+          seenH.add(k.kpiKey);
+        } else if (
+          KPIS_TO_CONSEQUENCE.has(k.kpiKey) &&
+          consBlock &&
+          !seenC.has(k.kpiKey)
+        ) {
+          consBlock.kpis.push(k);
+          seenC.add(k.kpiKey);
+        }
+      }
+    }
+    if (Array.isArray(DATA.factRows)) {
+      for (let i = 0; i < DATA.factRows.length; i++) {
+        const r = DATA.factRows[i];
+        if (r.categoryKey !== RISK_CONTROL_CATEGORY_KEY) continue;
+        if (KPIS_TO_HAZARD.has(r.kpiKey)) r.categoryKey = HAZARD_CAT;
+        else if (KPIS_TO_CONSEQUENCE.has(r.kpiKey)) r.categoryKey = CONSEQUENCE_CAT;
+      }
+    }
+    function syncKpiCount(catKey) {
+      const cat = DATA.categories.find((c) => c.categoryKey === catKey);
+      const det = DATA.kpiDetailByCategory.find((x) => x.categoryKey === catKey);
+      if (cat && det && Array.isArray(det.kpis)) {
+        cat.kpiCount = det.kpis.length;
+      }
+    }
+    syncKpiCount(HAZARD_CAT);
+    syncKpiCount(CONSEQUENCE_CAT);
+  }
+
+  /**
+   * Remove Workforce Exposure & Manhour Base (5); add Assurance (5) with seeded facts. Other categories unchanged.
+   */
+  function previewCategoryDataBootstrap() {
+    if (!DATA || !Array.isArray(DATA.factRows)) return;
+
+    function stripCategory(k) {
+      DATA.categories = (DATA.categories || []).filter((c) => c.categoryKey !== k);
+      DATA.factRows = (DATA.factRows || []).filter((r) => r.categoryKey !== k);
+      if (DATA.monthlyByCategory) {
+        DATA.monthlyByCategory = DATA.monthlyByCategory.filter(
+          (x) => x.categoryKey !== k
+        );
+      }
+      if (DATA.kpiDetailByCategory) {
+        DATA.kpiDetailByCategory = DATA.kpiDetailByCategory.filter(
+          (x) => x.categoryKey !== k
+        );
+      }
+      if (DATA.businessBreakdown) {
+        DATA.businessBreakdown = DATA.businessBreakdown.filter(
+          (x) => x.categoryKey !== k
+        );
+      }
+    }
+
+    function ymToDateKey(ym) {
+      return Number(String(ym).replace("-", "").slice(0, 6) + "01");
+    }
+
+    function seedValue(seedStr, min, max) {
+      let h = 2166136261;
+      const s = String(seedStr);
+      for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      const u = (h >>> 0) / 4294967296;
+      return min + u * (max - min);
+    }
+
+    stripCategory(ASSURANCE_CATEGORY_KEY);
+
+    const monthKeys = (DATA.months || [])
+      .map((m) => m.yearMonth)
+      .filter(Boolean)
+      .sort();
+    if (!monthKeys.length) return;
+
+    const businesses = [];
+    const seen = new Set();
+    for (let i = 0; i < DATA.factRows.length; i++) {
+      const r = DATA.factRows[i];
+      const b = String(r.businessName || "").trim();
+      if (!b || seen.has(b)) continue;
+      seen.add(b);
+      businesses.push({
+        businessName: b,
+        businessKey: r.businessKey,
+        state: String(r.state || "Maharashtra").trim() || "Maharashtra",
+      });
+      if (businesses.length >= 14) break;
+    }
+    if (!businesses.length) {
+      businesses.push({
+        businessName: "Power",
+        businessKey: 1,
+        state: "Madhya Pradesh",
+      });
+    }
+
+    const assuranceKpis = [
+      {
+        kpiKey: 501,
+        kpiName: "FRC Compliance Rate %",
+        unitType: "PercentOrRate",
+        latestValue: 88,
+      },
+      {
+        kpiKey: 502,
+        kpiName: "Standard Implementation %",
+        unitType: "PercentOrRate",
+        latestValue: 72,
+      },
+      {
+        kpiKey: 503,
+        kpiName: "Key Learning Implementation %",
+        unitType: "PercentOrRate",
+        latestValue: 81,
+      },
+    ];
+    DATA.categories.push({
+      categoryKey: ASSURANCE_CATEGORY_KEY,
+      categoryName: "Assurance",
+      sortOrder: 5,
+      uxNote:
+        "Governance assurance visits, audits, and critical finding closure.",
+      kpiCount: assuranceKpis.length,
+      latestMonthIndex: 1,
+    });
+    DATA.categories.sort(
+      (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+    );
+
+    DATA.kpiDetailByCategory.push({
+      categoryKey: ASSURANCE_CATEGORY_KEY,
+      kpis: assuranceKpis,
+    });
+
+    const newRows = [];
+    for (let mi = 0; mi < monthKeys.length; mi++) {
+      const ym = monthKeys[mi];
+      const dk = ymToDateKey(ym);
+      for (let bi = 0; bi < businesses.length; bi++) {
+        const biz = businesses[bi];
+        for (let ki = 0; ki < assuranceKpis.length; ki++) {
+          const kpi = assuranceKpis[ki];
+          let v;
+          if (kpi.unitType === "Count") {
+            v = Math.round(
+              seedValue(ym + "|" + biz.businessName + "|" + kpi.kpiKey, 8, 220)
+            );
+          } else {
+            v = seedValue(
+              ym + "|" + biz.businessName + "|" + kpi.kpiKey,
+              55,
+              98
+            );
+          }
+          newRows.push({
+            yearMonth: ym,
+            dateKey: dk,
+            businessKey: biz.businessKey,
+            businessName: biz.businessName,
+            state: biz.state,
+            kpiKey: kpi.kpiKey,
+            kpiName: kpi.kpiName,
+            categoryKey: ASSURANCE_CATEGORY_KEY,
+            unitType: kpi.unitType,
+            value: v,
+            target: null,
+          });
+        }
+      }
+    }
+    DATA.factRows.push(...newRows);
+
+    function rollupSeries(catKey, sampleKpiKey) {
+      return monthKeys.map((ym) => {
+        const nums = newRows
+          .filter(
+            (r) =>
+              r.yearMonth === ym &&
+              r.categoryKey === catKey &&
+              r.kpiKey === sampleKpiKey
+          )
+          .map((r) => Number(r.value));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+
+    DATA.monthlyByCategory.push({
+      categoryKey: ASSURANCE_CATEGORY_KEY,
+      series: rollupSeries(ASSURANCE_CATEGORY_KEY, 501),
+    });
+  }
+
+  previewApplyDataMetaTitles();
+  previewStripRiskControlPrograms();
+  previewAddIncidentFirePropertyKpis();
+  previewCategoryDataBootstrap();
+
   /** Detail table rows per page (keep in sync with styles.css --detail-table-body-rows) */
   const PAGE_SIZE = 5;
   let tableState = {
@@ -327,15 +704,35 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
-  /** Category keys with full KPI drill-down: 1–3 core preview; 10 Location Vulnerability (comparison view). */
-  const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2, 3, 10]);
   const SPI_CATEGORY_KEY = 3;
   const HAZARD_CATEGORY_KEY = 2;
+  /**
+   * Consequence Management — stacked CMP accountability chart replaces the
+   * trend line when primary KPI is LTI vs CMP (24) or Total CMP action Taken (25).
+   */
+  const CONSEQUENCE_MANAGEMENT_CATEGORY_KEY = 4;
+  const CMP_ACCOUNTABILITY_CHART_PRIMARY_KPI_KEYS = new Set(["24", "25"]);
+  const TRAINING_CATEGORY_KEY = 6;
+  const SYSTEMS_ADOPTION_CATEGORY_KEY = 9;
+  const LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY = 8;
+  const CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS = new Set([
+    LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY,
+  ]);
+  /** Percent speedometer (Adani_Safety_MIS_Theme.json: bad → good / teal). */
+  const SPEEDOMETER_ARC_HEX = [
+    "#DC2626",
+    "#EA580C",
+    "#F59E0B",
+    "#00A3A3",
+    "#0D9488",
+  ];
+  /** Assurance — all three preview KPIs use the speedometer. */
+  const ASSURANCE_SPEEDOMETER_KPI_KEYS = new Set(["501", "502", "503"]);
+  const TRAINING_SAKSHAM_SPEEDOMETER_KPI_KEY = "49";
+  const SYSTEMS_SAFEX_SPEEDOMETER_KPI_KEY = "50";
   const LOCATION_VULN_CAT_KEY = 10;
   const LOCATION_VULN_SOURCE_CAT = 2;
-  const LOCATION_VULN_KPI_KEYS = new Set([
-    13, 38, 39, 40, 45, 46, 53, 21,
-  ]);
+  const LOCATION_VULN_KPI_KEYS = new Set([13, 38, 39, 40, 45, 46, 53]);
   const EVENT_LEVEL_LABELS = [
     "0 Near Miss",
     "1 Minor",
@@ -582,9 +979,42 @@
       .replace(/</g, "&lt;");
   }
 
+  const EXPORT_DL_ICON_SVG =
+    '<svg class="export-dl-svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>';
+
+  const EXPORT_TABLE_CSV_SVG =
+    '<svg class="export-dl-svg" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 3h18v18H3V3zm2 2v5h5V5H5zm7 0v5h5V5h-5zm7 0v5h5V5h-5zM5 12v5h5v-5H5zm7 0v5h5v-5h-5zm7 0v5h5v-5h-5z"/></svg>';
+
+  function chartDownloadButton(dataId, slug) {
+    return (
+      '<button type="button" class="chart-export-btn" data-chart-export="' +
+      escapeAttr(dataId) +
+      '" data-export-slug="' +
+      escapeAttr(slug) +
+      '" title="Download chart (JPEG)" aria-label="Download this chart as JPEG">' +
+      EXPORT_DL_ICON_SVG +
+      "</button>"
+    );
+  }
+
+  function chartBlockTitleHtml(innerSpansHtml, dataId, slug) {
+    return (
+      '<h3 class="chart-analytics-title chart-analytics-title--toolbar">' +
+      '<span class="chart-analytics-title__text">' +
+      innerSpansHtml +
+      "</span>" +
+      chartDownloadButton(dataId, slug) +
+      "</h3>"
+    );
+  }
+
   const LS_VARIABLE_FILTER = "mis-variable-checkpoints";
-  const LS_KPI_PREFIX = "preview-kpi-keys-";
-  const LS_CAT_MAIN_VIEW = "adani_cat_main_view";
+  const LS_KPI_PREFIX = insightShell
+    ? "insights-kpi-keys-"
+    : "preview-kpi-keys-";
+  const LS_CAT_MAIN_VIEW = insightShell
+    ? "insights_cat_main_view"
+    : "adani_cat_main_view";
 
   const TREND_LINE_COLORS = [
     "#006DB6",
@@ -677,7 +1107,7 @@
       '<details class="kpi-scope kpi-scope--toolbar">' +
       '<summary class="kpi-scope__summary" id="f-kpi-scope-label">' +
       '<span class="kpi-scope__summary-text">' +
-      '<span class="kpi-scope__title">KPIs</span>' +
+      '<span class="kpi-scope__title">KPI list</span>' +
       '<span class="kpi-scope__count" id="f-kpi-count"></span>' +
       "</span></summary>" +
       '<div class="kpi-panel" id="f-kpi-panel" role="group" aria-labelledby="f-kpi-scope-label">' +
@@ -701,6 +1131,20 @@
     const el = document.getElementById("f-kpi-count");
     if (el) el.textContent = n + "/" + total;
   }
+
+  /** Single KPI in toolbar + persist; refreshes charts/table (used by tiles & SPI trend chart). */
+  function applyToolbarSingleKpiSelection(catKey, kpiKey) {
+    const panel = document.getElementById("f-kpi-panel");
+    if (!panel || catKey == null || kpiKey == null) return;
+    panel.querySelectorAll('input[name="f-kpi-cb"]').forEach((cb) => {
+      cb.checked = String(cb.value) === String(kpiKey);
+    });
+    saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+    updateKpiScopeCount();
+    tableState.page = 0;
+    refreshCategoryView(catKey);
+  }
+
   const CHECKPOINT_LABELS = ["Field Force", "O and M", "Office", "Projects"];
 
   function getRowCheckpoint(r) {
@@ -729,15 +1173,15 @@
   function variableFilterFieldHtml() {
     return (
       '<div class="field field--variable field--var-inline">' +
-      '<span class="field-label" id="f-var-lbl">Verticals</span>' +
+      '<span class="field-label" id="f-var-lbl">Vertical</span>' +
       '<details class="var-scope var-scope--toolbar" id="f-var-details">' +
-      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl" title="Verticals (checkpoints)">' +
+      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl" title="Vertical (checkpoints)">' +
       '<span class="var-scope__summary-text">' +
-      '<span class="var-scope__hint" id="f-var-hint">All checkpoints</span>' +
+      '<span class="var-scope__hint" id="f-var-hint">All verticals</span>' +
       "</span>" +
       '<span class="var-scope__chev" aria-hidden="true"></span>' +
       "</summary>" +
-      '<div class="var-scope__panel" role="group" aria-label="Vertical options">' +
+      '<div class="var-scope__panel" role="group" aria-label="Vertical filter options">' +
       '<div class="var-scope__menu">' +
       '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
       '<input type="checkbox" id="f-var-all" checked />' +
@@ -771,12 +1215,12 @@
     const cbs = document.querySelectorAll("input.f-var-cb");
     if (!hint || !all) return;
     if (all.checked) {
-      hint.textContent = "All checkpoints";
+      hint.textContent = "All verticals";
       return;
     }
     const sel = [...cbs].filter((cb) => cb.checked).map((cb) => cb.value);
     if (sel.length === 0) {
-      hint.textContent = "All checkpoints";
+      hint.textContent = "All verticals";
       return;
     }
     hint.textContent = sel.length + " Selected";
@@ -876,6 +1320,66 @@
     updateVariableSummary();
   }
 
+  /**
+   * Filters share one horizontal scroll strip; <details> panels use fixed
+   * positioning while open so overflow-x on the strip does not clip them.
+   */
+  function wireToolbarScopeScrollPanels(host) {
+    const scope = host.querySelector(".cat-toolbar__filters-all-scroll");
+    if (!scope) return;
+    const pairs = [];
+    [
+      ["details.var-scope--toolbar", ".var-scope__panel"],
+      ["details.kpi-scope--toolbar", ".kpi-panel"],
+    ].forEach(([dSel, pSel]) => {
+      scope.querySelectorAll(dSel).forEach((det) => {
+        const panel = det.querySelector(pSel);
+        if (panel) pairs.push([det, panel]);
+      });
+    });
+    if (!pairs.length) return;
+
+    function placePair(det, panel) {
+      if (!det.open) {
+        panel.style.position = "";
+        panel.style.top = "";
+        panel.style.left = "";
+        panel.style.right = "";
+        panel.style.width = "";
+        panel.style.zIndex = "";
+        return;
+      }
+      const summary = det.querySelector("summary");
+      if (!summary) return;
+      const r = summary.getBoundingClientRect();
+      const estW = panel.offsetWidth || 280;
+      let left = r.left;
+      const maxL = window.innerWidth - estW - 8;
+      if (left > maxL) left = Math.max(8, maxL);
+      if (left < 8) left = 8;
+      panel.style.position = "fixed";
+      panel.style.left = left + "px";
+      panel.style.top = r.bottom + 6 + "px";
+      panel.style.right = "auto";
+      panel.style.zIndex = "200";
+    }
+
+    function syncAll() {
+      pairs.forEach(([d, p]) => placePair(d, p));
+    }
+
+    pairs.forEach(([det]) => {
+      det.addEventListener("toggle", () => {
+        requestAnimationFrame(() => {
+          requestAnimationFrame(syncAll);
+        });
+      });
+    });
+    scope.addEventListener("scroll", syncAll, { passive: true });
+    window.addEventListener("resize", syncAll);
+    window.addEventListener("scroll", syncAll, true);
+  }
+
   /** Decorative icons for category cards (list context; button has aria-label). */
   function categoryIconSvg(categoryKey) {
     const svg = (paths) =>
@@ -899,7 +1403,7 @@
         );
       case 5:
         return svg(
-          '<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'
+          '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
         );
       case 6:
         return svg(
@@ -910,19 +1414,15 @@
           '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/>'
         );
       case 8:
-        /* Leadership & Safety Governance — clear climb + leader w/ flag + follower + idea dots (matches other stroke icons) */
+        /* Leadership & Safety Governance — large front leader, two teammates, up-chevron (clear at 22px) */
         return svg(
-          '<path d="M1.5 22h8v-3.5h6.5v-4h7.5v-3.5"/>' +
-            '<path d="M8.5 15.5c2.8-2.2 5.8-4.2 9-5.8" opacity="0.45"/>' +
-            '<circle cx="6.2" cy="13" r="1.75"/>' +
-            '<path d="M3.2 20v-.5a2.6 2.6 0 012.6-2.3h.8a2.6 2.6 0 012.6 2.3v.5"/>' +
-            '<circle cx="17.6" cy="7.2" r="1.85"/>' +
-            '<path d="M14 13.2v-.5a3 3 0 013-2.6h.8a3 3 0 013 2.6v.5"/>' +
-            '<line x1="19.8" y1="8.8" x2="19.8" y2="2.2"/>' +
-            '<path d="M19.8 2.2l3.4 1.5v2.6l-3.4 1.5z"/>' +
-            '<circle cx="3.2" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
-            '<circle cx="5.4" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>' +
-            '<circle cx="7.6" cy="8.8" r="1.05" fill="currentColor" stroke="none"/>'
+          '<path d="M3.8 22V16.2Q6.5 13.8 9.2 16.2V22"/>' +
+            '<circle cx="6.5" cy="10.5" r="1.45"/>' +
+            '<path d="M14.8 22V16.2Q17.5 13.8 20.2 16.2V22"/>' +
+            '<circle cx="17.5" cy="10.5" r="1.45"/>' +
+            '<path d="M6.2 22V14.8Q12 11.2 17.8 14.8V22"/>' +
+            '<circle cx="12" cy="7.3" r="2.35"/>' +
+            '<path d="M8.5 3.4L12 1L15.5 3.4"/>'
         );
       case 9:
         return svg(
@@ -962,7 +1462,9 @@
 
   function getKpis(catKey) {
     const k = DATA.kpiDetailByCategory.find((x) => x.categoryKey === catKey);
-    return k ? k.kpis : [];
+    const list = k ? k.kpis.slice() : [];
+    if (catKey === SPI_CATEGORY_KEY) return list;
+    return list.filter((kpi) => !isTriKpiMeta(kpi));
   }
 
   /** Preferred default KPI in dropdown (TRI / TRIR); fallback: first KPI in display order. */
@@ -977,10 +1479,12 @@
       const sorted = sortKpisForDisplay(catKey, merged);
       return sorted.length ? String(sorted[0].kpiKey) : "38";
     }
-    const tri = merged.find((k) => isTriKpiMeta(k));
-    if (tri) return String(tri.kpiKey);
+    if (catKey === SPI_CATEGORY_KEY) {
+      const tri = merged.find((k) => isTriKpiMeta(k));
+      if (tri) return String(tri.kpiKey);
+    }
     const sorted = sortKpisForDisplay(catKey, merged);
-    return sorted.length ? String(sorted[0].kpiKey) : "21";
+    return sorted.length ? String(sorted[0].kpiKey) : "1";
   }
 
   function kpiDropdownLabel(k) {
@@ -998,20 +1502,19 @@
     );
   }
 
-  /** KPI dropdown / filter: always offer TRI when missing; TRI listed first. */
+  /** KPI dropdown: TRIR / TRI only under Safety Performance Indices (category 3). */
   function kpiListForFilterDropdown(catKey) {
-    const m = getKpis(catKey);
-    const hasTri = m.some(isTriKpiMeta);
-    const base = hasTri
-      ? m.slice()
-      : [
-          {
-            kpiKey: 21,
-            kpiName: "TRIR",
-            unitType: "PercentOrRate",
-            latestValue: null,
-          },
-        ].concat(m);
+    let base = getKpis(catKey);
+    if (catKey === SPI_CATEGORY_KEY && !base.some(isTriKpiMeta)) {
+      base = [
+        {
+          kpiKey: 21,
+          kpiName: "TRIR",
+          unitType: "PercentOrRate",
+          latestValue: null,
+        },
+      ].concat(base);
+    }
     return sortKpisForDisplay(catKey, base);
   }
 
@@ -1171,8 +1674,7 @@
       "chart-biz",
       "chart-spi-bubble",
       "chart-spi-insights",
-      "chart-loc-compare",
-      "chart-hazard-polar",
+      "chart-bu-compare",
     ].forEach((id) => {
       const el = document.getElementById(id);
       if (el && typeof Chart !== "undefined") {
@@ -1182,6 +1684,24 @@
     });
     destroySpiLeafletMap();
     destroyLocBuLeafletMap();
+    const spiHmHost = document.getElementById("spi-hazard-heatmap-host");
+    if (spiHmHost) spiHmHost.innerHTML = "";
+    try {
+      window.__adaniSpeedometerGaugeRedraw = null;
+    } catch {
+      /* ignore */
+    }
+    const lineGaugeEl = document.getElementById("chart-line");
+    if (
+      lineGaugeEl &&
+      lineGaugeEl.getAttribute("data-speedometer-gauge") === "1"
+    ) {
+      lineGaugeEl.removeAttribute("data-speedometer-gauge");
+      const gctx = lineGaugeEl.getContext("2d");
+      if (gctx) {
+        gctx.clearRect(0, 0, lineGaugeEl.width, lineGaugeEl.height);
+      }
+    }
   }
 
   function resizeSpiMapIfAny() {
@@ -1231,8 +1751,7 @@
       "chart-biz",
       "chart-spi-bubble",
       "chart-spi-insights",
-      "chart-loc-compare",
-      "chart-hazard-polar",
+      "chart-bu-compare",
     ].forEach((id) => {
       const el = document.getElementById(id);
       if (el && typeof Chart !== "undefined") {
@@ -1242,6 +1761,13 @@
     });
     resizeSpiMapIfAny();
     resizeLocBuMapIfAny();
+    if (typeof window.__adaniSpeedometerGaugeRedraw === "function") {
+      try {
+        window.__adaniSpeedometerGaugeRedraw();
+      } catch {
+        /* ignore */
+      }
+    }
   }
 
   const spiQuadrantZonePlugin = {
@@ -1561,7 +2087,7 @@
       return;
     }
 
-    const months = chartMonthKeys(f.refMonth, 12);
+    const months = calendarClippedMonthKeys(f, 12);
     const labels = months.map(spiChartMonthTick);
 
     host.innerHTML =
@@ -1705,6 +2231,154 @@
       const ch = Chart.getChart(canvas);
       if (ch) ch.resize();
     }, 80);
+  }
+
+  /**
+   * SPI: multi-KPI monthly line trend (same averaging as Property Damage / incident trend).
+   * Click a series or legend item to focus that KPI in the KPI list.
+   */
+  function renderSpiKpiTrendLineChart(poolAll, f) {
+    const elLine = document.getElementById("chart-line");
+    if (!elLine || typeof Chart === "undefined") return;
+
+    const catKey = SPI_CATEGORY_KEY;
+    const kpisMeta = sortKpisForDisplay(
+      catKey,
+      kpiListForFilterDropdown(catKey)
+    );
+    if (!kpisMeta.length) return;
+
+    const allKeys = new Set(kpisMeta.map((k) => String(k.kpiKey)));
+    const range = new Set(effectiveChartMonths(f));
+    const base = applyNonMonthFiltersAllKpis(poolAll, f);
+    const filtered = base.filter(
+      (r) =>
+        range.has(r.yearMonth) && allKeys.has(String(r.kpiKey))
+    );
+
+    const monthSet = new Set();
+    filtered.forEach((r) => monthSet.add(r.yearMonth));
+    const lineLabels = Array.from(monthSet).sort();
+    if (!lineLabels.length) return;
+
+    const utChart = kpiUnitTypeForFilter(catKey, f);
+    const primaryKpi = String(
+      f.kpiKeys && f.kpiKeys.length ? f.kpiKeys[0] : f.kpi
+    );
+
+    const datasets = kpisMeta.map((kMeta, idx) => {
+      const kk = String(kMeta.kpiKey);
+      const data = lineLabels.map((ym) => {
+        const slice = filtered.filter(
+          (r) => r.yearMonth === ym && String(r.kpiKey) === kk
+        );
+        if (!slice.length) return null;
+        return avg(slice.map((r) => Number(r.value)));
+      });
+      const color = TREND_LINE_COLORS[idx % TREND_LINE_COLORS.length];
+      const sel = kk === primaryKpi;
+      return {
+        label: kpiDropdownLabel(kMeta),
+        data: data,
+        unitType: kMeta.unitType,
+        kpiKey: kk,
+        borderColor: color,
+        backgroundColor: hexToRgba(color, sel ? 0.2 : 0.1),
+        fill: true,
+        tension: 0.2,
+        borderWidth: sel ? 2.75 : 1.35,
+        pointRadius: sel ? 3.5 : 2,
+        pointHoverRadius: 6,
+        order: sel ? 99 : idx,
+      };
+    });
+
+    elLine.setAttribute(
+      "aria-label",
+      "Line chart: monthly average for each Safety Performance Index KPI; click a series or legend entry to focus that KPI."
+    );
+
+    new Chart(elLine, {
+      type: "line",
+      data: {
+        labels: lineLabels,
+        datasets: datasets,
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: { top: 10, right: 14, bottom: 10, left: 18 },
+        },
+        interaction: { mode: "nearest", intersect: false, axis: "x" },
+        onHover(evt, els) {
+          const t = evt && evt.native && evt.native.target;
+          if (t && t.style) t.style.cursor = els.length ? "pointer" : "default";
+        },
+        onClick(evt, elements, chart) {
+          if (!elements.length) return;
+          const dsi = elements[0].datasetIndex;
+          const ds = chart.data.datasets[dsi];
+          if (ds && ds.kpiKey) {
+            applyToolbarSingleKpiSelection(catKey, ds.kpiKey);
+          }
+        },
+        plugins: {
+          legend: {
+            display: datasets.length > 1,
+            position: "bottom",
+            labels: {
+              boxWidth: 10,
+              padding: 6,
+              font: { size: 8, family: FONT_UI },
+            },
+            onClick(e, legendItem, legend) {
+              const i = legendItem.datasetIndex;
+              const ds = legend.chart.data.datasets[i];
+              if (ds && ds.kpiKey) {
+                if (e && typeof e.preventDefault === "function") {
+                  e.preventDefault();
+                }
+                applyToolbarSingleKpiSelection(catKey, ds.kpiKey);
+              }
+            },
+          },
+          tooltip: {
+            callbacks: {
+              label(ctx) {
+                const v =
+                  ctx.parsed && ctx.parsed.y != null
+                    ? ctx.parsed.y
+                    : Number(ctx.raw) || 0;
+                const ut = ctx.dataset.unitType || utChart;
+                return " " + formatValue(v, ut);
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            grace: "12%",
+            ticks: {
+              font: { size: 9 },
+              color: "#231F20",
+              padding: 4,
+            },
+            grid: { color: "rgba(109, 110, 113, 0.2)" },
+          },
+          x: {
+            ticks: {
+              font: { size: 9 },
+              maxRotation: 45,
+              color: "#231F20",
+              padding: 2,
+            },
+            grid: { color: "rgba(109, 110, 113, 0.15)" },
+          },
+        },
+      },
+    });
   }
 
   /**
@@ -1898,7 +2572,7 @@
     } catch {
       /* ignore */
     }
-    if (initial === "compare" && !hasCompare) initial = "charts";
+    if (initial === "compare" && !tabCompare) initial = "charts";
 
     apply(initial);
     tabCharts?.addEventListener("click", () => apply("charts"));
@@ -2162,30 +2836,116 @@
     return order.filter((id) => chosen.includes(id));
   }
 
+  /**
+   * Keys for multi-series trend/hazard charts: selected checkboxes, else primary `f.kpi`,
+   * else category default (matches applyChartFilter / applyNonMonthFilters fallback).
+   */
+  function effectiveKpiKeysForChartSeries(catKey, f) {
+    const raw =
+      f.kpiKeys && f.kpiKeys.length
+        ? f.kpiKeys.map(String)
+        : f.kpi != null && String(f.kpi) !== ""
+          ? [String(f.kpi)]
+          : [];
+    let ordered = orderKpiKeysForCharts(catKey, raw);
+    if (!ordered.length) {
+      const dk = defaultKpiKeyForCategory(
+        catKey,
+        kpiListForFilterDropdown(catKey)
+      );
+      if (dk) ordered = orderKpiKeysForCharts(catKey, [String(dk)]);
+    }
+    return ordered;
+  }
+
+  function shouldShowCmpAccountabilityChart(catKey, f) {
+    if (catKey !== CONSEQUENCE_MANAGEMENT_CATEGORY_KEY) return false;
+    const keys = effectiveKpiKeysForChartSeries(catKey, f);
+    return Boolean(
+      keys.length && CMP_ACCOUNTABILITY_CHART_PRIMARY_KPI_KEYS.has(keys[0])
+    );
+  }
+
+  function speedometerPrimaryKpiKey(catKey, f) {
+    const keys = effectiveKpiKeysForChartSeries(catKey, f);
+    if (!keys.length) return null;
+    const primary = keys[0];
+    if (
+      catKey === ASSURANCE_CATEGORY_KEY &&
+      ASSURANCE_SPEEDOMETER_KPI_KEYS.has(primary)
+    ) {
+      return primary;
+    }
+    if (
+      catKey === TRAINING_CATEGORY_KEY &&
+      primary === TRAINING_SAKSHAM_SPEEDOMETER_KPI_KEY
+    ) {
+      return primary;
+    }
+    if (
+      catKey === SYSTEMS_ADOPTION_CATEGORY_KEY &&
+      primary === SYSTEMS_SAFEX_SPEEDOMETER_KPI_KEY
+    ) {
+      return primary;
+    }
+    return null;
+  }
+
+  function shouldShowPercentSpeedometerChart(catKey, f) {
+    return speedometerPrimaryKpiKey(catKey, f) != null;
+  }
+
+  function speedometerPercentFromSnapRows(catKey, snapRows, f) {
+    const pk = speedometerPrimaryKpiKey(catKey, f);
+    if (!pk) return 0;
+    const rows = snapRows.filter((r) => String(r.kpiKey) === pk);
+    const nums = rows.map((r) => Number(r.value)).filter(Number.isFinite);
+    if (!nums.length) return 0;
+    return avg(nums);
+  }
+
   function readFilters(catKey) {
     const elVs = document.getElementById("f-vs");
     const elSt = document.getElementById("f-state");
-    if (!elSt) return null;
     const elBiz = document.getElementById("f-biz");
+    const elSite = document.getElementById("f-site");
+    const elPersonal = document.getElementById("f-personal");
+    const elFrom = document.getElementById("f-dt-from");
+    const elTo = document.getElementById("f-dt-to");
     const kpisMeta = kpiListForFilterDropdown(catKey);
-    const rawKeys = readSelectedKpiKeysFromDom();
+    const rawKeys = document.getElementById("f-kpi-panel")
+      ? readSelectedKpiKeysFromDom()
+      : [];
     let kpiKeys = orderKpiKeysForCharts(catKey, rawKeys);
     const dk = defaultKpiKeyForCategory(catKey, kpisMeta);
     const kpi = kpiKeys.length ? kpiKeys[0] : dk;
+    const mb = dataMonthBounds();
+    const monthTo =
+      elTo && elTo.value && elTo.value.length >= 7
+        ? elTo.value.slice(0, 7)
+        : mb.max;
+    const monthFrom =
+      elFrom && elFrom.value && elFrom.value.length >= 7
+        ? elFrom.value.slice(0, 7)
+        : null;
     return {
       catKey,
       kpi: kpi,
       kpiKeys: kpiKeys,
       vsMode: elVs ? elVs.value : DEFAULT_VS_MODE,
-      refMonth: getRefMonth(),
-      state: elSt.value,
+      refMonth: monthTo,
+      monthFrom: monthFrom,
+      monthTo: monthTo,
+      state: elSt ? elSt.value : "all",
       business: elBiz ? elBiz.value : "all",
+      site: elSite ? elSite.value : "all",
+      personalType: elPersonal ? elPersonal.value : "all",
       unitType: "all",
       variable: readVariableSelectionFromDom(),
     };
   }
 
-  /** Table / KPI tiles: current reference month only (plus non-month filters). */
+  /** Table / KPI tiles: calendar end month (or full from–to when both set). */
   function applyRowFilter(rows, f) {
     const keys =
       f.kpiKeys && f.kpiKeys.length
@@ -2193,11 +2953,15 @@
         : [String(f.kpi)];
     return rows.filter((r) => {
       if (!keys.includes(String(r.kpiKey))) return false;
-      if (r.yearMonth !== f.refMonth) return false;
+      if (f.monthFrom && f.monthTo) {
+        if (r.yearMonth < f.monthFrom || r.yearMonth > f.monthTo) return false;
+      } else if (r.yearMonth !== f.refMonth) return false;
       if (f.state !== "all" && r.state !== f.state) return false;
       if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
+      if (!rowMatchesSiteFilter(r, f)) return false;
+      if (!rowMatchesPersonalTypeFilter(r, f)) return false;
       return true;
     });
   }
@@ -2213,15 +2977,90 @@
     return keys.reverse();
   }
 
+  function dataMonthBounds() {
+    const list = (DATA.months || [])
+      .map((x) => x.yearMonth)
+      .filter(Boolean)
+      .sort();
+    if (list.length) return { min: list[0], max: list[list.length - 1] };
+    const m = meta.lastDataMonth || "2024-01";
+    return { min: m, max: m };
+  }
+
+  function lastDayOfMonthYm(ym) {
+    const p = String(ym || "").split("-");
+    if (p.length < 2) return ym + "-28";
+    const y = Number(p[0]);
+    const mo = Number(p[1]);
+    if (!y || !mo) return ym + "-28";
+    const d = new Date(y, mo, 0).getDate();
+    return ym + "-" + String(d).padStart(2, "0");
+  }
+
+  /** Vs window months, clipped to Calendar from–to when set (Power BI–style slicer). */
+  function effectiveChartMonths(f) {
+    const ref = (f && (f.monthTo || f.refMonth)) || getRefMonth();
+    const base = chartMonthsForVsMode(f.vsMode || DEFAULT_VS_MODE, ref);
+    const from = f && f.monthFrom;
+    const to = (f && f.monthTo) || ref;
+    if (!from) return base;
+    return base.filter((ym) => ym >= from && ym <= to);
+  }
+
+  /** Fixed-length month keys ending at calendar “to”, clipped to from–to range. */
+  function calendarClippedMonthKeys(f, count) {
+    const end = (f && (f.monthTo || f.refMonth)) || getRefMonth();
+    const months = chartMonthKeys(end, count);
+    const from = f && f.monthFrom;
+    const to = (f && f.monthTo) || end;
+    if (!from) return months;
+    return months.filter((ym) => ym >= from && ym <= to);
+  }
+
+  function rowDummySite(r) {
+    const h = Math.abs(
+      hash32(
+        String(r.businessKey || "") +
+          "|" +
+          String(r.kpiKey || "") +
+          "|" +
+          String(r.yearMonth || "")
+      )
+    );
+    return "Site" + ((h % 7) + 1);
+  }
+
+  function rowDummyPersonalType(r) {
+    const h = Math.abs(
+      hash32(
+        "pt|" +
+          String(r.businessKey || "") +
+          "|" +
+          String(r.kpiKey || "") +
+          "|" +
+          String(r.yearMonth || "")
+      )
+    );
+    return h % 3 === 1 ? "Contractor" : "Employee";
+  }
+
+  function rowMatchesSiteFilter(r, f) {
+    if (!f || !f.site || f.site === "all") return true;
+    return rowDummySite(r) === f.site;
+  }
+
+  function rowMatchesPersonalTypeFilter(r, f) {
+    if (!f || !f.personalType || f.personalType === "all") return true;
+    return rowDummyPersonalType(r) === f.personalType;
+  }
+
   function applyChartFilter(rows, f) {
     const keys =
       f.kpiKeys && f.kpiKeys.length
         ? f.kpiKeys.map(String)
         : [String(f.kpi)];
     if (!keys.length) return [];
-    const range = new Set(
-      chartMonthsForVsMode(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
-    );
+    const range = new Set(effectiveChartMonths(f));
     return rows.filter((r) => {
       if (!keys.includes(String(r.kpiKey))) return false;
       if (!range.has(r.yearMonth)) return false;
@@ -2229,6 +3068,8 @@
       if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
+      if (!rowMatchesSiteFilter(r, f)) return false;
+      if (!rowMatchesPersonalTypeFilter(r, f)) return false;
       return true;
     });
   }
@@ -2256,10 +3097,10 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
-  function getFilterConfig(_catKey) {
+  function getFilterConfig(catKey) {
     return {
-      showKpi: true,
-      showState: true,
+      showKpi: catKey !== LOCATION_VULN_CAT_KEY,
+      showState: catKey === LOCATION_VULN_CAT_KEY,
       showBusiness: true,
     };
   }
@@ -2271,10 +3112,31 @@
 
   /** Incident Management: TRI first, then wireframe order (ΔRepeat, ΔFatal, Man-days, Vehicle). */
   const INCIDENT_KPI_ORDER = [
-    21, 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
+    21,
+    1,
+    2,
+    3,
+    4,
+    5,
+    7,
+    8,
+    INCIDENT_FIRE_KPI_KEY,
+    INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
+    9,
+    10,
+    11,
+    12,
+    14,
+    15,
+    19,
+    22,
+    28,
+    44,
   ];
-  /** Hazard & Observation (leading): activity first; TRIR last for context only. */
-  const HAZARD_KPI_ORDER = [38, 13, 6, 39, 40, 45, 46, 53, 21];
+  /** Hazard & Observation (leading): activity first + S-4/S-5 SRFA (from former Risk Control). */
+  const HAZARD_KPI_ORDER = [38, 13, 6, 39, 40, 41, 42, 45, 46, 53, 21];
+  /** Consequence Management + compliance KPIs moved from Risk Control. */
+  const CONSEQUENCE_KPI_ORDER = [23, 24, 25, 26, 27, 51, 52, 54];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
     const list = kpisMeta.slice();
@@ -2292,6 +3154,19 @@
       );
       return ordered.concat(rest);
     }
+    if (catKey === ASSURANCE_CATEGORY_KEY) {
+      const order = [501, 502, 503];
+      const map = new Map(list.map((k) => [k.kpiKey, k]));
+      return order.map((id) => map.get(id)).filter(Boolean);
+    }
+    if (catKey === CONSEQUENCE_MANAGEMENT_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [k.kpiKey, k]));
+      return CONSEQUENCE_KPI_ORDER.map((id) => map.get(id))
+        .filter(Boolean)
+        .concat(
+          list.filter((k) => !CONSEQUENCE_KPI_ORDER.includes(Number(k.kpiKey)))
+        );
+    }
     if (catKey === SPI_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [k.kpiKey, k]));
       const ordered = SPI_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
@@ -2301,7 +3176,7 @@
       return ordered.concat(rest);
     }
     if (catKey === LOCATION_VULN_CAT_KEY) {
-      const order = [21, 13, 38, 39, 40, 45, 46, 53];
+      const order = [13, 38, 39, 40, 45, 46, 53];
       const map = new Map(list.map((k) => [k.kpiKey, k]));
       return order.map((id) => map.get(id)).filter(Boolean);
     }
@@ -2498,6 +3373,8 @@
       if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
+      if (!rowMatchesSiteFilter(r, f)) return false;
+      if (!rowMatchesPersonalTypeFilter(r, f)) return false;
       return true;
     });
   }
@@ -2509,6 +3386,8 @@
       if (!rowMatchesBusinessFilter(r, f)) return false;
       if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
       if (!rowMatchesVariable(r, f.variable)) return false;
+      if (!rowMatchesSiteFilter(r, f)) return false;
+      if (!rowMatchesPersonalTypeFilter(r, f)) return false;
       return true;
     });
   }
@@ -2903,16 +3782,16 @@
     vsMode,
     tileClass,
     selectedKpiKeys,
-    presentationSeed
+    presentationSeed,
+    catKey
   ) {
     void refMonth;
     void presentationSeed;
+    void selectedKpiKeys;
     const tile = document.createElement("div");
-    tile.className = tileClass || "multi-kpi-tile";
-    const sel = new Set((selectedKpiKeys || []).map(String));
-    if (sel.has(String(item.kpiKey))) {
-      tile.classList.add("multi-kpi-tile--selected");
-    }
+    tile.className = (tileClass || "multi-kpi-tile") + " multi-kpi-tile--action";
+    tile.setAttribute("role", "button");
+    tile.setAttribute("tabindex", "0");
     const vsShort = vsTagShort(vsMode || DEFAULT_VS_MODE);
     const pres = tileVsDisplay(item);
     const vDir = pres.dir;
@@ -2962,6 +3841,21 @@
         e.stopPropagation();
       });
     }
+    function openCompareForKpi() {
+      applyToolbarSingleKpiSelection(catKey, item.kpiKey);
+      const tabc = document.getElementById("view-tab-compare");
+      if (tabc) tabc.click();
+    }
+    tile.addEventListener("click", function (e) {
+      if (e.target.closest(".multi-kpi-tile__info")) return;
+      openCompareForKpi();
+    });
+    tile.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openCompareForKpi();
+      }
+    });
     grid.appendChild(tile);
   }
 
@@ -2971,7 +3865,8 @@
     refMonth,
     vsMode,
     selectedKpiKeys,
-    presentationSeed
+    presentationSeed,
+    catKey
   ) {
     container.innerHTML = "";
     const sorted = aggregatesList.slice();
@@ -3002,7 +3897,8 @@
           vsMode,
           "multi-kpi-tile",
           selectedKpiKeys,
-          presentationSeed
+          presentationSeed,
+          catKey
         );
       });
       while (grid.children.length < 4) {
@@ -3034,10 +3930,9 @@
     container.appendChild(rowMain);
   }
 
-  /** Location Vulnerability: grouped bars — comparison (base) vs current KPI value per BU (24). */
-  function buildLocationComparisonChart(catKey, f) {
-    if (catKey !== LOCATION_VULN_CAT_KEY) return;
-    const el = document.getElementById("chart-loc-compare");
+  /** Grouped bars — comparison (base) vs current KPI value per BU (all categories). */
+  function buildBuComparisonChart(catKey, f) {
+    const el = document.getElementById("chart-bu-compare");
     if (!el || typeof Chart === "undefined") return;
     const prev = Chart.getChart(el);
     if (prev) prev.destroy();
@@ -3142,8 +4037,12 @@
         },
       },
     });
-    const hint = document.getElementById("chart-loc-compare-hint");
+    const hint = document.getElementById("chart-bu-compare-hint");
     if (hint) hint.textContent = "(" + vsShort + " · 2 bars per BU)";
+    const titleEl = document.getElementById("chart-bu-compare-title");
+    if (titleEl)
+      titleEl.textContent =
+        shortKpiHeaderLabel(kMeta.kpiName) + " — comparison by business";
   }
 
   const HAZARD_CHART_FILL = [
@@ -3165,13 +4064,9 @@
     return out;
   }
 
-  function hazardPolarFills(n) {
-    return hazardChartColors(n).map((c) => c.replace(/0\.\d+\)/, "0.48)"));
-  }
-
   /** One dataset per selected KPI; `kind` is "line" or "bar" (hazard trend). */
   function trendDatasetsForPreview(catKey, f, filteredTrend, lineLabels, kind) {
-    const keys = orderKpiKeysForCharts(catKey, f.kpiKeys);
+    const keys = effectiveKpiKeysForChartSeries(catKey, f);
     const kpisLine = getKpis(catKey);
     return keys.map((kk, idx) => {
       const kMeta = kpisLine.find((x) => String(x.kpiKey) === kk);
@@ -3210,8 +4105,143 @@
     });
   }
 
+  /** SPI first panel: hazard spotting & closure heatmap (week or month columns). */
+  function renderSpiHazardHeatmap(f) {
+    const host = document.getElementById("spi-hazard-heatmap-host");
+    const foot = document.getElementById("spi-hazard-heatmap-foot");
+    if (!host) return;
+    const modeBtn = document.querySelector(
+      ".spi-hm-period-btn.spi-hm-period-btn--active"
+    );
+    const mode =
+      modeBtn && modeBtn.getAttribute("data-spi-hm-period") === "month"
+        ? "month"
+        : "week";
+    const ref = (f.monthTo || f.refMonth) || getRefMonth();
+    const bizTag = f.business === "all" ? "All" : String(f.business || "All");
+    const monthShort = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    let colLabels;
+    if (mode === "week") {
+      colLabels = ["Week 1", "Week 2", "Week 3", "Week 4"];
+    } else {
+      colLabels = [];
+      for (let i = -5; i <= 0; i++) {
+        const ym = monthAdd(ref, i);
+        if (!ym) continue;
+        const p = ym.split("-");
+        colLabels.push(
+          (monthShort[Number(p[1]) - 1] || p[1]) + " " + String(p[0]).slice(2)
+        );
+      }
+    }
+    const colCount = colLabels.length;
+    const rowTitles = ["Hazard spotting", "Hazard closure"];
+    const matrix = [];
+    for (let ri = 0; ri < rowTitles.length; ri++) {
+      const row = [];
+      for (let ci = 0; ci < colCount; ci++) {
+        const seed = ref + "|" + bizTag + "|" + mode + "|" + ri + "|" + ci;
+        const raw = -5 + (hash32(seed + "|v") % 200) / 10;
+        let display;
+        if (ci === colCount - 1) {
+          const p = -15 + (hash32(seed + "|p") % 31);
+          display = (p >= 0 ? "+ " : "− ") + Math.abs(p) + "%";
+        } else {
+          display =
+            Math.abs(raw) < 1 ? String(raw.toFixed(4)) : String(raw.toFixed(2));
+        }
+        row.push({ display: display, raw: raw });
+      }
+      matrix.push(row);
+    }
+
+    function normForRow(ri, invert) {
+      const row = matrix[ri];
+      const end = row.length - 1;
+      const vals = [];
+      for (let i = 0; i < end; i++) vals.push(row[i].raw);
+      const mn = Math.min.apply(null, vals);
+      const mx = Math.max.apply(null, vals);
+      return function (raw) {
+        if (mx <= mn) return 0.5;
+        let t = (raw - mn) / (mx - mn);
+        if (invert) t = 1 - t;
+        return t;
+      };
+    }
+    const normSpot = normForRow(0, false);
+    const normClose = normForRow(1, true);
+
+    function classForCell(ri, ci, raw) {
+      if (ci === colCount - 1) return "spi-hm-cell spi-hm-cell--pct";
+      const t = ri === 0 ? normSpot(raw) : normClose(raw);
+      if (ri === 0) {
+        if (t < 0.34) return "spi-hm-cell spi-hm--spot-1";
+        if (t < 0.67) return "spi-hm-cell spi-hm--spot-2";
+        return "spi-hm-cell spi-hm--spot-3";
+      }
+      if (t < 0.34) return "spi-hm-cell spi-hm--cls-1";
+      if (t < 0.67) return "spi-hm-cell spi-hm--cls-2";
+      return "spi-hm-cell spi-hm--cls-3";
+    }
+
+    let html =
+      '<table class="spi-hazard-heatmap-table" role="grid"><thead><tr><th class="spi-hm-corner" scope="col"></th>';
+    for (let c = 0; c < colCount; c++) {
+      html +=
+        '<th scope="col" class="spi-hm-colhead">' +
+        escapeHtml(colLabels[c]) +
+        "</th>";
+    }
+    html += "</tr></thead><tbody>";
+    for (let r = 0; r < rowTitles.length; r++) {
+      html +=
+        '<tr><th scope="row" class="spi-hm-rowhead">' +
+        escapeHtml(rowTitles[r]) +
+        "</th>";
+      for (let c = 0; c < colCount; c++) {
+        const cell = matrix[r][c];
+        html +=
+          '<td class="' +
+          classForCell(r, c, cell.raw) +
+          '">' +
+          escapeHtml(cell.display) +
+          "</td>";
+      }
+      html += "</tr>";
+    }
+    html += "</tbody></table>";
+    host.innerHTML = html;
+
+    if (foot) {
+      const n = 8 + (hash32(ref + bizTag + "|spiHmFoot") % 15);
+      const mom = -5 + (hash32(ref + bizTag + "|spiHmMom") % 21);
+      const momStr =
+        (mom >= 0 ? "▲" : "▼") + Math.abs(mom) + "% MoM";
+      foot.innerHTML =
+        "Total hazard-linked observations reached <strong>" +
+        n +
+        "</strong> (" +
+        momStr +
+        ") · <strong>Hazard closure</strong> indicators for the selected filters (preview sample).";
+    }
+  }
+
   /**
-   * Hazard & Observation (leading): bar trend, horizontal BU bars, vertical doughnut, polar KPI snapshot.
+   * Hazard & Observation (leading): bar trend, horizontal BU bars, vertical doughnut (same 3-chart layout as other domains).
    */
   function buildHazardObservationCharts(
     f,
@@ -3228,67 +4258,9 @@
     const lineSeriesName = kMetaPrimary
       ? kpiDropdownLabel(kMetaPrimary)
       : "Value";
-    const monthSet = new Set();
-    filteredTrend.forEach((r) => monthSet.add(r.yearMonth));
-    const lineLabels = Array.from(monthSet).sort();
-    const barSets = trendDatasetsForPreview(
-      catKey,
-      f,
-      filteredTrend,
-      lineLabels,
-      "bar"
-    );
-    const elLine = document.getElementById("chart-line");
-    if (elLine && lineLabels.length && typeof Chart !== "undefined") {
-      new Chart(elLine, {
-        type: "bar",
-        data: {
-          labels: lineLabels,
-          datasets: barSets,
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: { padding: { top: 10, right: 12, bottom: 12, left: 18 } },
-          plugins: {
-            legend: {
-              display: barSets.length > 1,
-              position: "bottom",
-              labels: {
-                boxWidth: 10,
-                padding: 5,
-                font: { size: 8, family: FONT_UI },
-              },
-            },
-            tooltip: {
-              callbacks: {
-                label(ctx) {
-                  const v = Number(ctx.raw) || 0;
-                  const ut = ctx.dataset.unitType || utChart;
-                  return " " + formatValue(v, ut);
-                },
-              },
-            },
-          },
-          scales: {
-            y: {
-              beginAtZero: false,
-              grace: "10%",
-              ticks: { font: { size: 10, family: FONT_UI }, color: "#231F20" },
-              grid: { color: "rgba(109, 110, 113, 0.2)" },
-            },
-            x: {
-              ticks: {
-                font: { size: 9, family: FONT_UI },
-                maxRotation: 45,
-                color: "#231F20",
-              },
-              grid: { display: false },
-            },
-          },
-        },
-      });
-    }
+
+    /** Primary panel: same week/month heatmap as Safety Performance Indices (Hazard category). */
+    renderSpiHazardHeatmap(f);
 
     const byBizVals = {};
     snapRows.forEach((r) => {
@@ -3447,90 +4419,236 @@
         },
       });
     }
+  }
 
-    const hazWin = applyNonMonthFiltersAllKpis(poolAll, f).filter((r) =>
-      winMonths.has(r.yearMonth)
-    );
-    const kMetaPolar = sortKpisForDisplay(
-      HAZARD_CATEGORY_KEY,
-      getKpis(HAZARD_CATEGORY_KEY)
-    ).filter((k) => Number(k.kpiKey) !== 21);
-    const sliceK = kMetaPolar.slice(0, 8);
-    const polLabels = sliceK.map((k) => shortKpiHeaderLabel(k.kpiName));
-    const polValues = sliceK.map((k) => {
-      const sub = hazWin.filter(
-        (r) => String(r.kpiKey) === String(k.kpiKey)
-      );
-      if (!sub.length) return 0;
-      const nums = sub.map((x) => Number(x.value)).filter(Number.isFinite);
-      if (!nums.length) return 0;
-      if (isAdditiveUnit(k.unitType)) {
-        return nums.reduce((a, b) => a + b, 0);
+  /**
+   * Semi-circular % speedometer (theme-aligned arc: Adani_Safety_MIS_Theme.json).
+   */
+  function drawPercentSpeedometerCanvas(canvasEl, percentRaw) {
+    const p = Math.max(0, Math.min(100, Number(percentRaw) || 0));
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvasEl.getBoundingClientRect();
+    let cssW = rect.width;
+    let cssH = rect.height;
+    if (cssW < 2 || cssH < 2) {
+      const wrap = canvasEl.parentElement;
+      if (wrap) {
+        cssW = wrap.clientWidth || 280;
+        cssH = wrap.clientHeight || 200;
+      } else {
+        cssW = 280;
+        cssH = 200;
       }
-      return avg(nums);
-    });
-    let polMax = 0;
-    for (let pi = 0; pi < polValues.length; pi++) {
-      const ax = Math.abs(Number(polValues[pi]) || 0);
-      if (ax > polMax) polMax = ax;
     }
-    if (polMax < 1e-9) polMax = 1;
-    const polNorm = polValues.map((v) => {
-      const x = Number(v) || 0;
-      return x < 0 ? 0 : (x / polMax) * 100;
-    });
-    const elPol = document.getElementById("chart-hazard-polar");
-    if (elPol && polLabels.length && typeof Chart !== "undefined") {
-      new Chart(elPol, {
-        type: "polarArea",
-        data: {
-          labels: polLabels,
-          datasets: [
-            {
-              data: polNorm,
-              backgroundColor: hazardPolarFills(polLabels.length),
-            },
-          ],
+    canvasEl.width = Math.max(1, Math.round(cssW * dpr));
+    canvasEl.height = Math.max(1, Math.round(cssH * dpr));
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const padX = Math.max(10, cssW * 0.06);
+    const padB = Math.max(14, cssH * 0.12);
+    const cx = cssW / 2;
+    const cy = cssH - padB;
+    const R = Math.min(cssW - 2 * padX, (cssH - padB) * 1.05) * 0.48;
+    const rFill = R * 0.88;
+    const rTrack = R * 0.97;
+
+    function pToTheta(pct) {
+      return Math.PI + (Math.PI * pct) / 100;
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, rFill, Math.PI, 2 * Math.PI, false);
+    ctx.closePath();
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy - R * 0.35, rFill);
+    grad.addColorStop(0, "rgba(13, 148, 136, 0.22)");
+    grad.addColorStop(0.5, "rgba(0, 163, 163, 0.14)");
+    grad.addColorStop(1, "rgba(248, 250, 252, 0.92)");
+    ctx.fillStyle = grad;
+    ctx.fill();
+    ctx.restore();
+
+    const segColors = SPEEDOMETER_ARC_HEX;
+    const gap = 0.04;
+    for (let i = 0; i < 5; i++) {
+      const p0 = i * 20 + gap * 10;
+      const p1 = (i + 1) * 20 - gap * 10;
+      const a0 = pToTheta(p0);
+      const a1 = pToTheta(p1);
+      ctx.beginPath();
+      ctx.arc(cx, cy, rTrack, a0, a1, false);
+      ctx.strokeStyle = segColors[i];
+      ctx.lineWidth = Math.max(7, R * 0.09);
+      ctx.lineCap = "round";
+      ctx.stroke();
+    }
+
+    const theta = pToTheta(p);
+    const needleLen = R * 0.78;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(
+      cx + needleLen * Math.cos(theta),
+      cy + needleLen * Math.sin(theta)
+    );
+    ctx.strokeStyle = "#1F2937";
+    ctx.lineWidth = Math.max(2, R * 0.028);
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(5, R * 0.065), 0, 2 * Math.PI);
+    ctx.fillStyle = "#374151";
+    ctx.fill();
+
+    const labelR = needleLen + Math.max(12, R * 0.14);
+    const tx = cx + labelR * Math.cos(theta);
+    const ty = cy + labelR * Math.sin(theta);
+    ctx.font = "600 " + Math.max(13, Math.round(R * 0.2)) + "px " + FONT_UI;
+    ctx.fillStyle = "#111827";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(Math.round(p) + "%", tx, ty);
+  }
+
+  function renderPercentSpeedometerChart(canvasEl, percent) {
+    canvasEl.setAttribute("data-speedometer-gauge", "1");
+    canvasEl.setAttribute(
+      "aria-label",
+      "Speedometer: selected KPI rate for the current Vs window"
+    );
+    let lastPct = Number(percent) || 0;
+    function redraw() {
+      drawPercentSpeedometerCanvas(canvasEl, lastPct);
+    }
+    redraw();
+    window.__adaniSpeedometerGaugeRedraw = redraw;
+  }
+
+  /**
+   * Consequence Management / KPIs 24–25: CMP accountability — three 100% stacked
+   * bars (preview proportions; match design reference).
+   */
+  function renderCmpAccountabilityBreakdownChart(canvasEl) {
+    canvasEl.setAttribute(
+      "aria-label",
+      "CMP accountability breakdown: three stacked percentage bars"
+    );
+    function seg(label, color, triple) {
+      return {
+        label: label,
+        data: triple,
+        backgroundColor: color,
+        borderWidth: 0,
+        stack: "cmp",
+      };
+    }
+    new Chart(canvasEl, {
+      type: "bar",
+      data: {
+        labels: ["", "Action Category", "Job Band"],
+        datasets: [
+          seg("CMP Done", "#36D391", [72, null, null]),
+          seg("Training", "#5DA5F9", [null, 32, null]),
+          seg("PPE", "#A78BFA", [null, 22, null]),
+          seg("Procedure", "#22D3EE", [null, 18, null]),
+          seg("L1-L3", "#FBBF24", [null, null, 25]),
+          seg("L4-L6", "#FB923C", [null, null, 30]),
+          seg("L7+", "#FDE047", [null, null, 17]),
+          {
+            label: "Not Done",
+            data: [28, 28, 28],
+            backgroundColor: "#F87171",
+            borderWidth: 0,
+            stack: "cmp",
+            borderRadius: { topLeft: 4, topRight: 4 },
+            borderSkipped: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: { padding: { top: 8, right: 14, bottom: 2, left: 8 } },
+        datasets: {
+          bar: {
+            barPercentage: 0.52,
+            categoryPercentage: 0.72,
+          },
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: { padding: { top: 6, right: 10, bottom: 6, left: 10 } },
-          plugins: {
-            legend: {
+        plugins: {
+          legend: {
+            display: true,
+            position: "bottom",
+            labels: {
+              usePointStyle: true,
+              pointStyle: "circle",
+              boxWidth: 7,
+              padding: 10,
+              font: { size: 8.5, family: FONT_UI },
+            },
+          },
+          tooltip: {
+            filter: function (item) {
+              const v = item.raw;
+              return v != null && !Number.isNaN(Number(v));
+            },
+            callbacks: {
+              label: function (ctx) {
+                const v = ctx.parsed.y;
+                if (v == null || Number.isNaN(v)) return "";
+                return " " + ctx.dataset.label + ": " + v + "%";
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: true,
+            ticks: {
+              font: { size: 9, family: FONT_UI },
+              color: "#231F20",
+              maxRotation: 0,
+            },
+            grid: { display: false },
+            border: {
               display: true,
-              position: "bottom",
-              labels: {
-                boxWidth: 10,
-                padding: 5,
-                font: { size: 8, family: FONT_UI },
-              },
-            },
-            tooltip: {
-              callbacks: {
-                label(ctx) {
-                  const i = ctx.dataIndex;
-                  const raw = polValues[i];
-                  const ut = sliceK[i] ? sliceK[i].unitType : "";
-                  return " " + formatValue(raw, ut);
-                },
-              },
+              color: "rgba(109, 110, 113, 0.45)",
             },
           },
-          scales: {
-            r: {
-              suggestedMin: 0,
-              suggestedMax: 100,
-              ticks: {
-                display: false,
-                backdropColor: "transparent",
-              },
-              grid: { color: "rgba(109, 110, 113, 0.2)" },
+          y: {
+            stacked: true,
+            min: 0,
+            max: 100,
+            ticks: {
+              stepSize: 25,
+              font: { size: 10, family: FONT_UI },
+              color: "#231F20",
+              padding: 6,
+            },
+            border: {
+              display: true,
+              color: "rgba(109, 110, 113, 0.45)",
+            },
+            grid: {
+              color: "rgba(109, 110, 113, 0.35)",
+              borderDash: [2, 4],
+            },
+            title: {
+              display: true,
+              text: "% of Total Incidents",
+              font: { size: 10, family: FONT_UI },
+              color: "#6D6E71",
+              padding: { top: 0, bottom: 6, left: 0, right: 0 },
             },
           },
         },
-      });
-    }
+      },
+    });
   }
 
   /**
@@ -3573,6 +4691,16 @@
       return;
     }
 
+    if (catKey === SPI_CATEGORY_KEY) {
+      renderSpiHazardHeatmap(f);
+      const spiPoolAllKpis = applyNonMonthFiltersAllKpis(poolAll, f);
+      renderSpiRiskQuadrantChart(spiPoolAllKpis, f);
+      renderSpiInsightsChart(spiPoolAllKpis, f);
+      renderSpiKpiTrendLineChart(poolAll, f);
+      updateChartHints(f);
+      return;
+    }
+
     const lineSets = trendDatasetsForPreview(
       catKey,
       f,
@@ -3581,7 +4709,39 @@
       "line"
     );
     const elLine = document.getElementById("chart-line");
-    if (elLine && lineLabels.length && lineSets.length) {
+    const lineChartHost = elLine ? elLine.closest(".chart-box") : null;
+    if (lineChartHost) {
+      lineChartHost.classList.remove("chart-box--cmp-breakdown");
+      lineChartHost.classList.remove("chart-box--speedometer-gauge");
+      lineChartHost.classList.remove("chart-box--assurance-gauge");
+    }
+
+    const showCmpAccountability = shouldShowCmpAccountabilityChart(catKey, f);
+    const showSpeedometerGauge = shouldShowPercentSpeedometerChart(catKey, f);
+    const speedometerPct = showSpeedometerGauge
+      ? Math.max(
+          0,
+          Math.min(100, speedometerPercentFromSnapRows(catKey, snapRows, f))
+        )
+      : null;
+
+    if (
+      showCmpAccountability &&
+      elLine &&
+      typeof Chart !== "undefined"
+    ) {
+      if (lineChartHost) lineChartHost.classList.add("chart-box--cmp-breakdown");
+      renderCmpAccountabilityBreakdownChart(elLine);
+    } else if (showSpeedometerGauge && elLine) {
+      if (lineChartHost) {
+        lineChartHost.classList.add("chart-box--speedometer-gauge");
+      }
+      renderPercentSpeedometerChart(elLine, speedometerPct);
+    } else if (elLine && lineLabels.length && lineSets.length) {
+      elLine.setAttribute(
+        "aria-label",
+        "Line chart: monthly average for the selected KPI in the trend window"
+      );
       new Chart(elLine, {
         type: "line",
         data: {
@@ -3640,14 +4800,6 @@
           },
         },
       });
-    }
-
-    if (catKey === SPI_CATEGORY_KEY) {
-      const spiPoolAllKpis = applyNonMonthFiltersAllKpis(poolAll, f);
-      renderSpiRiskQuadrantChart(spiPoolAllKpis, f);
-      renderSpiInsightsChart(spiPoolAllKpis, f);
-      updateChartHints(f);
-      return;
     }
 
     if (catKey === LOCATION_VULN_CAT_KEY) {
@@ -3785,34 +4937,74 @@
     const bizEl = document.getElementById("chart-biz-hint");
     const vertEl = document.getElementById("chart-vertical-hint");
     const n = chartMonthsForVsMode(mode, ref).length;
+    const showCmpAcc =
+      f &&
+      shouldShowCmpAccountabilityChart(f.catKey, f);
+    const showSpeedometerSpd =
+      f && shouldShowPercentSpeedometerChart(f.catKey, f);
+    const hmHintEl = document.getElementById("chart-hm-hint");
     if (lineTitleEl && f && f.catKey != null) {
-      const list = kpiListForFilterDropdown(f.catKey);
-      let keys =
-        f.kpiKeys && f.kpiKeys.length
-          ? f.kpiKeys.map(String)
-          : f.kpi
-            ? [String(f.kpi)]
-            : [];
-      if (!keys.length && f.kpi) keys = [String(f.kpi)];
-      if (keys.length <= 1) {
-        const k = list.find(
-          (x) => String(x.kpiKey) === String(keys[0] || f.kpi)
+      if (f.catKey === SPI_CATEGORY_KEY) {
+        const list = kpiListForFilterDropdown(SPI_CATEGORY_KEY);
+        const pk = String(
+          f.kpiKeys && f.kpiKeys.length ? f.kpiKeys[0] : f.kpi || ""
         );
-        lineTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
-      } else {
-        const first = list.find((x) => String(x.kpiKey) === keys[0]);
-        const a = first ? kpiDropdownLabel(first) : keys[0];
+        const k = list.find((x) => String(x.kpiKey) === pk);
+        lineTitleEl.textContent = k ? kpiDropdownLabel(k) : "SPI KPI trends";
+      } else if (showCmpAcc) {
         lineTitleEl.textContent =
-          keys.length > 1 ? a + " +" + (keys.length - 1) + " more" : a;
+          "CMP ACCOUNTABILITY - BREAKDOWN ANALYSIS";
+      } else {
+        const list = kpiListForFilterDropdown(f.catKey);
+        let keys =
+          f.kpiKeys && f.kpiKeys.length
+            ? f.kpiKeys.map(String)
+            : f.kpi
+              ? [String(f.kpi)]
+              : [];
+        if (!keys.length && f.kpi) keys = [String(f.kpi)];
+        if (keys.length <= 1) {
+          const k = list.find(
+            (x) => String(x.kpiKey) === String(keys[0] || f.kpi)
+          );
+          lineTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
+        } else {
+          const first = list.find((x) => String(x.kpiKey) === keys[0]);
+          const a = first ? kpiDropdownLabel(first) : keys[0];
+          lineTitleEl.textContent =
+            keys.length > 1 ? a + " +" + (keys.length - 1) + " more" : a;
+        }
       }
     }
     const isHazard = f && f.catKey === HAZARD_CATEGORY_KEY;
-    if (trendEl) {
-      if (isHazard) {
+    if (
+      hmHintEl &&
+      f &&
+      (f.catKey === SPI_CATEGORY_KEY || f.catKey === HAZARD_CATEGORY_KEY)
+    ) {
+      const modeBtn = document.querySelector(
+        ".spi-hm-period-btn.spi-hm-period-btn--active"
+      );
+      const hmMode =
+        modeBtn && modeBtn.getAttribute("data-spi-hm-period") === "month"
+          ? "month"
+          : "week";
+      hmHintEl.textContent =
+        hmMode === "month" ? "(heatmap · month)" : "(heatmap · week)";
+    }
+    if (trendEl && f && f.catKey === SPI_CATEGORY_KEY) {
+      trendEl.textContent =
+        mode === "vs_last_year"
+          ? "(lines · 12 mo)"
+          : "(lines · " + n + " mo)";
+    } else if (trendEl) {
+      if (showSpeedometerSpd) {
         trendEl.textContent =
           mode === "vs_last_year"
-            ? "(bars · 12 mo)"
-            : "(bars · " + n + " mo)";
+            ? "(speedometer · 12 mo)"
+            : "(speedometer · " + n + " mo)";
+      } else if (showCmpAcc) {
+        trendEl.textContent = "% of Fatal Incident";
       } else {
         trendEl.textContent =
           mode === "vs_last_year"
@@ -3848,13 +5040,6 @@
       vs_last_quarter: "(doughnut · 3 mo)",
       vs_last_year: "(doughnut · YTD window)",
     };
-    const polarHintHazard = {
-      vs_yesterday: "(polar · 8 KPIs · latest mo)",
-      vs_last_month: "(polar · 8 KPIs · latest mo)",
-      vs_last_week: "(polar · 8 KPIs · 2 mo)",
-      vs_last_quarter: "(polar · 8 KPIs · 3 mo)",
-      vs_last_year: "(polar · 8 KPIs · YTD window)",
-    };
     const bh = isHazard
       ? bizHintHazard[mode] || "(h-bars)"
       : bizHint[mode] || "(share)";
@@ -3863,11 +5048,6 @@
       vertEl.textContent = isHazard
         ? vertHintHazard[mode] || "(doughnut)"
         : vertHint[mode] || "(vertical)";
-    }
-    const polHintEl = document.getElementById("chart-hazard-polar-hint");
-    if (polHintEl && isHazard) {
-      polHintEl.textContent =
-        polarHintHazard[mode] || "(polar · multi-KPI)";
     }
     const spiBubbleHint = document.getElementById("chart-spi-bubble-hint");
     const spiMapHint = document.getElementById("chart-spi-map-hint");
@@ -4038,7 +5218,9 @@
     const f = readFilters(catKey);
     if (!f) return;
     const kpisMeta = getKpis(catKey);
-    const selectedSet = new Set((f.kpiKeys || [f.kpi]).map(String));
+    const selectedSet = new Set(
+      (f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi]).map(String)
+    );
     let colKpis = sortKpisForDisplay(catKey, kpisMeta).filter((k) =>
       selectedSet.has(String(k.kpiKey))
     );
@@ -4128,12 +5310,9 @@
             const eff = cellEff[ri][ki];
             const pctStr = formatSignedPct(eff.value);
             const divW = matrixBarDivergingWidths(eff.value, maxAbs);
-            const imputedCls = eff.imputed ? " bu-cell--imputed" : "";
             return (
               '<td class="bu-matrix__cell">' +
-              '<div class="bu-cell bu-cell--pbi' +
-              imputedCls +
-              '">' +
+              '<div class="bu-cell bu-cell--pbi">' +
               '<div class="bu-cell__databar bu-cell__databar--diverging" role="img" aria-label="' +
               escapeAttr(bu + ", " + k.kpiName + ": " + pctStr) +
               '">' +
@@ -4164,6 +5343,288 @@
         );
       })
       .join("");
+  }
+
+  function initCalendarDateInputs() {
+    const mb = dataMonthBounds();
+    const elFrom = document.getElementById("f-dt-from");
+    const elTo = document.getElementById("f-dt-to");
+    if (!elFrom || !elTo) return;
+    const minD = mb.min + "-01";
+    const maxD = lastDayOfMonthYm(mb.max);
+    elFrom.min = minD;
+    elFrom.max = maxD;
+    elTo.min = minD;
+    elTo.max = maxD;
+    if (!elTo.value || elTo.value.length < 8) elTo.value = maxD;
+    const endYm = elTo.value.slice(0, 7);
+    let m = endYm;
+    for (let i = 0; i < 11; i++) m = monthAdd(m, -1);
+    if (!elFrom.value || elFrom.value.length < 8) {
+      const startYm = m < mb.min ? mb.min : m;
+      elFrom.value = startYm + "-01";
+    }
+  }
+
+  function slugExportFilename(s) {
+    return String(s || "export")
+      .replace(/[^\w\-]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 48);
+  }
+
+  function filterReportTextLines(catKey, f) {
+    const cat = getCategory(catKey);
+    const lines = [];
+    lines.push("Adani Safety Performance Profile — applied filters (export)");
+    lines.push("Generated: " + new Date().toISOString());
+    lines.push("");
+    lines.push("Category: " + (cat ? cat.categoryName : String(catKey)));
+    lines.push("Business unit: " + (f.business === "all" ? "All" : f.business));
+    lines.push("Site: " + (f.site === "all" ? "All" : f.site));
+    lines.push(
+      "Calendar: " +
+        (f.monthFrom || "—") +
+        " → " +
+        (f.monthTo || f.refMonth || "—")
+    );
+    lines.push(
+      "Personal type: " + (f.personalType === "all" ? "All" : f.personalType)
+    );
+    lines.push("Vs: " + vsOptionLabel(f.vsMode || DEFAULT_VS_MODE));
+    if (f.state && f.state !== "all") lines.push("State: " + f.state);
+    const vert =
+      f.variable && f.variable.length
+        ? f.variable.join(", ")
+        : "All verticals";
+    lines.push("Vertical: " + vert);
+    const ids = f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi];
+    const kStr = ids
+      .map((id) => {
+        const m = getKpis(catKey).find((x) => String(x.kpiKey) === String(id));
+        return m ? m.kpiName : String(id);
+      })
+      .join("; ");
+    lines.push("KPI list: " + kStr);
+    return lines;
+  }
+
+  function triggerDownloadBlob(blob, filename) {
+    const u = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = u;
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(u), 1500);
+  }
+
+  function downloadChartAsJpeg(canvasId, basename) {
+    const el = document.getElementById(canvasId);
+    if (!el) return;
+    let url;
+    if (typeof Chart !== "undefined") {
+      const ch = Chart.getChart(el);
+      if (ch) url = ch.toBase64Image("image/jpeg", 0.92);
+    }
+    if (!url && el.tagName === "CANVAS") {
+      url = el.toDataURL("image/jpeg", 0.92);
+    }
+    if (!url) return;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = slugExportFilename(basename) + ".jpg";
+    a.click();
+    announce("Downloaded chart as JPEG.");
+  }
+
+  function exportChartOrHostToJpeg(id, slug) {
+    if (
+      id === "chart-loc-bu-map" ||
+      id === "chart-spi-map" ||
+      id === "spi-hazard-heatmap-capture"
+    ) {
+      const host = document.getElementById(id);
+      if (!host) return;
+      captureElementToCanvas(host).then((canvas) => {
+        if (!canvas) return;
+        canvas.toBlob((blob) => {
+          if (blob) {
+            triggerDownloadBlob(blob, slugExportFilename(slug) + ".jpg");
+          }
+        }, "image/jpeg", 0.92);
+        announce("Downloaded as JPEG.");
+      });
+      return;
+    }
+    downloadChartAsJpeg(id, slug);
+  }
+
+  function exportTableToCsv() {
+    const tbl = document.getElementById("tbl-detail");
+    if (!tbl) return;
+    const rows = [...tbl.querySelectorAll("tr")].map((tr) =>
+      [...tr.querySelectorAll("th,td")]
+        .map((cell) => {
+          let t = (cell.textContent || "").trim().replace(/\s+/g, " ");
+          if (/[",\n]/.test(t)) t = '"' + t.replace(/"/g, '""') + '"';
+          return t;
+        })
+        .join(",")
+    );
+    const blob = new Blob([rows.join("\n")], {
+      type: "text/csv;charset=utf-8",
+    });
+    triggerDownloadBlob(blob, slugExportFilename("bu-table") + ".csv");
+    announce("Downloaded table (CSV).");
+  }
+
+  function exportTableToJpeg() {
+    const panel = document.getElementById("view-panel-table");
+    const scroll =
+      panel && panel.querySelector(".table-scroll")
+        ? panel.querySelector(".table-scroll")
+        : document.querySelector(".table-scroll--bu-matrix");
+    captureElementToCanvas(scroll || panel).then((canvas) => {
+      if (!canvas) return;
+      canvas.toBlob((blob) => {
+        if (blob) {
+          triggerDownloadBlob(blob, slugExportFilename("bu-table") + ".jpg");
+        }
+      }, "image/jpeg", 0.92);
+      announce("Downloaded table (JPEG).");
+    });
+  }
+
+  async function captureElementToCanvas(el) {
+    if (!el) return null;
+    if (typeof html2canvas !== "function") {
+      announce("Page export needs html2canvas (check network).");
+      return null;
+    }
+    try {
+      return await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      });
+    } catch {
+      announce("Capture failed.");
+      return null;
+    }
+  }
+
+  function wireExportDownloads(catKey) {
+    const menu = document.getElementById("export-menu");
+    if (!menu) return;
+    const panel = menu.querySelector(".download-toolbar__panel");
+    if (panel) {
+      panel.addEventListener("click", (e) => e.stopPropagation());
+    }
+    function runPdfReport() {
+      const f = readFilters(catKey);
+      if (!f) return;
+      const JSPDF = window.jspdf && window.jspdf.jsPDF;
+      if (!JSPDF) {
+        announce("PDF export needs jsPDF (check network).");
+        return;
+      }
+      const pdf = new JSPDF({ unit: "pt", format: "a4" });
+      const lines = filterReportTextLines(catKey, f);
+      let y = 48;
+      pdf.setFontSize(11);
+      pdf.setTextColor(35, 31, 32);
+      lines.forEach((ln) => {
+        const parts = pdf.splitTextToSize(ln, 515);
+        parts.forEach((p) => {
+          if (y > 760) {
+            pdf.addPage();
+            y = 48;
+          }
+          pdf.text(p, 40, y);
+          y += 14;
+        });
+      });
+      pdf.save(slugExportFilename("filters-report") + ".pdf");
+      announce("Downloaded filters report (PDF).");
+    }
+    async function runPagePdf() {
+      const el = document.querySelector(".cat-view");
+      const canvas = await captureElementToCanvas(el);
+      if (!canvas) return;
+      const JSPDF = window.jspdf && window.jspdf.jsPDF;
+      if (!JSPDF) {
+        announce("PDF export needs jsPDF.");
+        return;
+      }
+      const imgData = canvas.toDataURL("image/jpeg", 0.9);
+      const pdf = new JSPDF({
+        orientation: "landscape",
+        unit: "pt",
+        format: "a4",
+      });
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const iw = canvas.width;
+      const ih = canvas.height;
+      const r = Math.min(pageW / iw, pageH / ih) * 0.96;
+      const w = iw * r;
+      const h = ih * r;
+      pdf.addImage(imgData, "JPEG", (pageW - w) / 2, (pageH - h) / 2, w, h);
+      pdf.save(slugExportFilename("dashboard-page") + ".pdf");
+      announce("Downloaded page (PDF).");
+    }
+    async function runPageJpeg() {
+      const el = document.querySelector(".cat-view");
+      const canvas = await captureElementToCanvas(el);
+      if (!canvas) return;
+      canvas.toBlob((blob) => {
+        if (blob) {
+          triggerDownloadBlob(blob, slugExportFilename("dashboard-page") + ".jpg");
+        }
+      }, "image/jpeg", 0.92);
+      announce("Downloaded page (JPEG).");
+    }
+    function bind(id, fn) {
+      const b = document.getElementById(id);
+      if (b) {
+        b.addEventListener("click", () => {
+          fn();
+          try {
+            menu.open = false;
+          } catch {
+            /* ignore */
+          }
+        });
+      }
+    }
+    bind("dl-page-pdf", runPagePdf);
+    bind("dl-page-jpeg", runPageJpeg);
+    bind("dl-report-pdf", runPdfReport);
+  }
+
+  function wireAppRootExportClicks() {
+    if (window.__adaniAppRootExportWired) return;
+    window.__adaniAppRootExportWired = true;
+    const root = document.getElementById("app-root");
+    if (!root) return;
+    root.addEventListener("click", function (e) {
+      const cbtn = e.target.closest("[data-chart-export]");
+      if (cbtn) {
+        e.preventDefault();
+        const id = cbtn.getAttribute("data-chart-export");
+        const slug = cbtn.getAttribute("data-export-slug") || id;
+        exportChartOrHostToJpeg(id, slug);
+        return;
+      }
+      const tbtn = e.target.closest("[data-table-export]");
+      if (tbtn) {
+        e.preventDefault();
+        const fmt = tbtn.getAttribute("data-table-export");
+        if (fmt === "csv") exportTableToCsv();
+        else if (fmt === "jpeg") exportTableToJpeg();
+      }
+    });
   }
 
   function wireTableHeaders(catKey) {
@@ -4204,7 +5665,9 @@
     const buCount =
       f.business === "all" ? PREVIEW_BUSINESS_NAMES.length : f.business ? 1 : 0;
     const meta = getKpis(catKey);
-    const sel = new Set((f.kpiKeys || [f.kpi]).map(String));
+    const sel = new Set(
+      (f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi]).map(String)
+    );
     const kpiCols = sortKpisForDisplay(catKey, meta).filter((k) =>
       sel.has(String(k.kpiKey))
     ).length;
@@ -4239,7 +5702,7 @@
     if (multiWrap) {
       if (!aggList.length) {
         multiWrap.innerHTML =
-          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Adjust Versus or geography filters.</div>';
+          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Adjust Vs or geography filters.</div>';
       } else {
         renderMultiKpiCards(
           multiWrap,
@@ -4247,15 +5710,14 @@
           f.refMonth,
           f.vsMode,
           f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi],
-          presentationSeed
+          presentationSeed,
+          catKey
         );
       }
     }
 
     buildCharts(catKey, f);
-    if (catKey === LOCATION_VULN_CAT_KEY) {
-      buildLocationComparisonChart(catKey, f);
-    }
+    buildBuComparisonChart(catKey, f);
     renderTableBody(catKey);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => resizeAllChartsIndex());
@@ -4282,11 +5744,11 @@
       return;
     }
 
-    if (!ACTIVE_PREVIEW_CATEGORY_KEYS.has(catKey)) {
+    if (CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(catKey)) {
       history.replaceState(null, "", "#categories");
       renderCategories();
       announce(
-        "This preview includes Incident Management, Hazard and Observation Management (Leading), Safety Performance Indices, and Location Vulnerability. Choose one on the category list."
+        "Leadership and Safety Governance is not included in this preview."
       );
       return;
     }
@@ -4324,7 +5786,7 @@
       distinctSorted(rowsForCat, (r) => r.businessName)
     );
     const bizOpts =
-      '<option value="all">All businesses</option>' +
+      '<option value="all">All business units</option>' +
       bizList
         .map(
           (b) =>
@@ -4337,70 +5799,211 @@
         .join("");
 
     const wrap = document.createElement("div");
-    wrap.className = "cat-view";
-    const kpiFieldHtml =
-      cfg.showKpi
-        ? '<div class="field field--kpi-inline">' +
-          '<label class="field-label" for="f-kpi-scope-label">KPIs</label>' +
-          kpiScopePanelHtml(catKey, kpisForUi) +
-          "</div>"
-        : "";
-    /* Horizontal scroll only for native selects; KPI / Variable <details> panels are position:absolute and must not sit inside overflow-y:hidden. */
-    const filterCore =
+    wrap.className = insightShell ? "cat-view cat-view--modern" : "cat-view";
+    const siteOpts =
+      '<option value="all">All sites</option>' +
+      [1, 2, 3, 4, 5, 6, 7]
+        .map(
+          (n) =>
+            '<option value="Site' +
+            n +
+            '">Site ' +
+            n +
+            "</option>"
+        )
+        .join("");
+    const siteFieldHtml =
+      '<div class="field"><label class="field-label" for="f-site">Site</label>' +
+      '<select id="f-site">' +
+      siteOpts +
+      "</select></div>";
+    const calendarFieldHtml =
+      '<div class="field field--calendar-range field--calendar-compact">' +
+      '<span class="field-label field-label--inline" id="f-cal-lbl">Calendar</span>' +
+      '<div class="field-calendar-range" role="group" aria-labelledby="f-cal-lbl">' +
+      '<label class="visually-hidden" for="f-dt-from">From date</label>' +
+      '<input type="date" id="f-dt-from" class="toolbar-date" />' +
+      '<span class="field-calendar-sep" aria-hidden="true">→</span>' +
+      '<label class="visually-hidden" for="f-dt-to">To date</label>' +
+      '<input type="date" id="f-dt-to" class="toolbar-date" />' +
+      "</div></div>";
+    const personalFieldHtml =
+      '<div class="field"><label class="field-label" for="f-personal">Personal type</label>' +
+      '<select id="f-personal">' +
+      '<option value="all">All</option>' +
+      '<option value="Employee">Employee</option>' +
+      '<option value="Contractor">Contractor</option>' +
+      "</select></div>";
+    const vsFieldHtml =
       '<div class="field"><label class="field-label" for="f-vs">Vs</label>' +
       '<select id="f-vs">' +
       vsOpts +
-      "</select></div>" +
-      (cfg.showState
-        ? '<div class="field"><label class="field-label" for="f-state">State</label>' +
-          '<select id="f-state">' +
-          stateOpts +
-          "</select></div>"
-        : "") +
-      (cfg.showBusiness
-        ? '<div class="field"><label class="field-label" for="f-biz">Business</label>' +
-          '<select id="f-biz">' +
-          bizOpts +
-          "</select></div>"
-        : "") +
-      "";
+      "</select></div>";
     const variableFieldHtml = variableFilterFieldHtml();
+    const businessFieldHtml = cfg.showBusiness
+      ? '<div class="field"><label class="field-label" for="f-biz">Business unit</label>' +
+        '<select id="f-biz">' +
+        bizOpts +
+        "</select></div>"
+      : "";
+    const stateFieldHtml = cfg.showState
+      ? '<div class="field"><label class="field-label" for="f-state">State</label>' +
+        '<select id="f-state">' +
+        stateOpts +
+        "</select></div>"
+      : "";
+    const filterCoreInner =
+      businessFieldHtml +
+      siteFieldHtml +
+      calendarFieldHtml +
+      personalFieldHtml +
+      vsFieldHtml +
+      stateFieldHtml;
+    const kpiSurfaceHtml =
+      cfg.showKpi
+        ? '<div class="cat-toolbar__kpi-surface" role="group" aria-labelledby="f-kpi-surface-lbl">' +
+          '<span id="f-kpi-surface-lbl" class="cat-toolbar__kpi-surface__lbl">KPI list</span>' +
+          '<div class="cat-toolbar__kpi-surface__control">' +
+          kpiScopePanelHtml(catKey, kpisForUi) +
+          "</div></div>"
+        : "";
+    const filtersAllScrollHtml =
+      '<div class="cat-toolbar__filters-all-scroll">' +
+      variableFieldHtml +
+      filterCoreInner +
+      kpiSurfaceHtml +
+      "</div>";
+    const lineChartTitleInner =
+      '<span class="chart-analytics-title__label" id="chart-line-title">' +
+      escapeHtml(TRI_LABEL_FULL) +
+      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span>';
     const lineChartBoxHtml =
-      '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-line-title">' +
-      escapeHtml(TRI_LABEL_FULL) +
-      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for the selected KPI in the trend window"></canvas></div></div>';
-    const hazardLineChartBoxHtml =
-      '<div class="chart-box chart-box--hazard-trend"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-line-title">' +
-      escapeHtml(TRI_LABEL_FULL) +
-      '</span> <span id="chart-trend-hint" class="chart-box__hint">(bars · 12 mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Bar chart: monthly values for the selected leading KPI in the trend window"></canvas></div></div>';
+      '<div class="chart-box">' +
+      chartBlockTitleHtml(lineChartTitleInner, "chart-line", "trend") +
+      '<div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for the selected KPI in the trend window"></canvas></div></div>';
+    const spiLineChartTitleInner =
+      '<span class="chart-analytics-title__label" id="chart-line-title">' +
+      escapeHtml("SPI KPI trends") +
+      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span>';
+    const spiLineChartBoxHtml =
+      '<div class="chart-box chart-box--spi-kpi-trend">' +
+      chartBlockTitleHtml(spiLineChartTitleInner, "chart-line", "trend") +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--spi-trend"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for each SPI KPI in the trend window"></canvas></div></div>';
+    /** Same SPI heatmap visual; used on Leading Hazard for Hazard Spotting (primary panel). */
+    const hazardLeadingHeatmapBoxHtml =
+      '<div class="chart-box chart-box--spi-hazard-hm chart-box--hazard-leading-hm">' +
+      chartBlockTitleHtml(
+        '<span class="spi-hm-chart-title" id="spi-hm-heading">Hazard Spotting</span> ' +
+        '<span class="chart-box__hint" id="chart-hm-hint">(heatmap · week)</span>',
+        "spi-hazard-heatmap-capture",
+        "spi-hazard-heatmap"
+      ) +
+      '<div class="spi-hm-period-bar">' +
+      '<span class="spi-hm-period-label">Period</span>' +
+      '<div class="spi-hm-period-toggle" role="group" aria-label="Heat map period">' +
+      '<button type="button" class="spi-hm-period-btn spi-hm-period-btn--active" data-spi-hm-period="week">Week</button>' +
+      '<button type="button" class="spi-hm-period-btn" data-spi-hm-period="month">Month</button>' +
+      "</div></div>" +
+      '<div class="spi-hazard-heatmap-rule" aria-hidden="true"></div>' +
+      '<div id="spi-hazard-heatmap-capture" class="spi-hazard-heatmap-capture">' +
+      '<div id="spi-hazard-heatmap-host" class="spi-hazard-heatmap-host"></div>' +
+      '<p class="spi-hazard-heatmap-foot" id="spi-hazard-heatmap-foot" aria-live="polite"></p>' +
+      "</div></div>";
+    const spiHazardHeatmapBoxHtml =
+      '<div class="chart-box chart-box--spi-hazard-hm">' +
+      chartBlockTitleHtml(
+        '<span class="spi-hm-chart-title" id="spi-hm-heading">Hazard category</span> ' +
+        '<span class="chart-box__hint" id="chart-hm-hint">(heatmap · week)</span>',
+        "spi-hazard-heatmap-capture",
+        "spi-hazard-heatmap"
+      ) +
+      '<div class="spi-hm-period-bar">' +
+      '<span class="spi-hm-period-label">Period</span>' +
+      '<div class="spi-hm-period-toggle" role="group" aria-label="Heat map period">' +
+      '<button type="button" class="spi-hm-period-btn spi-hm-period-btn--active" data-spi-hm-period="week">Week</button>' +
+      '<button type="button" class="spi-hm-period-btn" data-spi-hm-period="month">Month</button>' +
+      "</div></div>" +
+      '<div class="spi-hazard-heatmap-rule" aria-hidden="true"></div>' +
+      '<div id="spi-hazard-heatmap-capture" class="spi-hazard-heatmap-capture">' +
+      '<div id="spi-hazard-heatmap-host" class="spi-hazard-heatmap-host"></div>' +
+      '<p class="spi-hazard-heatmap-foot" id="spi-hazard-heatmap-foot" aria-live="polite"></p>' +
+      "</div></div>";
     const hazardChartsRowHtml =
-      '<div class="cat-charts cat-charts--hazard" role="group" aria-label="Leading hazard and observation charts">' +
-      hazardLineChartBoxHtml +
-      '<div class="chart-box chart-box--biz chart-box--hazard-bu"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">BU comparison</span> <span id="chart-biz-hint" class="chart-box__hint">(bars · all BUs)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Horizontal bar chart: selected KPI by business unit"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
-      '<div class="chart-box chart-box--hazard-vert"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Vertical mix</span> <span id="chart-vertical-hint" class="chart-box__hint">(doughnut · Vs window)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--hazard-doughnut"><canvas id="chart-verticals" role="img" aria-label="Doughnut chart: share of selected KPI by vertical"></canvas></div></div>' +
-      '<div class="chart-box chart-box--hazard-polar"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Leading KPI snapshot</span> <span id="chart-hazard-polar-hint" class="chart-box__hint">(polar · multi-KPI)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--hazard-polar"><canvas id="chart-hazard-polar" role="img" aria-label="Polar area: relative mix of leading hazard KPIs in the Versus window"></canvas></div></div></div>';
+      '<div class="cat-charts cat-charts--hazard" role="group" aria-label="Leading hazard and observation charts: hazard heat map, BU comparison, vertical mix">' +
+      hazardLeadingHeatmapBoxHtml +
+      '<div class="chart-box chart-box--biz chart-box--hazard-bu">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label">BU comparison</span> <span id="chart-biz-hint" class="chart-box__hint">(bars · all BUs)</span>',
+        "chart-biz",
+        "bu-comparison"
+      ) +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Horizontal bar chart: selected KPI by business unit"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
+      '<div class="chart-box chart-box--hazard-vert">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label">Vertical mix</span> <span id="chart-vertical-hint" class="chart-box__hint">(doughnut · Vs window)</span>',
+        "chart-verticals",
+        "vertical-mix"
+      ) +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--hazard-doughnut"><canvas id="chart-verticals" role="img" aria-label="Doughnut chart: share of selected KPI by vertical"></canvas></div></div></div>';
     const chartsRowHtml =
       catKey === SPI_CATEGORY_KEY
-        ? '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: trend, quadrant analysis, SPI KPI mix">' +
-          lineChartBoxHtml +
-          '<div class="chart-box chart-box--spi-bubble"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">Quadrant analysis</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(all SPI KPIs · cross-plot)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble quadrant chart: concern reporting rate versus fatality rate by business unit"></canvas></div></div>' +
-          '<div class="chart-box chart-box--spi-map"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">SPI mix over time</span> <span id="chart-spi-map-hint" class="chart-box__hint">(all SPI KPIs · 100% · 12 mo)</span></h3><div class="chart-spi-map-host chart-spi-map-host--insights" id="chart-spi-map" role="region" aria-label="SPI one hundred percent stacked mix by month"></div></div></div>'
+        ? '<div class="cat-charts-wrap cat-charts-wrap--spi">' +
+          '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: hazard heat map, quadrant analysis, SPI KPI mix">' +
+          spiHazardHeatmapBoxHtml +
+          '<div class="chart-box chart-box--spi-bubble">' +
+          chartBlockTitleHtml(
+            '<span class="chart-analytics-title__label">Quadrant analysis</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(all SPI KPIs · cross-plot)</span>',
+            "chart-spi-bubble",
+            "quadrant"
+          ) +
+          '<div class="chart-canvas-wrap chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble quadrant chart: concern reporting rate versus fatality rate by business unit"></canvas></div></div>' +
+          '<div class="chart-box chart-box--spi-map">' +
+          chartBlockTitleHtml(
+            '<span class="chart-analytics-title__label">SPI mix over time</span> <span id="chart-spi-map-hint" class="chart-box__hint">(all SPI KPIs · 100% · 12 mo)</span>',
+            "chart-spi-insights",
+            "spi-kpi-mix"
+          ) +
+          '<div class="chart-spi-map-host chart-spi-map-host--insights" id="chart-spi-map" role="region" aria-label="SPI one hundred percent stacked mix by month"></div></div></div>' +
+          '<div class="cat-charts cat-charts--spi-trend" role="group" aria-label="SPI KPI trends: monthly line chart for all indices; click a series to focus a KPI">' +
+          spiLineChartBoxHtml +
+          "</div></div>"
         : catKey === HAZARD_CATEGORY_KEY
           ? hazardChartsRowHtml
         : catKey === LOCATION_VULN_CAT_KEY
           ? '<div class="cat-charts cat-charts--loc-map" role="group" aria-label="Location vulnerability: BU map">' +
-            '<div class="chart-box chart-box--loc-bu-map"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By business (India map)</span> <span id="chart-loc-bu-map-hint" class="chart-box__hint">(map · row counts · 24 BUs)</span></h3><div class="chart-spi-map-host chart-spi-map-host--loc-bu" id="chart-loc-bu-map" role="presentation" aria-label="Map of India: circle size by filtered row count per business unit"></div></div></div>'
+            '<div class="chart-box chart-box--loc-bu-map">' +
+            chartBlockTitleHtml(
+              '<span class="chart-analytics-title__label">By business (India map)</span> <span id="chart-loc-bu-map-hint" class="chart-box__hint">(map · row counts · 24 BUs)</span>',
+              "chart-loc-bu-map",
+              "india-bu-map"
+            ) +
+            '<div class="chart-spi-map-host chart-spi-map-host--loc-bu" id="chart-loc-bu-map" role="presentation" aria-label="Map of India: circle size by filtered row count per business unit"></div></div></div>'
           : '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
             lineChartBoxHtml +
-            '<div class="chart-box chart-box--biz"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(radar · all BUs)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Radar chart: KPI value by business unit across all preview businesses"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
-            '<div class="chart-box"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span></h3><div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
-    const showLocCompare = catKey === LOCATION_VULN_CAT_KEY;
-    const compareTabHtml = showLocCompare
-      ? '<button type="button" role="tab" id="view-tab-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-compare" tabindex="-1" data-view="compare">Comparison view</button>'
-      : "";
-    const comparePanelHtml = showLocCompare
-      ? '<div id="view-panel-compare" class="view-panel view-panel--compare" role="tabpanel" aria-labelledby="view-tab-compare" hidden><div class="chart-box chart-box--loc-compare"><h3 class="chart-analytics-title"><span class="chart-analytics-title__label" id="chart-loc-compare-title">Current vs comparison period by business</span> <span id="chart-loc-compare-hint" class="chart-box__hint">(grouped bars · 24 BUs)</span></h3><div class="chart-canvas-wrap chart-canvas-wrap--loc-compare"><canvas id="chart-loc-compare" role="img" aria-label="Grouped bar chart: comparison period versus current KPI value for each business unit"></canvas></div></div></div>'
-      : "";
+            '<div class="chart-box chart-box--biz">' +
+            chartBlockTitleHtml(
+              '<span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(radar · all BUs)</span>',
+              "chart-biz",
+              "by-business-radar"
+            ) +
+            '<div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Radar chart: KPI value by business unit across all preview businesses"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
+            '<div class="chart-box">' +
+            chartBlockTitleHtml(
+              '<span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span>',
+              "chart-verticals",
+              "by-vertical"
+            ) +
+            '<div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
+    const compareTabHtml =
+      '<button type="button" role="tab" id="view-tab-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-compare" tabindex="-1" data-view="compare">Comparison view</button>';
+    const comparePanelHtml =
+      '<div id="view-panel-compare" class="view-panel view-panel--compare" role="tabpanel" aria-labelledby="view-tab-compare" hidden><div class="chart-box chart-box--bu-compare">' +
+      '<h3 class="chart-analytics-title chart-analytics-title--toolbar">' +
+      '<span class="chart-analytics-title__text">' +
+      '<span class="chart-analytics-title__label" id="chart-bu-compare-title">KPI comparison by business</span> <span id="chart-bu-compare-hint" class="chart-box__hint">(grouped bars · all BUs)</span>' +
+      "</span>" +
+      chartDownloadButton("chart-bu-compare", "comparison-by-bu") +
+      '</h3><div class="chart-canvas-wrap chart-canvas-wrap--bu-compare"><canvas id="chart-bu-compare" role="img" aria-label="Grouped bar chart: comparison period versus current KPI value for each business unit"></canvas></div></div></div>';
     wrap.innerHTML =
       '<div class="cat-top-bar">' +
       '<div class="cat-top-bar__lead">' +
@@ -4416,20 +6019,28 @@
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group">' +
       '<div class="cat-toolbar__filters-scroll">' +
-      kpiFieldHtml +
-      '<div class="cat-toolbar__filters-core">' +
-      filterCore +
-      "</div>" +
-      variableFieldHtml +
+      filtersAllScrollHtml +
       "</div>" +
       '<div class="toolbar-actions">' +
-      '<button type="button" class="btn" id="f-reset">Reset</button>' +
+      '<details class="download-toolbar" id="export-menu">' +
+      '<summary class="toolbar-download-icon" title="Download page or filter report" aria-label="Download page or filter report">' +
+      '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
+      "</svg></summary>" +
+      '<div class="download-toolbar__panel download-toolbar__panel--compact" role="menu" aria-label="Page export">' +
+      '<button type="button" class="download-toolbar__btn" id="dl-page-pdf" role="menuitem">Page (PDF)</button>' +
+      '<button type="button" class="download-toolbar__btn" id="dl-page-jpeg" role="menuitem">Page (JPEG)</button>' +
+      '<button type="button" class="download-toolbar__btn" id="dl-report-pdf" role="menuitem">Filters report (PDF)</button>' +
+      "</div></details>" +
+      '<button type="button" class="btn btn--reset-compact" id="f-reset">Reset</button>' +
       "</div></div></fieldset>" +
       "</div>" +
-      '<fieldset class="kpi-summary-region">' +
-      '<legend class="visually-hidden">KPI summary for current filters</legend>' +
-      '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
-      "</fieldset>" +
+      (catKey === LOCATION_VULN_CAT_KEY
+        ? ""
+        : '<fieldset class="kpi-summary-region">' +
+          '<legend class="visually-hidden">KPI summary for current filters</legend>' +
+          '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
+          "</fieldset>") +
       '<div class="cat-main-view cat-main-view--charts" id="cat-main-view" data-view="charts">' +
       '<div class="view-tabs" role="tablist" aria-label="Chart, table, or comparison view">' +
       '<button type="button" role="tab" id="view-tab-charts" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-charts" data-view="charts">Chart view</button>' +
@@ -4446,6 +6057,13 @@
       '<span class="table-zone__label">BU performance</span>' +
       '<span id="tbl-summary" class="table-zone__summary" aria-live="polite"></span>' +
       "</div>" +
+      '<div class="table-zone__exports" role="group" aria-label="Export table">' +
+      '<button type="button" class="chart-export-btn" data-table-export="csv" title="Download table (CSV)" aria-label="Download table as CSV">' +
+      EXPORT_TABLE_CSV_SVG +
+      "</button>" +
+      '<button type="button" class="chart-export-btn" data-table-export="jpeg" title="Download table (JPEG)" aria-label="Download table as JPEG">' +
+      EXPORT_DL_ICON_SVG +
+      "</button></div>" +
       '<div class="table-pager" hidden>' +
       '<button type="button" id="tbl-prev" aria-label="Previous page">Prev</button>' +
       '<span id="tbl-pageinfo"></span>' +
@@ -4464,24 +6082,61 @@
       escapeHtml(cat.uxNote) +
       "</p>";
 
+    if (insightShell) {
+      wrap.innerHTML = wrap.innerHTML
+        .replace('class="breadcrumb"', 'class="breadcrumb m2-breadcrumb"')
+        .replace('class="cat-heading"', 'class="cat-heading m2-cat-heading"')
+        .replace(
+          '<div class="table-zone">',
+          '<div class="table-zone m2-table-zone m2-evidence-zone">'
+        )
+        .replace('class="cat-context"', 'class="cat-context m2-cat-context"');
+    }
+
     root.innerHTML = "";
     root.appendChild(wrap);
 
     document.getElementById("f-vs").value = DEFAULT_VS_MODE;
     if (cfg.showState) document.getElementById("f-state").value = "all";
     if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
+    const siteEl0 = document.getElementById("f-site");
+    if (siteEl0) siteEl0.value = "all";
+    const personalEl0 = document.getElementById("f-personal");
+    if (personalEl0) personalEl0.value = "all";
     applyVariableFilterFromStorage();
+    initCalendarDateInputs();
 
     function onFilterChange() {
       tableState.page = 0;
       refreshCategoryView(catKey);
     }
 
-    ["f-vs", "f-state", "f-biz"].forEach((id) => {
+    [
+      "f-vs",
+      "f-state",
+      "f-biz",
+      "f-site",
+      "f-personal",
+      "f-dt-from",
+      "f-dt-to",
+    ].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.addEventListener("change", onFilterChange);
     });
     wireVariableFilterControls(onFilterChange);
+    wireToolbarScopeScrollPanels(wrap);
+
+    if (catKey === SPI_CATEGORY_KEY || catKey === HAZARD_CATEGORY_KEY) {
+      wrap.querySelectorAll(".spi-hm-period-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          wrap.querySelectorAll(".spi-hm-period-btn").forEach((b) => {
+            b.classList.remove("spi-hm-period-btn--active");
+          });
+          btn.classList.add("spi-hm-period-btn--active");
+          refreshCategoryView(catKey);
+        });
+      });
+    }
 
     if (cfg.showKpi) {
       updateKpiScopeCount();
@@ -4541,6 +6196,11 @@
       }
       if (cfg.showState) document.getElementById("f-state").value = "all";
       if (cfg.showBusiness) document.getElementById("f-biz").value = "all";
+      const siteEl = document.getElementById("f-site");
+      if (siteEl) siteEl.value = "all";
+      const personalEl = document.getElementById("f-personal");
+      if (personalEl) personalEl.value = "all";
+      initCalendarDateInputs();
       try {
         localStorage.removeItem(LS_VARIABLE_FILTER);
       } catch {
@@ -4561,6 +6221,7 @@
 
     wireTableHeaders(catKey);
     wireCatMainViewIndex();
+    wireExportDownloads(catKey);
     refreshCategoryView(catKey);
     const h = document.getElementById("cat-heading");
     if (h) h.focus();
@@ -4574,9 +6235,11 @@
     setShellLandingMode(true);
 
     const box = document.createElement("div");
-    box.className = "landing landing--bg-only";
+    box.className =
+      "landing landing--bg-only" +
+      (insightShell ? " landing--modern" : "");
     box.setAttribute("role", "region");
-    box.setAttribute("aria-label", "Adani Safety MIS home");
+    box.setAttribute("aria-label", "Adani Safety Performance Profile home");
     box.innerHTML =
       '<div class="landing__cta">' +
       '<button type="button" class="landing__start" id="btn-landing-start">' +
@@ -4601,11 +6264,176 @@
         renderCategories();
       });
     }
-    announce("Adani Safety MIS home.");
+    announce(
+      insightShell
+        ? "Insights home. Choose Start Now to browse safety domains."
+        : "Adani Safety Performance Profile home."
+    );
+    updateHeaderNavState();
+  }
+
+  /** Categories list styled for Insights (`m2-cat-directory` rows). */
+  function renderCategoriesInsightsDirectory() {
+    currentCategoryKey = null;
+    destroyCharts();
+    history.replaceState(null, "", "#categories");
+    setShellLandingMode(false);
+
+    const box = document.createElement("div");
+    box.className =
+      "home-body home-body--modern m2-cat-page m2-cat-page--directory";
+    box.innerHTML =
+      '<div class="m2-cat-dir-head">' +
+      journeyStepsHtml(2) +
+      '<div class="m2-cat-dir-intro">' +
+      '<h2 id="home-h">Safety domains</h2>' +
+      '<p class="m2-cat-dir-lede">Search by <strong>category or KPI name</strong>. All domains below open the same charts, table, comparison, and exports as the main dashboard preview—presented in the Insights layout.</p>' +
+      '<div class="home-tools m2-cat-dir-search" role="search">' +
+      '<label class="home-search-label" for="cat-q">Find</label>' +
+      '<input id="cat-q" class="home-search home-search--modern" type="search" placeholder="Category or KPI name…" autocomplete="off" />' +
+      "</div></div></div>" +
+      '<div class="m2-cat-directory-wrap">' +
+      '<p class="m2-cat-directory__label" id="cat-dir-lbl">All domains</p>' +
+      '<div class="m2-cat-directory" role="list" aria-labelledby="cat-dir-lbl"></div>' +
+      "</div>";
+
+    const grid = box.querySelector(".m2-cat-directory");
+    function scheduleCategorySearchAnnounce(opts) {
+      const o = opts || {};
+      clearTimeout(catSearchAnnounceTimer);
+      const run = () => {
+        if (o.noMatch) {
+          announce("No matches for category or KPI name.");
+          return;
+        }
+        announce(
+          o.count +
+            " categor" +
+            (o.count === 1 ? "y" : "ies") +
+            " shown." +
+            (o.filtered ? " Search filter applied." : "")
+        );
+      };
+      if (o.immediate) run();
+      else catSearchAnnounceTimer = setTimeout(run, 380);
+    }
+
+    function buildCards(query, opts) {
+      const o = opts || {};
+      grid.innerHTML = "";
+      const q = (query || "").trim().toLowerCase();
+      const cats = DATA.categories.filter((c) =>
+        categoryMatchesSearchQuery(c, q)
+      );
+      if (!cats.length) {
+        grid.removeAttribute("role");
+        grid.removeAttribute("aria-labelledby");
+        const empty = document.createElement("div");
+        empty.className = "m2-cat-directory__empty";
+        empty.setAttribute("role", "status");
+        empty.setAttribute("aria-live", "polite");
+        empty.innerHTML =
+          "<p><strong>No matches.</strong> Try a different category name or KPI keyword.</p>";
+        grid.appendChild(empty);
+        scheduleCategorySearchAnnounce({ noMatch: true, immediate: o.immediate });
+        return;
+      }
+      grid.setAttribute("role", "list");
+      grid.setAttribute("aria-labelledby", "cat-dir-lbl");
+      cats.forEach((cat) => {
+        const interactive = !CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(
+          cat.categoryKey
+        );
+        const el = interactive
+          ? document.createElement("button")
+          : document.createElement("div");
+        if (interactive) el.type = "button";
+        const order = String(cat.sortOrder || cat.categoryKey).padStart(2, "0");
+        el.className =
+          "m2-cat-row m2-cat-row--k" +
+          cat.categoryKey +
+          (interactive ? " m2-cat-row--open" : " m2-cat-row--disabled");
+        el.setAttribute("role", "listitem");
+        el.setAttribute(
+          "aria-label",
+          interactive
+            ? cat.categoryName + ", " + cat.kpiCount + " KPIs, open dashboard"
+            : cat.categoryName +
+                ", " +
+                cat.kpiCount +
+                " KPIs, not in preview"
+        );
+        if (!interactive) {
+          el.setAttribute("aria-disabled", "true");
+        }
+        const note = (cat.uxNote || "").trim();
+        el.innerHTML =
+          '<span class="m2-cat-row__rail" aria-hidden="true"></span>' +
+          '<span class="m2-cat-row__index">' +
+          order +
+          "</span>" +
+          '<span class="m2-cat-row__icon" aria-hidden="true">' +
+          categoryIconSvg(cat.categoryKey) +
+          "</span>" +
+          '<span class="m2-cat-row__main">' +
+          '<span class="m2-cat-row__chip m2-cat-row__chip--' +
+          (interactive ? "live" : "muted") +
+          '">' +
+          (interactive ? "Available" : "Not in Preview") +
+          "</span>" +
+          '<span class="m2-cat-row__title">' +
+          escapeHtml(cat.categoryName) +
+          "</span>" +
+          (note
+            ? '<span class="m2-cat-row__note">' + escapeHtml(note) + "</span>"
+            : "") +
+          "</span>" +
+          '<span class="m2-cat-row__aside">' +
+          '<span class="m2-cat-row__pill">' +
+          cat.kpiCount +
+          " KPIs</span>" +
+          '<span class="m2-cat-row__cta">' +
+          (interactive ? "Open" : "—") +
+          "</span>" +
+          "</span>";
+        if (interactive) {
+          el.addEventListener("click", () => {
+            history.replaceState({}, "", "#cat=" + cat.categoryKey);
+            renderCategory(cat.categoryKey);
+          });
+          el.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              history.replaceState({}, "", "#cat=" + cat.categoryKey);
+              renderCategory(cat.categoryKey);
+            }
+          });
+        }
+        grid.appendChild(el);
+      });
+      scheduleCategorySearchAnnounce({
+        count: cats.length,
+        filtered: !!q,
+        immediate: o.immediate,
+      });
+    }
+
+    root.innerHTML = "";
+    root.appendChild(box);
+    buildCards("", { immediate: true });
+    const q = document.getElementById("cat-q");
+    if (q) {
+      q.addEventListener("input", () => buildCards(q.value, {}));
+      q.focus();
+    }
     updateHeaderNavState();
   }
 
   function renderCategories() {
+    if (insightShell) {
+      renderCategoriesInsightsDirectory();
+      return;
+    }
     currentCategoryKey = null;
     destroyCharts();
     history.replaceState(null, "", "#categories");
@@ -4617,7 +6445,7 @@
       journeyStepsHtml(2) +
       '<div class="home-intro home-intro--launchpad">' +
       '<h2 id="home-h">Categories</h2>' +
-      '<p class="home-lede"><strong>Incident Management</strong>, <strong>Hazard &amp; Observation Management (Leading)</strong>, <strong>Safety Performance Indices</strong>, and <strong>Location Vulnerability</strong> are interactive in this preview; other categories are for context. Use <strong>Home</strong> in the header to return here.</p>' +
+      '<p class="home-lede">All <strong>safety domains</strong> below are available in this preview—including <strong>Incident Management</strong>, <strong>Hazard &amp; Observation (Leading)</strong>, <strong>Assurance</strong>, <strong>Safety Performance Indices</strong>, and <strong>Location Vulnerability</strong>. Use <strong>Home</strong> in the header to return to the start screen.</p>' +
       '<div class="home-tools" role="search">' +
       '<label class="home-search-label" for="cat-q">Find category or KPI</label>' +
       '<input id="cat-q" class="home-search" type="search" placeholder="Category or KPI name (e.g. Incident, LTI…)" autocomplete="off" />' +
@@ -4669,7 +6497,9 @@
       grid.setAttribute("role", "list");
       grid.setAttribute("aria-labelledby", "home-h");
       cats.forEach((cat) => {
-        const active = ACTIVE_PREVIEW_CATEGORY_KEYS.has(cat.categoryKey);
+        const active = !CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(
+          cat.categoryKey
+        );
         const el = active
           ? document.createElement("button")
           : document.createElement("div");
@@ -4685,7 +6515,7 @@
             : cat.categoryName +
                 ", " +
                 cat.kpiCount +
-                " KPIs. Not available in this preview; open Incident Management or Hazard and Observation Management, Leading."
+                " KPIs. Not in preview."
         );
         if (!active) {
           el.setAttribute("aria-disabled", "true");
@@ -4704,7 +6534,7 @@
           '<span class="category-card__lp-badge ' +
           (active ? "category-card__lp-badge--live" : "category-card__lp-badge--muted") +
           '">' +
-          (active ? "Interactive" : "Preview") +
+          (active ? "Available" : "Not in Preview") +
           "</span></div>" +
           '<div class="category-card__lp-body">' +
           '<span class="category-card__name">' +
@@ -4717,7 +6547,7 @@
           '<span class="category-card__lp-cta' +
           (active ? "" : " category-card__lp-cta--muted") +
           '">' +
-          (active ? "Explore" : "Not in preview") +
+          (active ? "Explore" : "—") +
           "</span></div>";
         if (active) {
           el.addEventListener("click", () => {
@@ -4759,9 +6589,15 @@
     else renderLanding();
   });
 
+  wireAppRootExportClicks();
+
   normalizePreviewFactRowsVsBand();
 
-  setHeaderLastUpdatedToday();
+  if (insightShell && meta.lastUpdateISO) {
+    setHeaderTimestamp(meta.lastUpdateISO);
+  } else {
+    setHeaderLastUpdatedToday();
+  }
 
   const m0 = location.hash.match(/cat=(\d+)/);
   if (m0) renderCategory(parseInt(m0[1], 10));

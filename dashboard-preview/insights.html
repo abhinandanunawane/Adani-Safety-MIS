@@ -2,16 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Adani Safety MIS — Insights</title>
+    <title>Adani Safety Performance Profile — Insights</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Adani Safety MIS — Insights preview for Power BI: domains, filters, KPI tiles, charts, and detail table. Fixed 1280×720. Sample data."
+      content="Adani Safety Performance Profile — Insights preview: same features as the dashboard (domains, filters, KPIs, charts, table, comparison, PDF export) with the Insights layout. Fixed canvas. Sample data."
     />
     <meta name="theme-color" content="#006db6" />
-    <!-- Brand palette: #00B16B #006DB6 #8E278F #F04C23 — solid fills in styles-alt.css -->
     <meta name="color-scheme" content="light" />
     <link rel="canonical" href="insights.html" />
+    <!-- Critical: header matches dashboard (styles.css) if main CSS is blocked -->
     <style>
       html {
         font-family: "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
@@ -24,16 +24,20 @@
         min-height: 58px;
         height: 58px;
         padding: 0 14px 0 0;
+        background: #ffffff;
+        color: #231f20;
+        border-bottom: 3px solid #8e278f;
+        box-sizing: border-box;
       }
       .top-header__logo-wrap {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: flex-start;
         flex-shrink: 0;
         height: 100%;
-        padding: 4px 12px 4px 10px;
-        background: #ffffff;
-        border-radius: 0 8px 8px 0;
+        padding: 0 12px 0 10px;
+        background: transparent;
+        border-radius: 0;
         box-sizing: border-box;
       }
       .top-header__titles {
@@ -44,16 +48,41 @@
         justify-content: center;
         padding: 0 10px 0 14px;
       }
+      .top-header__titles h1 {
+        margin: 0;
+        font-size: 1.05rem;
+        font-weight: 700;
+        line-height: 1.15;
+        color: #8e278f;
+      }
+      .top-header__subtitle {
+        margin: 0;
+        font-size: 0.7rem;
+        color: #6d6e71;
+      }
       .top-header__logo-wrap img {
-        height: 50px;
+        height: 45px;
         width: auto;
-        max-height: 50px;
+        max-height: 45px;
         object-fit: contain;
         display: block;
       }
+      .top-header__meta {
+        color: #6d6e71;
+      }
+      .last-updated {
+        font-size: 12px;
+        white-space: nowrap;
+        color: #6d6e71;
+      }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260618" />
-    <link rel="stylesheet" href="styles-alt.css?v=20260618" />
+    <link rel="stylesheet" href="styles.css?v=20260413b" />
+    <link rel="stylesheet" href="styles-alt.css?v=20260413b" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin=""
+    />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
   </head>
   <body>
@@ -64,14 +93,14 @@
         <div class="top-header__logo-wrap">
           <img
             src="./assets/logo11.png"
-            width="200"
-            height="50"
+            width="180"
+            height="45"
             alt="Adani safetyverse"
             decoding="async"
           />
         </div>
         <div class="top-header__titles">
-          <h1>Adani Safety MIS</h1>
+          <h1>Adani Safety Performance Profile</h1>
           <p class="top-header__subtitle">Insights · KPI exploration</p>
         </div>
         <div class="top-header__meta">
@@ -92,7 +121,7 @@
         class="viewport__main viewport__main--modern"
         role="main"
         tabindex="-1"
-        aria-label="Adani Safety MIS Insights: safety KPI exploration and detail data"
+        aria-label="Adani Safety Performance Profile Insights: safety KPI exploration and detail data"
       ></main>
 
       <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
@@ -110,12 +139,32 @@
       aria-atomic="true"
     ></div>
 
+    <script>
+      if (typeof window.__GOOGLE_MAPS_API_KEY__ === "undefined") {
+        window.__GOOGLE_MAPS_API_KEY__ = "";
+      }
+    </script>
     <script
       defer
       src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
       crossorigin="anonymous"
     ></script>
-    <script defer src="embedded-data.js?v=20260412"></script>
-    <script defer src="app-modern.js?v=20260618"></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      crossorigin=""
+    ></script>
+    <script defer src="embedded-data.js?v=20260611"></script>
+    <script defer src="app.js?v=20260627"></script>
   </body>
 </html>

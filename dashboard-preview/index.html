@@ -2,11 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Adani Safety MIS — Dashboard Preview · User research, IA &amp; UCD</title>
+    <title>Adani Safety Performance Profile — Dashboard Preview · User research, IA &amp; UCD</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Adani Safety MIS Dashboard Preview: user research, information architecture (IA), usability testing, accessibility, consistency, hierarchy, iterative process, user-centered design (UCD), human–computer interaction (HCI), and customer experience (CX)—evaluate usability, desirability, accessibility, and usefulness. Home → Categories → KPIs, filters, charts, detail table. Fixed 1280×720. Sample data."
+      content="Adani Safety Performance Profile — dashboard preview: user research, information architecture (IA), usability testing, accessibility, consistency, hierarchy, iterative process, user-centered design (UCD), human–computer interaction (HCI), and customer experience (CX)—evaluate usability, desirability, accessibility, and usefulness. Home → Categories → KPIs, filters, charts, detail table. Fixed 1280×720. Sample data."
     />
     <meta name="theme-color" content="#006db6" />
     <meta name="color-scheme" content="light" />
@@ -25,18 +25,20 @@
         min-height: 58px;
         height: 58px;
         padding: 0 14px 0 0;
-        background: #006db6;
-        color: #ffffff;
+        background: #ffffff;
+        color: #231f20;
+        border-bottom: 3px solid #8e278f;
+        box-sizing: border-box;
       }
       .top-header__logo-wrap {
         display: flex;
-        align-items: flex-start;
+        align-items: center;
         justify-content: flex-start;
         flex-shrink: 0;
         height: 100%;
-        padding: 4px 12px 4px 10px;
-        background: #ffffff;
-        border-radius: 0 8px 8px 0;
+        padding: 0 12px 0 10px;
+        background: transparent;
+        border-radius: 0;
         box-sizing: border-box;
       }
       .top-header__titles {
@@ -49,24 +51,28 @@
       }
       .top-header__title-line {
         margin: 0;
-        font-size: 0.8125rem;
+        font-size: calc(0.8125rem * 1.1);
         line-height: 1.25;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        color: #ffffff;
+        color: #231f20;
       }
       .top-header__brand {
         font-weight: 700;
+        color: #8e278f;
+      }
+      .top-header__sep {
+        color: #6d6e71;
       }
       .top-header__desc {
         font-weight: 400;
-        opacity: 0.92;
+        color: #6d6e71;
       }
       .top-header__logo-wrap img {
-        height: 50px;
+        height: 45px;
         width: auto;
-        max-height: 50px;
+        max-height: 45px;
         object-fit: contain;
         display: block;
       }
@@ -75,13 +81,15 @@
         display: flex;
         align-items: center;
         padding-right: 4px;
+        color: #6d6e71;
       }
       .last-updated {
         font-size: 12px;
         white-space: nowrap;
+        color: #6d6e71;
       }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260618" />
+    <link rel="stylesheet" href="styles.css?v=20260413b" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -97,17 +105,17 @@
         <div class="top-header__logo-wrap">
           <img
             src="./assets/logo11.png"
-            width="200"
-            height="50"
+            width="180"
+            height="45"
             alt="Adani safetyverse"
             decoding="async"
           />
         </div>
         <div class="top-header__titles">
           <p class="top-header__title-line" id="header-title-line">
-            <strong class="top-header__brand">Adani Safety MIS</strong
-            ><span class="top-header__sep" aria-hidden="true"> — </span
-            ><span class="top-header__desc">Group Safety KPI dashboard</span>
+            <strong class="top-header__brand"
+              >Adani Safety Performance Profile</strong
+            >
           </p>
         </div>
         <div class="top-header__meta top-header__meta--trailing">
@@ -126,7 +134,7 @@
         class="viewport__main"
         role="main"
         tabindex="-1"
-        aria-label="Adani Safety MIS dashboard preview: group safety KPIs for user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX, UCD, HCI, and CX design"
+        aria-label="Adani Safety Performance Profile dashboard preview: safety KPIs for user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX, UCD, HCI, and CX design"
       ></main>
 
       <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
@@ -153,8 +161,8 @@
         if (typeof window.__DASHBOARD_DATA__ !== "undefined") return;
         window.__DASHBOARD_DATA__ = {
           meta: {
-            dashboardTitle: "Adani Safety MIS",
-            subtitle: "Group Safety KPI Dashboard",
+            dashboardTitle: "Adani Safety Performance Profile",
+            subtitle: "Safety performance indicators",
             dataNote: "Placeholder until embedded-data.js loads or is regenerated.",
             lastDataMonth: "2024-01",
             lastUpdateISO: new Date().toISOString(),
@@ -176,10 +184,20 @@
     ></script>
     <script
       defer
+      src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
     <script defer src="embedded-data.js?v=20260611"></script>
-    <script defer src="app.js?v=20260618"></script>
+    <script defer src="app.js?v=20260627"></script>
   </body>
 </html>

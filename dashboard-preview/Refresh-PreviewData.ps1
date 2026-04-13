@@ -215,8 +215,8 @@ $statesList = @($biz | ForEach-Object { if ($_.State) { $_.State } else { $_.Reg
 
 $out = [PSCustomObject]@{
   meta = [PSCustomObject]@{
-    dashboardTitle = 'Adani Safety MIS'
-    subtitle = 'Group Safety KPI Dashboard — Interactive Preview'
+    dashboardTitle = 'Adani Safety Performance Profile'
+    subtitle = 'Safety performance indicators — Interactive Preview'
     dataNote = 'Demo data from PowerBI_Assets CSVs; replace with production feeds.'
     lastDataMonth = ($dates | Select-Object -Last 1).YearMonth
     lastUpdateISO = (Get-Date).ToUniversalTime().ToString('o')
