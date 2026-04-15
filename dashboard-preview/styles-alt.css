@@ -6,11 +6,11 @@
   --adani-blue: #006db6;
   --adani-purple: #8e278f;
   --adani-orange: #f04c23;
-  --adani-page: #ffffff;
+  --adani-page: #eef1f7;
   --adani-white: #ffffff;
   --text-body: #231f20;
   --text-page-header: #6d6e71;
-  --text-headline: #8e278f;
+  --text-headline: #7a4a8a;
   --text-on-reverse: #ffffff;
   --m2-font: var(
     --font,
@@ -28,11 +28,11 @@
   );
   --m2-ink: var(--text-body);
   --m2-muted: var(--text-page-header);
-  --m2-line: rgba(0, 109, 182, 0.28);
-  --m2-line-soft: rgba(0, 177, 107, 0.18);
+  --m2-line: rgba(0, 109, 182, 0.2);
+  --m2-line-soft: rgba(0, 177, 107, 0.14);
   --m2-radius: 10px;
-  --m2-sh: 0 3px 16px rgba(0, 109, 182, 0.1);
-  --m2-sh-deep: 0 14px 36px rgba(35, 31, 32, 0.12);
+  --m2-sh: 0 2px 12px rgba(0, 109, 182, 0.07);
+  --m2-sh-deep: 0 10px 28px rgba(35, 31, 32, 0.08);
   /* Solid surfaces only (no gradients) */
   --m2-grad-page: var(--adani-page);
   --m2-grad-page-landing: var(--adani-page);
@@ -41,6 +41,14 @@
   --m2-grad-cta: var(--adani-blue);
   --m2-grad-ribbon: var(--adani-green);
   --m2-grad-kpi-card: var(--adani-white);
+}
+
+/* KPI drill-in only: align Insights shell with brighter Adani (see styles.css body:has(.cat-view)) */
+body:has(.cat-view) {
+  --adani-page: #f1f6fc;
+  --text-headline: #8e278f;
+  --m2-line: rgba(0, 109, 182, 0.28);
+  --m2-sh: 0 3px 14px rgba(0, 109, 182, 0.12);
 }
 
 /* Letterboxing: match body to canvas wash (base body is flat gray in styles.css) */
@@ -71,13 +79,13 @@ body:has(.shell.shell--modern) {
   background: var(--m2-grad-page-landing);
 }
 
-/* insights.html home — same hero image as dashboard (assets/home-1.png) */
+/* insights.html home — same hero as dashboard (assets/home-2-2.png — Home 2 (2)) */
 .shell--modern[data-layout="insights"]
   .viewport__main--modern:has(.landing--modern) {
-  background-color: #0c4a6e;
-  background-image: url("assets/home-1.png");
+  background-color: #dde6ed;
+  background-image: url("assets/home-2-2.png");
   background-size: cover;
-  background-position: center;
+  background-position: center center;
   background-repeat: no-repeat;
 }
 
@@ -907,6 +915,16 @@ button.m2-cat-row {
   color: #f9fafb;
 }
 
+.m2-cat-row__chip--leading {
+  background: var(--adani-blue);
+  color: #fff;
+}
+
+.m2-cat-row__chip--lagging {
+  background: #b45309;
+  color: #fffbeb;
+}
+
 .shell--modern .home-grid--modern .category-card {
   min-height: 0;
   padding: 4px 6px;
@@ -1168,6 +1186,11 @@ button.m2-cat-row {
   font-family: var(--m2-display);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.m2-cat-domain {
+  align-self: flex-start;
+  margin-top: 2px;
 }
 
 .m2-toolbar-shell {
@@ -1674,6 +1697,22 @@ button.m2-cat-row {
   border-color: rgba(0, 177, 107, 0.22);
 }
 
+.m2-kpi-tile--card.m2-kpi-tile--dir-up {
+  border-color: rgba(0, 177, 107, 0.55);
+}
+
+.m2-kpi-tile--card.m2-kpi-tile--dir-down {
+  border-color: rgba(196, 30, 58, 0.58);
+}
+
+.m2-kpi-tile--card.m2-kpi-tile--dir-up:hover {
+  border-color: rgba(0, 177, 107, 0.72);
+}
+
+.m2-kpi-tile--card.m2-kpi-tile--dir-down:hover {
+  border-color: rgba(196, 30, 58, 0.78);
+}
+
 .m2-kpi-tile__ribbon {
   position: absolute;
   left: 0;
@@ -1689,7 +1728,7 @@ button.m2-cat-row {
 }
 
 .m2-kpi-tile--dir-down {
-  --kpi-ribbon: var(--adani-orange);
+  --kpi-ribbon: #c41e3a;
 }
 
 .m2-kpi-tile--dir-flat {
@@ -1705,6 +1744,35 @@ button.m2-cat-row {
   flex-wrap: wrap;
   gap: 3px;
   align-items: center;
+}
+
+.m2-kpi-tile__head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px 6px;
+  min-width: 0;
+  width: 100%;
+}
+
+.m2-kpi-tile__type-badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  max-width: 52%;
+  font-size: 0.36rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--adani-blue);
+  background: rgba(0, 109, 182, 0.16);
+  padding: 1px 5px;
+  border-radius: 999px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .m2-kpi-tile__chip {
@@ -1784,7 +1852,7 @@ button.m2-cat-row {
   color: var(--adani-green);
 }
 .m2-kpi-tile__arrow--down {
-  color: var(--adani-orange);
+  color: #c41e3a;
 }
 .m2-kpi-tile__arrow--same,
 .m2-kpi-tile__arrow--na {
@@ -1855,7 +1923,7 @@ button.m2-cat-row {
 .m2-chart-title .chart-box__hint {
   font-weight: 400;
   font-size: var(--viz-caption-fs);
-  color: var(--m2-muted);
+  color: var(--text-body);
 }
 
 .m2-charts--row .m2-chart-card:first-child,
@@ -2250,13 +2318,7 @@ button.m2-cat-row {
   min-height: 3.5rem;
   padding: 0;
   border-radius: 6px;
-  background: repeating-linear-gradient(
-    -45deg,
-    rgba(0, 109, 182, 0.04),
-    rgba(0, 109, 182, 0.04) 6px,
-    transparent 6px,
-    transparent 12px
-  );
+  background: #e6e7e8;
 }
 
 .m2-detail-empty:empty {
@@ -2356,4 +2418,82 @@ button.m2-cat-row {
   .view-panel--charts
   .cat-charts--loc-map {
   min-height: min(320px, 48vh) !important;
+}
+
+/* Narrow screens: stack KPI metric bands + charts (pairs with styles.css mobile block) */
+@media (max-width: 900px) {
+  body:has(.shell.shell--modern) {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .shell--modern {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+    max-height: none;
+    overflow-x: hidden;
+  }
+
+  .shell--modern .viewport__main--modern {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 6px 6px;
+  }
+
+  /* Match classic preview: two KPI bands per row on narrow viewports only */
+  .m2-kpi-metrics-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  .m2-kpi-metric-card {
+    flex: 1 1 calc(50% - 4px) !important;
+    min-width: 0 !important;
+    max-width: calc(50% - 3px);
+    width: auto;
+    box-sizing: border-box;
+  }
+
+  .m2-kpi-metrics-row .m2-kpi-metric-card:last-child:nth-child(odd) {
+    flex: 1 1 100% !important;
+    max-width: 100%;
+  }
+
+  .shell--modern[data-layout="insights"]
+    .cat-main-view--charts
+    .view-panel--charts
+    .cat-charts:not(.cat-charts--spi):not(.cat-charts--hazard):not(
+      .cat-charts--loc-map
+    ) {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    min-height: min(200px, 38vh) !important;
+  }
+
+  .shell--modern[data-layout="insights"]
+    .cat-main-view--charts
+    .view-panel--charts
+    .cat-charts--spi,
+  .shell--modern[data-layout="insights"]
+    .cat-main-view--charts
+    .view-panel--charts
+    .cat-charts--hazard {
+    grid-template-columns: 1fr !important;
+    grid-template-rows: auto !important;
+    min-height: min(200px, 38vh) !important;
+  }
+
+  .shell--modern[data-layout="insights"]
+    .cat-main-view--charts
+    .view-panel--charts
+    .cat-charts--loc-map {
+    min-height: min(240px, 40vh) !important;
+  }
 }

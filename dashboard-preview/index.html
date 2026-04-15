@@ -20,14 +20,15 @@
       .top-header {
         display: flex !important;
         flex-shrink: 0;
+        flex-wrap: wrap;
         align-items: stretch;
         justify-content: space-between;
         min-height: 58px;
-        height: 58px;
+        height: auto;
         padding: 0 14px 0 0;
         background: #ffffff;
         color: #231f20;
-        border-bottom: 3px solid #8e278f;
+        border-bottom: 3px solid #c4b3d4;
         box-sizing: border-box;
       }
       .top-header__logo-wrap {
@@ -81,8 +82,29 @@
         margin-left: auto;
         display: flex;
         align-items: center;
+        flex-wrap: wrap;
         padding-right: 4px;
         color: #6d6e71;
+      }
+      @media (max-width: 900px) {
+        .top-header {
+          padding: 6px 8px 8px;
+        }
+        .top-header__meta--trailing {
+          margin-left: 0;
+          width: 100%;
+          flex-basis: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 6px;
+          padding: 6px 0 0;
+          margin-top: 4px;
+          border-top: 1px solid rgba(196, 179, 212, 0.45);
+          box-sizing: border-box;
+        }
+        .last-updated {
+          white-space: normal;
+        }
       }
       .last-updated {
         font-size: 12px;
@@ -90,7 +112,8 @@
         color: #6d6e71;
       }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260413b" />
+    <link rel="stylesheet" href="styles.css?v=20260416r17" />
+    <link rel="preload" as="image" href="assets/home-2-2.png" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -119,13 +142,25 @@
             >
           </p>
         </div>
-        <div class="top-header__meta top-header__meta--trailing">
-          <nav id="top-header-nav" class="top-header__nav" hidden aria-label="Primary">
-            <a class="top-nav-link" id="nav-home" href="#landing">Home</a>
-            <a class="top-nav-link" id="nav-categories" href="#categories">Categories</a>
+        <div class="top-header__meta top-header__meta--trailing top-header__meta--docs">
+          <nav id="top-header-nav" class="top-header__nav" aria-label="Primary">
+            <a class="top-nav-link top-nav-link--primary" id="nav-home" href="#landing">Home</a>
+            <a class="top-nav-link top-nav-link--primary" id="nav-categories" href="#categories">Categories</a>
+          </nav>
+          <nav class="top-header__docs top-header__docs--supporting" aria-label="Help, KPI reference, and back to home">
+            <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html">How to use</a>
+            <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="kpi-reference.html">KPI details</a>
+            <a
+              class="top-nav-link top-nav-link--secondary top-nav-link--back"
+              id="nav-back"
+              href="#landing"
+              hidden
+              aria-label="Back to home"
+              >Back</a
+            >
           </nav>
           <span class="last-updated"
-            >Last updated <time id="header-updated">-</time></span
+            >Last updated <time id="header-updated">Tuesday, April 14, 2026</time></span
           >
         </div>
       </header>
@@ -153,29 +188,11 @@
       aria-atomic="true"
     ></div>
 
-    <!-- Fallback before deferred scripts: if embedded-data.js fails (file://, 404, blocked), app still boots -->
     <script>
       (function () {
         if (typeof window.__GOOGLE_MAPS_API_KEY__ === "undefined") {
           window.__GOOGLE_MAPS_API_KEY__ = "";
         }
-        if (typeof window.__DASHBOARD_DATA__ !== "undefined") return;
-        window.__DASHBOARD_DATA__ = {
-          meta: {
-            dashboardTitle: "Adani Safety Performance Profile",
-            subtitle: "Safety performance indicators",
-            dataNote: "Placeholder until embedded-data.js loads or is regenerated.",
-            lastDataMonth: "2024-01",
-            lastUpdateISO: new Date().toISOString(),
-          },
-          categories: [],
-          kpiDetailByCategory: [],
-          monthlyByCategory: [],
-          businessBreakdown: [],
-          factRows: [],
-          months: [],
-          states: [],
-        };
       })();
     </script>
     <script
@@ -198,7 +215,7 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
-    <script defer src="embedded-data.js?v=20260611"></script>
-    <script defer src="app.js?v=20260627"></script>
+    <script defer src="embedded-data.js?v=20260416r12"></script>
+    <script defer src="app.js?v=20260416r21"></script>
   </body>
 </html>

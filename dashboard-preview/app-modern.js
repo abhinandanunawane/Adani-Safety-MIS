@@ -16,6 +16,7 @@
     const h = raw === "" || raw === "#" ? "#landing" : raw;
     const home = document.getElementById("nav-home");
     const cats = document.getElementById("nav-categories");
+    const navBack = document.getElementById("nav-back");
     const onLanding = h === "#landing";
     const onCategories = h === "#categories";
     const onCategoryDrill = /^#cat=\d+/.test(h);
@@ -28,6 +29,15 @@
         cats.setAttribute("aria-current", "page");
       } else {
         cats.removeAttribute("aria-current");
+      }
+    }
+    if (navBack) {
+      if (onLanding) {
+        navBack.hidden = true;
+        navBack.setAttribute("aria-hidden", "true");
+      } else {
+        navBack.hidden = false;
+        navBack.removeAttribute("aria-hidden");
       }
     }
   }
@@ -54,7 +64,8 @@
     if (root) {
       root.innerHTML =
         '<div class="boot-error" style="padding:12px;font-size:13px;color:#0f172a">' +
-        "<strong>Data not loaded.</strong> The header and title above should still be visible. " +
+        '<h1 class="boot-error__title" style="margin:0 0 10px;font-size:1.05rem;font-weight:700;color:#8e278f">Adani Safety Performance Profile</h1>' +
+        "<p style=\"margin:0 0 10px;line-height:1.45\"><strong>Data not loaded.</strong> The site header above should still be visible.</p>" +
         "Ensure <code>embedded-data.js</code> is in the same folder as <code>insights.html</code> " +
         "and open the page via a local server (e.g. <code>npx serve</code>) if scripts are blocked. " +
         "Then run <code>Refresh-PreviewData.ps1</code> to regenerate data.</div>";
@@ -149,7 +160,7 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
-  /** Category keys with full KPI drill-down: 1 Incident Management, 2 Hazard & Observation Management (Leading). */
+  /** Category keys with full KPI drill-down: 1 Incident Management, 2 Hazard & Observation Management. */
   const ACTIVE_PREVIEW_CATEGORY_KEYS = new Set([1, 2]);
 
   const LS_KPI_PREFIX = "insights-kpi-keys-";
@@ -279,19 +290,25 @@
     return VS_PERIOD_CAPTION[mode] || VS_PERIOD_CAPTION.vs_last_month;
   }
 
-  /** IA: Discover → Orient → Insights (aligns with user mental model; same routes as classic). */
-  function journeyStepsHtml(step) {
-    function item(n, label, isActive) {
+  /** IA: same journey as classic preview — Home → Categories → current domain on KPI drill. */
+  function journeyStepsHtml(step, step3Label) {
+    const s3 =
+      step3Label != null && String(step3Label).trim() !== ""
+        ? String(step3Label).trim()
+        : "Explore KPIs";
+    function item(n, label, isActive, extraAttrs) {
       const cls =
         " route-steps__item" +
         (isActive ? " route-steps__item--active" : "") +
         " route-steps__item--modern";
       const cur = isActive ? ' aria-current="step"' : "";
+      const attrs = extraAttrs || "";
       return (
         '<span class="' +
         cls.trim() +
         '"' +
         cur +
+        attrs +
         ">" +
         n +
         " " +
@@ -299,13 +316,17 @@
         "</span>"
       );
     }
+    const thirdAttrs =
+      step === 3 ? ' id="cat-heading" tabindex="-1"' : "";
     return (
-      '<nav class="route-steps route-steps--modern" aria-label="Journey: Discover, Orient, Insights">' +
-      item(1, "Discover", step === 1) +
+      '<nav class="route-steps route-steps--modern" aria-label="Journey: Home, Categories, ' +
+      escapeAttr(s3) +
+      '">' +
+      item(1, "Home", step === 1) +
       '<span class="route-steps__sep" aria-hidden="true">→</span>' +
-      item(2, "Orient", step === 2) +
+      item(2, "Categories", step === 2) +
       '<span class="route-steps__sep" aria-hidden="true">→</span>' +
-      item(3, "Insights", step === 3) +
+      item(3, s3, step === 3, thirdAttrs) +
       "</nav>"
     );
   }
@@ -683,6 +704,24 @@
     return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
+  function kpiUnitTypeLabel(unitType) {
+    const u = String(unitType || "").trim();
+    if (u === "Count") return "Count";
+    if (u === "PercentOrRate") return "% / Rate";
+    if (u === "Days") return "Days";
+    if (u === "Hours") return "Hours";
+    return u || "—";
+  }
+
+  function kpiUnitTypeTitle(unitType) {
+    const u = String(unitType || "").trim();
+    if (u === "Count") return "Measure type: count";
+    if (u === "PercentOrRate") return "Measure type: percentage or rate";
+    if (u === "Days") return "Measure type: days";
+    if (u === "Hours") return "Measure type: hours";
+    return u ? "Measure type: " + u : "Measure type";
+  }
+
   function getCategory(catKey) {
     return DATA.categories.find((c) => c.categoryKey === catKey);
   }
@@ -1000,9 +1039,12 @@
     return nums.reduce((a, b) => a + b, 0) / nums.length;
   }
 
-  /** Incident Management: wireframe order — chunk 4 = ΔRepeat, ΔFatal, Man-days, Vehicle. */
+  /**
+   * Incident Management: same order as main app (Fatality → … → Investigation Closure %).
+   * 56/57 = Fire incidents / Property Damage incidents when present in data.
+   */
   const INCIDENT_KPI_ORDER = [
-    1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 15, 19, 22, 28, 44,
+    8, 9, 10, 11, 12, 19, 14, 22, 4, 3, 7, 28, 56, 57, 1, 2, 5, 15, 44,
   ];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
@@ -1300,9 +1342,13 @@
     const periodLine =
       item.periodCaption ||
       tilePeriodForKpi(refMonth, vsMode || DEFAULT_VS_MODE, item.unitType);
+    const typeLbl = kpiUnitTypeLabel(item.unitType);
+    const typeTitle = kpiUnitTypeTitle(item.unitType);
     tile.setAttribute(
       "aria-label",
       item.kpiName +
+        ". " +
+        typeLbl +
         ". " +
         periodLine +
         ". Value " +
@@ -1315,14 +1361,16 @@
     );
     tile.innerHTML =
       '<div class="m2-kpi-tile__ribbon" aria-hidden="true"></div>' +
-      '<div class="m2-kpi-tile__chips">' +
-      '<span class="m2-kpi-tile__chip m2-kpi-tile__chip--unit">' +
-      escapeHtml(item.unitType) +
-      "</span>" +
+      '<div class="m2-kpi-tile__head">' +
       '<span class="m2-kpi-tile__chip m2-kpi-tile__chip--vs" title="' +
       escapeAttr(vsLbl) +
       '">' +
       escapeHtml(vsShort) +
+      "</span>" +
+      '<span class="m2-kpi-tile__type-badge" title="' +
+      escapeAttr(typeTitle) +
+      '">' +
+      escapeHtml(typeLbl) +
       "</span></div>" +
       '<h4 class="m2-kpi-tile__name">' +
       escapeHtml(item.kpiName) +
@@ -2114,7 +2162,7 @@
       history.replaceState(null, "", "#categories");
       renderCategories();
       announce(
-        "This preview includes Incident Management and Hazard and Observation Management, Leading. Choose one on the category list."
+        "This preview includes Incident Management and Hazard & Observation Management. Choose one on the category list."
       );
       return;
     }
@@ -2207,14 +2255,8 @@
     wrap.innerHTML =
       '<div class="cat-top-bar">' +
       '<div class="cat-top-bar__lead">' +
-      journeyStepsHtml(3) +
-      '<div class="cat-top-bar__title">' +
-      '<nav class="breadcrumb m2-breadcrumb" aria-label="Breadcrumb">' +
-      '<ol><li><a href="#categories" id="bc-cats">Categories</a></li><li aria-current="page">' +
-      '<h2 class="cat-heading m2-cat-heading" id="cat-heading" tabindex="-1">' +
-      escapeHtml(cat.categoryName) +
-      "</h2></li></ol></nav>" +
-      "</div></div>" +
+      journeyStepsHtml(3, cat.categoryName) +
+      "</div>" +
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       toolbarInner +
@@ -2461,7 +2503,7 @@
     const hh = document.getElementById("landing-h");
     if (hh) hh.focus();
     announce(
-      "Insights home. Browse domains to open a category; Incident Management and Hazard and Observation Management, Leading are live in this preview."
+      "Insights home. Browse domains to open a category; Incident Management and Hazard & Observation Management are live in this preview."
     );
     updateHeaderNavState();
   }
@@ -2479,7 +2521,7 @@
       journeyStepsHtml(2) +
       '<div class="m2-cat-dir-intro">' +
       '<h2 id="home-h">Safety domains</h2>' +
-      '<p class="m2-cat-dir-lede">Search by <strong>category or KPI name</strong>. <strong>Live preview</strong>: <strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management (Leading)</strong>.</p>' +
+      '<p class="m2-cat-dir-lede">Search by <strong>category or KPI name</strong>. <strong>Live preview</strong>: <strong>Incident Management</strong> and <strong>Hazard &amp; Observation Management</strong>.</p>' +
       '<div class="home-tools m2-cat-dir-search" role="search">' +
       '<label class="home-search-label" for="cat-q">Find</label>' +
       '<input id="cat-q" class="home-search home-search--modern" type="search" placeholder="Category or KPI name…" autocomplete="off" />' +
@@ -2553,7 +2595,7 @@
             : cat.categoryName +
                 ", " +
                 cat.kpiCount +
-                " KPIs. Not in live preview; open Incident Management or Hazard and Observation Management, Leading."
+                " KPIs. Not in live preview; open Incident Management or Hazard & Observation Management."
         );
         if (!active) {
           el.setAttribute("aria-disabled", "true");

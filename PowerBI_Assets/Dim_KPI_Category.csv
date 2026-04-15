@@ -4,14 +4,14 @@
 4	Total Leak/spill cases	Incident Management
 5	Total Injury Illness incidents	Incident Management
 6	Repeat incident cases( cat- 0 to 5)	Incident Management
-7	Life saved cases	Hazard & Observation Management (Leading)
+7	Life saved cases	Hazard & Observation Management
 8	Total Dangerous occurance	Incident Management
 9	Fatality	Incident Management
 10	No. LTI	Incident Management
 11	No. MTC	Incident Management
 12	No. RWC	Incident Management
 13	No. FAC	Incident Management
-14	No. Near Miss	Hazard & Observation Management (Leading)
+14	No. Near Miss	Hazard & Observation Management
 15	Delta of LTI count	Incident Management
 16	Delta of Repeat incident count	Incident Management
 17	Fatality rate	Safety Performance Indices
@@ -36,21 +36,21 @@
 36	Training intensity Rate	Training & Competency Development
 37	Frontline worker training index	Training & Competency Development
 38	Executive training Index (Functional Managers, Managing Managers, Managing Others & Managing Self )	Training & Competency Development
-39	Hazard Spotting	Hazard & Observation Management (Leading)
-40	Hazards closure %	Hazard & Observation Management (Leading)
-41	% Completion of SRFA	Hazard & Observation Management (Leading)
+39	Hazard Spotting	Hazard & Observation Management
+40	Hazards closure %	Hazard & Observation Management
+41	% Completion of SRFA	Hazard & Observation Management
 42	S-4 SRFA Closure %	Risk Control Programs 
 43	S-5 SRFA Closure %	Risk Control Programs 
 44	Safety Walkthrough by Senior leadership Team	Leadership & Safety Governance
 45	Investigations Closure %	Incident Management
-46	Safety Inspection Observation closure %	Hazard & Observation Management (Leading)
-47	Action closure %	Hazard & Observation Management (Leading)
+46	Safety Inspection Observation closure %	Hazard & Observation Management
+47	Action closure %	Hazard & Observation Management
 48	Business Safety Council Meeting	Leadership & Safety Governance
 49	6 Taskforce governance meeting	Leadership & Safety Governance
 50	SAKSHAM Implementation %	Training & Competency Development
-51	SAFEX Utilization 	Systems Adoption & Digital Utilization
+51	SAFEX Utilization 	Digital & Technology Intervention
 52	Incident Key Learning implementation %	Risk Control Programs 
 53	FRC compliance Rate	Risk Control Programs 
-54	Number of Unsafe Acts Identified per hour in SI Rounds by trained personnel	Hazard & Observation Management (Leading)
+54	Number of Unsafe Acts Identified per hour in SI Rounds by trained personnel	Hazard & Observation Management
 55	% Standard Implementation against the top critical Safety Standards (4 nos.)	Risk Control Programs 
 56	Number of observations by leadership in walkthrough exercises/ discussions/ reviews for CAPA by concerned BU team - Felt leadership actions	Leadership & Safety Governance

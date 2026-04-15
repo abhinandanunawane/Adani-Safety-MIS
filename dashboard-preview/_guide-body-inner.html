@@ -1,0 +1,132 @@
+          <header class="doc-page__header doc-page__header--guide">
+            <h1>How to use this dashboard</h1>
+            <p class="doc-page__back">
+              <a href="index.html#landing">Dashboard home</a>
+              <span class="header-sep" aria-hidden="true">&middot;</span>
+              <a href="index.html#categories">Categories</a>
+              <span class="header-sep" aria-hidden="true">&middot;</span>
+              <a href="kpi-reference.html">KPI details</a>
+            </p>
+          </header>
+
+          <section class="guide-card" aria-labelledby="g-nav" data-lens="IA · Hierarchy">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10z" stroke-linejoin="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-nav">1. Navigation</h2>
+            </div>
+            <ul class="guide-card__list">
+              <li>
+                <strong>Home</strong> — returns to the landing hero (hash <code>#landing</code>).
+              </li>
+              <li>
+                <strong>Categories</strong> — grid of safety domains; pick one to drill into KPIs
+                (<code>#categories</code> → <code>#cat=&lt;id&gt;</code>).
+              </li>
+              <li>
+                <strong>Breadcrumb</strong> — “Categories” link at the top of a category view takes you back to the
+                grid without losing your session.
+              </li>
+            </ul>
+          </section>
+
+          <section class="guide-card" aria-labelledby="g-filters" data-lens="HCI · Usability">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 6h16M8 12h8M10 18h4" stroke-linecap="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-filters">2. Filters (toolbar)</h2>
+            </div>
+            <p>Typical controls (availability depends on category):</p>
+            <ul class="guide-card__list guide-card__list--checks">
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Business unit</strong> — limit rows to one BU or keep <em>All</em> for the preview roster.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>State</strong> — where the data model carries geography (e.g. Location Vulnerability).</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Vertical / checkpoints</strong> — Field / O&amp;M / Office / Projects roll-ups from the preview seed.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Calendar (from / to)</strong> — narrows the fact window; end month usually drives “latest” and Vs logic.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>KPI list</strong> — multi-select checkboxes which KPIs drive tiles, trend line, radar, and matrix columns (hidden where the UX is map-only).</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Reset</strong> — restores defaults for the open category (and clears saved KPI picks in local storage where applicable).</li>
+            </ul>
+          </section>
+
+          <section class="guide-card" aria-labelledby="g-vs" data-lens="Iterative · Consistency">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M8 7l4-4 4 4M8 17l4 4 4-4M12 3v18" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-vs">3. Versus (“Vs”) modes</h2>
+            </div>
+            <ul class="guide-card__list">
+              <li>
+                The <strong>Vs</strong> control sets how <em>current</em> and <em>base</em> periods are chosen for
+                trend lines, tiles, comparison bars, and table “Vs %”. Examples include last month, last quarter,
+                prior year YTD, etc. The active window affects chart hints and grouped-bar comparison (Chart view vs
+                Comparison view).
+              </li>
+            </ul>
+          </section>
+
+          <section class="guide-card" aria-labelledby="g-charts" data-lens="Usability · Desirability">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 19h16M6 15l3-4 3 2 4-6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-charts">4. Reading the charts</h2>
+            </div>
+            <ul class="guide-card__list guide-card__list--checks">
+              <li><span class="guide-bullet" aria-hidden="true"></span> Each chart title includes a short <strong>hint</strong> (e.g. “12 mo”, “all BUs”). Hover or focus the <strong>i</strong> beside the title where shown to see filters and parameters for that visual.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Trend</strong> — monthly series for the selected KPI(s); SPI domains may show several lines.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>By business / radar / bars</strong> — compare the same measure across BUs for the filtered window.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Location map</strong> — circle size reflects filtered row counts per BU (all contributing vulnerability KPIs combined).</li>
+            </ul>
+          </section>
+
+          <section class="guide-card" aria-labelledby="g-table" data-lens="Accessibility · Usefulness">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M4 6h16v12H4V6zm0 4h16M8 10v4M12 10v4M16 10v4" stroke-linejoin="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-table">5. Table view</h2>
+            </div>
+            <ul class="guide-card__list">
+              <li>
+                <strong>Table view</strong> shows a BU × KPI matrix with Vs colouring. Use the small export controls
+                on the table header for <strong>CSV</strong> (Excel-friendly) or <strong>JPEG</strong> (screenshot of
+                the table block).
+              </li>
+            </ul>
+          </section>
+
+          <section class="guide-card" aria-labelledby="g-export" data-lens="CX · Usefulness">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M12 3v12M8 11l4 4 4-4M5 21h14" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-export">6. Downloading and exporting</h2>
+            </div>
+            <ul class="guide-card__list guide-card__list--checks">
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Page (PDF / JPEG)</strong> — under the download (arrow) menu in the category toolbar: full page capture for stakeholder walkthroughs.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Filters report (PDF)</strong> — captures filter context and key blocks (when implemented in your build).</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>Chart JPEG</strong> — camera icon on each chart title exports that canvas/card as an image.</li>
+              <li><span class="guide-bullet" aria-hidden="true"></span> <strong>CSV</strong> — from the detail table exports (table toolbar icons).</li>
+            </ul>
+            <p class="guide-card__note">
+              Exports use your current filter and Vs settings. For governed numbers, reconcile against your Power BI
+              dataset.
+            </p>
+          </section>
+
+          <section class="guide-card guide-card--last" aria-labelledby="g-kpi" data-lens="Consistency · IA">
+            <div class="guide-card__head">
+              <span class="guide-card__icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.75"><path d="M7 4h10v16H7V4zm3 8h4M12 8v2" stroke-linecap="round"/></svg>
+              </span>
+              <h2 class="guide-card__title" id="g-kpi">7. KPI definitions &amp; formulas</h2>
+            </div>
+            <ul class="guide-card__list">
+              <li>
+                See <a href="kpi-reference.html">KPI details &amp; measures</a> for category listings, business
+                definitions, and the standard measure pattern used in the wireframe model.
+              </li>
+            </ul>
+          </section>

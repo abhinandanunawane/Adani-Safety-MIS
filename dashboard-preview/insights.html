@@ -19,10 +19,11 @@
       .top-header {
         display: flex !important;
         flex-shrink: 0;
+        flex-wrap: wrap;
         align-items: stretch;
         justify-content: space-between;
         min-height: 58px;
-        height: 58px;
+        height: auto;
         padding: 0 14px 0 0;
         background: #ffffff;
         color: #231f20;
@@ -76,9 +77,35 @@
         white-space: nowrap;
         color: #6d6e71;
       }
+      .top-header__meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      @media (max-width: 900px) {
+        .top-header {
+          padding: 6px 8px 8px;
+        }
+        .top-header__meta {
+          margin-left: 0;
+          width: 100%;
+          flex-basis: 100%;
+          flex-direction: column;
+          align-items: stretch;
+          gap: 6px;
+          padding: 6px 0 0;
+          margin-top: 4px;
+          border-top: 1px solid rgba(196, 179, 212, 0.45);
+          box-sizing: border-box;
+        }
+        .last-updated {
+          white-space: normal;
+        }
+      }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260413b" />
-    <link rel="stylesheet" href="styles-alt.css?v=20260413b" />
+    <link rel="stylesheet" href="styles.css?v=20260416r17" />
+    <link rel="stylesheet" href="styles-alt.css?v=20260416r6" />
+    <link rel="preload" as="image" href="assets/home-2-2.png" />
     <link
       rel="stylesheet"
       href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -103,15 +130,26 @@
         <div class="top-header__titles">
           <h1>Adani Safety Performance Profile</h1>
         </div>
-        <div class="top-header__meta">
-          <nav class="top-header__nav" aria-label="Primary">
-            <a class="top-nav-link" id="nav-home" href="#landing">Home</a>
+        <div class="top-header__meta top-header__meta--trailing top-header__meta--docs">
+          <nav id="top-header-nav" class="top-header__nav" aria-label="Primary">
+            <a class="top-nav-link top-nav-link--primary" id="nav-home" href="#landing">Home</a>
             <span class="header-sep" aria-hidden="true">|</span>
-            <a class="top-nav-link" id="nav-categories" href="#categories">Categories</a>
+            <a class="top-nav-link top-nav-link--primary" id="nav-categories" href="#categories">Categories</a>
           </nav>
-          <span class="header-sep" aria-hidden="true">|</span>
+          <nav class="top-header__docs top-header__docs--supporting" aria-label="Help, KPI reference, and back to home">
+            <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html">How to use</a>
+            <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="kpi-reference.html">KPI details</a>
+            <a
+              class="top-nav-link top-nav-link--secondary top-nav-link--back"
+              id="nav-back"
+              href="#landing"
+              hidden
+              aria-label="Back to home"
+              >Back</a
+            >
+          </nav>
           <span class="last-updated"
-            >Last updated <time id="header-updated">-</time></span
+            >Last updated <time id="header-updated">Tuesday, April 14, 2026</time></span
           >
         </div>
       </header>
@@ -164,7 +202,7 @@
       src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
       crossorigin=""
     ></script>
-    <script defer src="embedded-data.js?v=20260611"></script>
-    <script defer src="app.js?v=20260627"></script>
+    <script defer src="embedded-data.js?v=20260416r12"></script>
+    <script defer src="app.js?v=20260416r21"></script>
   </body>
 </html>

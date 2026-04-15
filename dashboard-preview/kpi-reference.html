@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>KPI details &amp; measures &mdash; Adani Safety Performance Profile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Safety KPI catalogue: all categories, units, business definitions, and preview-model DAX-style formulas aligned to Dim_KPI."
+    />
+    <meta name="theme-color" content="#006db6" />
+    <meta name="color-scheme" content="light" />
+    <style>
+      html {
+        font-family: "Segoe UI", "Segoe UI Variable", system-ui, sans-serif;
+      }
+      .top-header {
+        display: flex !important;
+        flex-shrink: 0;
+        align-items: stretch;
+        justify-content: space-between;
+        min-height: 58px;
+        height: 58px;
+        padding: 0 14px 0 0;
+        background: #ffffff;
+        color: #231f20;
+        border-bottom: 3px solid #8e278f;
+        box-sizing: border-box;
+      }
+      .top-header__logo-wrap {
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        flex-shrink: 0;
+        height: 100%;
+        padding: 0 12px 0 10px;
+        box-sizing: border-box;
+      }
+      .top-header__titles {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        padding: 0 10px 0 14px;
+      }
+      .top-header__title-line {
+        margin: 0;
+        font-size: calc(0.8125rem * 1.1);
+        line-height: 1.25;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        color: #231f20;
+      }
+      .top-header__brand {
+        font-weight: 700;
+        color: #8e278f;
+      }
+      .top-header__logo-wrap img {
+        height: auto;
+        width: auto;
+        max-height: max-content;
+        flex-shrink: 0;
+        display: block;
+        object-fit: contain;
+      }
+      .top-header__meta--trailing {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        padding-right: 4px;
+        color: #6d6e71;
+      }
+    </style>
+    <link rel="stylesheet" href="styles.css?v=20260415a" />
+  </head>
+  <body class="shell--docs-body">
+    <a class="skip-link" href="#doc-root">Skip to main content</a>
+
+    <div class="shell shell--docs" data-app-shell>
+      <header class="top-header" role="banner">
+        <div class="top-header__logo-wrap">
+          <img
+            src="./assets/logo11.png"
+            width="180"
+            height="45"
+            alt="Adani safetyverse"
+            decoding="async"
+          />
+        </div>
+        <div class="top-header__titles">
+          <p class="top-header__title-line">
+            <strong class="top-header__brand">Adani Safety Performance Profile</strong>
+            <span class="header-sep" aria-hidden="true"> &middot; </span>
+            <span class="top-header__desc">KPI details &amp; measures</span>
+          </p>
+        </div>
+        <div class="top-header__meta top-header__meta--trailing top-header__meta--docs">
+          <nav class="top-header__nav top-header__nav--static" aria-label="Go to dashboard">
+            <a class="top-nav-link top-nav-link--primary" href="index.html#landing">Home</a>
+            <a class="top-nav-link top-nav-link--primary" href="index.html#categories">Categories</a>
+          </nav>
+          <nav class="top-header__docs" aria-label="Help and KPI reference">
+            <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html">How to use</a>
+            <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="kpi-reference.html" aria-current="page">KPI details</a>
+          </nav>
+        </div>
+      </header>
+
+      <main id="doc-root" class="viewport__main viewport__main--docs" role="main" tabindex="-1">
+        <div class="doc-page doc-page--shell">
+          <header class="doc-page__header">
+            <h1>KPI details &amp; measures</h1>
+            <p class="doc-page__back">
+              <a href="index.html#landing">Dashboard home</a>
+              <span class="header-sep" aria-hidden="true">&middot;</span>
+              <a href="guide.html">How to use</a>
+            </p>
+            <p>
+              Full wireframe catalogue from <code>PowerBI_Assets/Dim_KPI.csv</code> and
+              <code>Dim_Category.csv</code>. Each row lists
+              <strong>Category</strong>, <strong>KPI</strong>, <strong>Unit</strong>, <strong>Business definition</strong>, and
+              <strong>Formula (preview model)</strong> &mdash; aggregate <code>Fact[Value]</code> for the listed
+              <code>Dim_KPI[KPIKey]</code> in the active filter context. Extra sections document synthetic keys
+              and map roll-ups used only in this HTML preview.
+            </p>
+          </header>
+
+          <div class="doc-kpi-toolbar" role="search">
+            <label class="doc-kpi-search">
+              <span class="visually-hidden">Search KPIs by category, name, unit, or formula</span>
+              <input
+                type="search"
+                id="kpi-doc-search"
+                class="doc-kpi-search__input"
+                placeholder="Search KPIs by category, name, or formula..."
+                autocomplete="off"
+                spellcheck="false"
+              />
+            </label>
+            <p class="doc-kpi-toolbar__hint" id="kpi-doc-search-status" aria-live="polite"></p>
+          </div>
+
+    <section class="doc-kpi-cat" id="cat-1">
+      <h2>Incident Management</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">1</td>
+              <td>Incident Management</td>
+              <td>PSI</td>
+              <td>Count</td>
+              <td>Count of PSI for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 1 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">2</td>
+              <td>Incident Management</td>
+              <td>PSNM</td>
+              <td>Count</td>
+              <td>Count of PSNM for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 2 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">3</td>
+              <td>Incident Management</td>
+              <td>Total Leak/spill cases</td>
+              <td>Count</td>
+              <td>Count of Total Leak/spill cases for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 3 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">4</td>
+              <td>Incident Management</td>
+              <td>Total Injury Illness incidents</td>
+              <td>Count</td>
+              <td>Count of Total Injury Illness incidents for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 4 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">5</td>
+              <td>Incident Management</td>
+              <td>Repeat incident cases( cat- 0 to 5)</td>
+              <td>Count</td>
+              <td>Count of Repeat incident cases( cat- 0 to 5) for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 5 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">6</td>
+              <td>Incident Management</td>
+              <td>Total Dangerous occurance</td>
+              <td>Count</td>
+              <td>Count of Total Dangerous occurance for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 7 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">7</td>
+              <td>Incident Management</td>
+              <td>Fatality</td>
+              <td>Count</td>
+              <td>Count of Fatality for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 8 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">8</td>
+              <td>Incident Management</td>
+              <td>No. LTI</td>
+              <td>Count</td>
+              <td>Count of No. LTI for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 9 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">9</td>
+              <td>Incident Management</td>
+              <td>No. MTC</td>
+              <td>Count</td>
+              <td>Count of No. MTC for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 10 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">10</td>
+              <td>Incident Management</td>
+              <td>No. RWC</td>
+              <td>Count</td>
+              <td>Count of No. RWC for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 11 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">11</td>
+              <td>Incident Management</td>
+              <td>No. FAC</td>
+              <td>Count</td>
+              <td>Count of No. FAC for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 12 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">12</td>
+              <td>Incident Management</td>
+              <td>Delta of LTI count</td>
+              <td>Count</td>
+              <td>Count of Delta of LTI count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 14 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">13</td>
+              <td>Incident Management</td>
+              <td>Delta of Repeat incident count</td>
+              <td>Count</td>
+              <td>Count of Delta of Repeat incident count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 15 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">14</td>
+              <td>Incident Management</td>
+              <td>Delta of Fatal incident</td>
+              <td>Count</td>
+              <td>Count of Delta of Fatal incident for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 19 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">15</td>
+              <td>Incident Management</td>
+              <td>Total Man day lost</td>
+              <td>Days</td>
+              <td>Total days for Total Man day lost for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 22 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">16</td>
+              <td>Incident Management</td>
+              <td>Total Vehicle incident</td>
+              <td>Count</td>
+              <td>Count of Total Vehicle incident for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 28 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">17</td>
+              <td>Incident Management</td>
+              <td>Investigations Closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Investigations Closure % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 44 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-2">
+      <h2>Hazard &amp; Observation Management</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">18</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>Life saved cases</td>
+              <td>Count</td>
+              <td>Count of Life saved cases for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 6 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">19</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>No. Near Miss</td>
+              <td>Count</td>
+              <td>Count of No. Near Miss for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 13 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">20</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>Hazard Spotting</td>
+              <td>Count</td>
+              <td>Count of Hazard Spotting for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 38 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">21</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>Hazards closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Hazards closure % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 39 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">22</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>% Completion of SRFA</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for % Completion of SRFA for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 40 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">23</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>Safety Inspection Observation closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Safety Inspection Observation closure % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 45 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">24</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>Action closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Action closure % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 46 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">25</td>
+              <td>Hazard &amp; Observation Management</td>
+              <td>Number of Unsafe Acts Identified per hour in SI Rounds by trained personnel</td>
+              <td>Count</td>
+              <td>Count of Number of Unsafe Acts Identified per hour in SI Rounds by trained personnel for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 53 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-3">
+      <h2>Safety Performance Indices</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">26</td>
+              <td>Safety Performance Indices</td>
+              <td>Fatality rate</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Fatality rate for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 16 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">27</td>
+              <td>Safety Performance Indices</td>
+              <td>LTIFR</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for LTIFR for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 17 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">28</td>
+              <td>Safety Performance Indices</td>
+              <td>LTISR</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for LTISR for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 18 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">29</td>
+              <td>Safety Performance Indices</td>
+              <td>Near Miss FR</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Near Miss FR for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 20 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">30</td>
+              <td>Safety Performance Indices</td>
+              <td>TRIR</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for TRIR for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 21 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">31</td>
+              <td>Safety Performance Indices</td>
+              <td>Vehicle incident rate</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Vehicle incident rate for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 29 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-4">
+      <h2>Consequence Management</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">32</td>
+              <td>Consequence Management</td>
+              <td>Fatality vs CMP action Compliance</td>
+              <td>Count</td>
+              <td>Count of Fatality vs CMP action Compliance for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 23 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">33</td>
+              <td>Consequence Management</td>
+              <td>LTI vs CMP action Compliance</td>
+              <td>Count</td>
+              <td>Count of LTI vs CMP action Compliance for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 24 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">34</td>
+              <td>Consequence Management</td>
+              <td>Total CMP action Taken</td>
+              <td>Count</td>
+              <td>Count of Total CMP action Taken for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 25 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">35</td>
+              <td>Consequence Management</td>
+              <td>CMP action catergory wise </td>
+              <td>Count</td>
+              <td>Count of CMP action catergory wise for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 26 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">36</td>
+              <td>Consequence Management</td>
+              <td>CMP action Job band wise</td>
+              <td>Count</td>
+              <td>Count of CMP action Job band wise for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 27 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-5">
+      <h2>Workforce Exposure &amp; Manhour Base</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">37</td>
+              <td>Workforce Exposure &amp; Manhour Base</td>
+              <td>Total safe man hrs</td>
+              <td>Hours</td>
+              <td>Total hours for Total safe man hrs for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 30 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">38</td>
+              <td>Workforce Exposure &amp; Manhour Base</td>
+              <td>Total Man hrs ( Employee)</td>
+              <td>Hours</td>
+              <td>Total hours for Total Man hrs ( Employee) for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 31 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">39</td>
+              <td>Workforce Exposure &amp; Manhour Base</td>
+              <td>Total Man hrs ( Contractor)</td>
+              <td>Hours</td>
+              <td>Total hours for Total Man hrs ( Contractor) for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 32 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">40</td>
+              <td>Workforce Exposure &amp; Manhour Base</td>
+              <td>Total Man hrs ( Employee + Contractor)</td>
+              <td>Hours</td>
+              <td>Total hours for Total Man hrs ( Employee + Contractor) for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 33 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-6">
+      <h2>Training &amp; Competency Development</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">41</td>
+              <td>Training &amp; Competency Development</td>
+              <td>Total training conducted</td>
+              <td>Count</td>
+              <td>Count of Total training conducted for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 34 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">42</td>
+              <td>Training &amp; Competency Development</td>
+              <td>Training intensity Rate</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Training intensity Rate for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 35 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">43</td>
+              <td>Training &amp; Competency Development</td>
+              <td>Frontline worker training index</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Frontline worker training index for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 36 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">44</td>
+              <td>Training &amp; Competency Development</td>
+              <td>Executive training Index (Functional Managers, Managing Managers, Managing Others &amp; Managing Self )</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Executive training Index (Functional Managers, Managing Managers, Managing Others &amp; Managing Self ) for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 37 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">45</td>
+              <td>Training &amp; Competency Development</td>
+              <td>SAKSHAM Implementation %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for SAKSHAM Implementation % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 49 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-7">
+      <h2>Risk Control Programs</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">46</td>
+              <td>Risk Control Programs</td>
+              <td>S-4 SRFA Closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for S-4 SRFA Closure % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 41 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">47</td>
+              <td>Risk Control Programs</td>
+              <td>S-5 SRFA Closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for S-5 SRFA Closure % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 42 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">48</td>
+              <td>Risk Control Programs</td>
+              <td>Incident Key Learning implementation %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Incident Key Learning implementation % for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 51 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">49</td>
+              <td>Risk Control Programs</td>
+              <td>FRC compliance Rate</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for FRC compliance Rate for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 52 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">50</td>
+              <td>Risk Control Programs</td>
+              <td>% Standard Implementation against the top critical Safety Standards (4 nos.)</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for % Standard Implementation against the top critical Safety Standards (4 nos.) for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 54 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-8">
+      <h2>Leadership &amp; Safety Governance</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">51</td>
+              <td>Leadership &amp; Safety Governance</td>
+              <td>Safety Walkthrough by Senior leadership Team</td>
+              <td>Count</td>
+              <td>Count of Safety Walkthrough by Senior leadership Team for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 43 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">52</td>
+              <td>Leadership &amp; Safety Governance</td>
+              <td>Business Safety Council Meeting</td>
+              <td>Count</td>
+              <td>Count of Business Safety Council Meeting for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 47 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">53</td>
+              <td>Leadership &amp; Safety Governance</td>
+              <td>6 Taskforce governance meeting</td>
+              <td>Count</td>
+              <td>Count of 6 Taskforce governance meeting for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 48 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">54</td>
+              <td>Leadership &amp; Safety Governance</td>
+              <td>Number of observations by leadership in walkthrough exercises/ discussions/ reviews for CAPA by concerned BU team - Felt leadership actions</td>
+              <td>Count</td>
+              <td>Count of Number of observations by leadership in walkthrough exercises/ discussions/ reviews for CAPA by concerned BU team - Felt leadership actions for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 55 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-9">
+      <h2>Digital &amp; Technology Intervention</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">55</td>
+              <td>Digital &amp; Technology Intervention</td>
+              <td>SAFEX Utilization </td>
+              <td>% / rate</td>
+              <td>Percentage or rate for SAFEX Utilization for the reporting period and active filters (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 50 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-assurance-preview">
+      <h2>Assurance (preview model)</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">56</td>
+              <td>Assurance (preview model)</td>
+              <td>Incident Key Learning implementation % (preview key)</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Incident Key Learning implementation % (preview key) for the reporting period and active filters (Synthetic key for Assurance preview; align to governed measure in production).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 501 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">57</td>
+              <td>Assurance (preview model)</td>
+              <td>FRC compliance Rate (preview key)</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for FRC compliance Rate (preview key) for the reporting period and active filters (Synthetic key for Assurance preview; align to governed measure in production).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 502 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">58</td>
+              <td>Assurance (preview model)</td>
+              <td>% Standard Implementation - top critical Safety Standards (preview key)</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for % Standard Implementation - top critical Safety Standards (preview key) for the reporting period and active filters (Synthetic key for Assurance preview; align to governed measure in production).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 503 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="doc-kpi-cat" id="cat-location-vulnerability">
+      <h2>Location Vulnerability (preview map)</h2>
+      <div class="doc-table-wrap">
+        <table class="doc-table doc-table--wide">
+          <thead>
+            <tr>
+              <th scope="col" class="doc-table__th-num">#</th>
+              <th scope="col">Category</th>
+              <th scope="col">KPI</th>
+              <th scope="col">Unit</th>
+              <th scope="col">Business definition</th>
+              <th scope="col">Formula (preview model)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="doc-table__num">59</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>No. Near Miss</td>
+              <td>Count</td>
+              <td>Count of No. Near Miss for the reporting period and active BU / geography / vertical filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 13 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">60</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>Hazard Spotting</td>
+              <td>Count</td>
+              <td>Count of Hazard Spotting for the reporting period and active BU / geography / vertical filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 38 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">61</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>Hazards closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Hazards closure % for the reporting period and active filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 39 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">62</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>% Completion of SRFA</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for % Completion of SRFA for the reporting period and active filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 40 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">63</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>Safety Inspection Observation closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Safety Inspection Observation closure % for the reporting period and active filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 45 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">64</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>Action closure %</td>
+              <td>% / rate</td>
+              <td>Percentage or rate for Action closure % for the reporting period and active filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 46 )</code></td>
+            </tr>
+            <tr>
+              <td class="doc-table__num">65</td>
+              <td>Location Vulnerability (preview map)</td>
+              <td>Number of Unsafe Acts Identified per hour in SI Rounds by trained personnel</td>
+              <td>Count</td>
+              <td>Count of Number of Unsafe Acts Identified per hour in SI Rounds by trained personnel for the reporting period and active BU / geography / vertical filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 53 )</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+
+          <section class="doc-kpi-cat doc-kpi-cat--source" id="source-files">
+            <h2>Source files</h2>
+            <p>
+              Authoritative names and category mapping:
+              <code>PowerBI_Assets/Dim_KPI.csv</code>,
+              <code>PowerBI_Assets/Dim_Category.csv</code>, and
+              <code>PowerBI_Assets/Master_KPI_Measures_Link.csv</code>. Align DAX with your enterprise semantic
+              model and row-level security.
+            </p>
+            <p>
+              Regenerate KPI tables by running
+              <code>dashboard-preview/_generate-kpi-reference-fragment.ps1</code> after changing the CSVs.
+            </p>
+          </section>
+        </div>
+      </main>
+
+      <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
+        <p class="app-footer__text">
+          <strong>Disclaimer:</strong> Sample data for user research, information architecture, usability testing, accessibility review, iterative UX validation, and UCD or HCI/CX design exploration &mdash; not operational reporting. Confirm all figures in your governed Power BI workspace.
+        </p>
+      </footer>
+    </div>
+    <script src="kpi-reference-search.js?v=20260415a" defer></script>
+  </body>
+</html>

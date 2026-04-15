@@ -1,8 +1,4 @@
-/**
- * Adani Safety Performance Profile — fixed 1280×720 preview (no page scroll). Copy and structure support
- * user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX,
- * UCD, HCI, and CX review (usability, desirability, accessibility, usefulness).
- */
+/** Adani Safety Performance Profile — HTML preview (fixed canvas; open via local server). */
 (function () {
   "use strict";
 
@@ -12,20 +8,18 @@
   /** Matches styles.css --font (Segoe UI family + UI sans fallbacks). */
   const FONT_UI =
     '"Segoe UI", "Segoe UI Variable", "Segoe UI Historic", system-ui, sans-serif';
+  /** Softer than pure black — axes, legends, ticks (pairs with light surfaces in styles.css). */
+  const CHART_INK = "#334155";
 
   function updateHeaderNavState() {
     const raw = location.hash || "";
     const h = raw === "" || raw === "#" ? "#landing" : raw;
     const home = document.getElementById("nav-home");
     const cats = document.getElementById("nav-categories");
-    const nav = document.getElementById("top-header-nav");
+    const navBack = document.getElementById("nav-back");
     const onLanding = h === "#landing";
     const onCategories = h === "#categories";
     const onCategoryDrill = /^#cat=\d+/.test(h);
-    if (nav) {
-      nav.hidden = onLanding;
-      nav.setAttribute("aria-hidden", onLanding ? "true" : "false");
-    }
     if (home) {
       if (onLanding) home.setAttribute("aria-current", "page");
       else home.removeAttribute("aria-current");
@@ -37,22 +31,22 @@
         cats.removeAttribute("aria-current");
       }
     }
+    if (navBack) {
+      if (onLanding) {
+        navBack.hidden = true;
+        navBack.setAttribute("aria-hidden", "true");
+      } else {
+        navBack.hidden = false;
+        navBack.removeAttribute("aria-hidden");
+      }
+    }
   }
 
-  /** Show today’s date in the header (per landing page requirement). */
+  /** Fixed preview stamp — same across sessions (aligns with static help pages). */
   function setHeaderLastUpdatedToday() {
     const hu = document.getElementById("header-updated");
     if (!hu) return;
-    try {
-      hu.textContent = new Date().toLocaleDateString(undefined, {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    } catch {
-      hu.textContent = new Date().toISOString().slice(0, 10);
-    }
+    hu.textContent = "Tuesday, April 14, 2026";
   }
 
   function setShellLandingMode(on) {
@@ -82,11 +76,16 @@
     setHeaderLastUpdatedToday();
     if (root) {
       root.innerHTML =
-        '<div class="boot-error" style="padding:12px;font-size:13px;color:#0f172a">' +
-        "<strong>Data not loaded.</strong> The header and title above should still be visible. " +
-        "Ensure <code>embedded-data.js</code> is in the same folder as <code>index.html</code> " +
-        "and open the page via a local server (e.g. <code>npx serve</code>) if scripts are blocked. " +
-        "Then run <code>Refresh-PreviewData.ps1</code> to regenerate data.</div>";
+        '<div class="boot-error" role="alert" style="padding:12px 14px;font-size:13px;color:#0f172a;max-width:52rem">' +
+        '<h1 class="boot-error__title" style="margin:0 0 10px;font-size:1.05rem;font-weight:700;color:#8e278f">' +
+        "Adani Safety Performance Profile</h1>" +
+        "<p style=\"margin:0 0 10px;line-height:1.45\"><strong>Data not loaded.</strong> " +
+        "The site header above should still be visible; this panel explains what went wrong.</p>" +
+        "<ul style=\"margin:0;padding-left:1.25rem;line-height:1.5\">" +
+        "<li>Place <code>embedded-data.js</code> in the same folder as <code>index.html</code> (dashboard-preview).</li>" +
+        "<li>Open via a local HTTP server (e.g. <code>npx serve</code> from that folder) so the browser is not blocking large scripts on <code>file://</code>.</li>" +
+        "<li>Regenerate data: run <code>dashboard-preview\\Refresh-PreviewData.ps1</code> (requires PowerBI_Assets CSVs).</li>" +
+        "</ul></div>";
     }
     return;
   }
@@ -95,85 +94,172 @@
   if (!DATA.months) DATA.months = [];
   if (!DATA.states) DATA.states = [];
   if (!DATA.categories) DATA.categories = [];
-  if (!DATA.kpiDetailByCategory) DATA.kpiDetailByCategory = [];
+  if (!DATA.kpiDetailByCategory) {
+    DATA.kpiDetailByCategory = [];
+  } else if (!Array.isArray(DATA.kpiDetailByCategory)) {
+    const raw = DATA.kpiDetailByCategory;
+    DATA.kpiDetailByCategory =
+      raw && typeof raw === "object" && Object.keys(raw).length
+        ? Object.values(raw)
+        : [];
+  }
   if (!DATA.monthlyByCategory) DATA.monthlyByCategory = [];
   if (!DATA.businessBreakdown) DATA.businessBreakdown = [];
 
-  /** Preview-only category 10 (not in all CSV exports); survives Refresh-PreviewData.ps1 regeneration. */
-  function ensureLocationVulnerabilityCategory() {
-    if (!DATA || !Array.isArray(DATA.categories)) return;
-    if (!Array.isArray(DATA.kpiDetailByCategory)) return;
-    const hasCat = DATA.categories.some((c) => c.categoryKey === 10);
-    const hasDetail = DATA.kpiDetailByCategory.some(
-      (x) => x.categoryKey === 10
-    );
-    if (hasCat && hasDetail) return;
-    if (!hasCat) {
-      DATA.categories.push({
-        categoryKey: 10,
-        categoryName: "Location Vulnerability",
-        sortOrder: 10,
-        uxNote:
-          "Location-based exposure and vulnerability — use Comparison view for current vs prior period by all BUs.",
-        kpiCount: 8,
-        latestMonthIndex: 65.5,
-      });
-      DATA.categories.sort(
-        (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+  /** Remove preview-only Location Vulnerability (10) — catalogue is nine domains only. */
+  function stripLocationVulnerabilityCategory() {
+    if (!DATA) return;
+    const drop = 10;
+    if (Array.isArray(DATA.categories)) {
+      DATA.categories = DATA.categories.filter(
+        (c) => Number(c.categoryKey) !== drop
       );
     }
-    if (!hasDetail) {
-      DATA.kpiDetailByCategory.push({
-        categoryKey: 10,
-        kpis: [
-          {
-            kpiKey: 13,
-            kpiName: "Near miss exposure by location",
-            unitType: "Count",
-            latestValue: 0,
-          },
-          {
-            kpiKey: 38,
-            kpiName: "Vulnerability observations (sites)",
-            unitType: "Count",
-            latestValue: 0,
-          },
-          {
-            kpiKey: 39,
-            kpiName: "Location risk closure %",
-            unitType: "PercentOrRate",
-            latestValue: 0,
-          },
-          {
-            kpiKey: 40,
-            kpiName: "SRFA completion (location work)",
-            unitType: "PercentOrRate",
-            latestValue: 0,
-          },
-          {
-            kpiKey: 45,
-            kpiName: "Inspection closure % (locations)",
-            unitType: "PercentOrRate",
-            latestValue: 0,
-          },
-          {
-            kpiKey: 46,
-            kpiName: "Action closure % (locations)",
-            unitType: "PercentOrRate",
-            latestValue: 0,
-          },
-          {
-            kpiKey: 53,
-            kpiName: "Unsafe acts per hour (site rounds)",
-            unitType: "Count",
-            latestValue: 0,
-          },
-        ],
+    if (Array.isArray(DATA.kpiDetailByCategory)) {
+      DATA.kpiDetailByCategory = DATA.kpiDetailByCategory.filter(
+        (x) => Number(x.categoryKey) !== drop
+      );
+    }
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter(
+        (r) => Number(r.categoryKey) !== drop
+      );
+    }
+    if (Array.isArray(DATA.monthlyByCategory)) {
+      DATA.monthlyByCategory = DATA.monthlyByCategory.filter(
+        (x) => Number(x.categoryKey) !== drop
+      );
+    }
+    if (Array.isArray(DATA.businessBreakdown)) {
+      DATA.businessBreakdown = DATA.businessBreakdown.filter(
+        (x) => Number(x.categoryKey) !== drop
+      );
+    }
+  }
+
+  stripLocationVulnerabilityCategory();
+
+  /**
+   * If embedded data is partial or failed to load, merge in missing domain rows so the
+   * Categories list always shows the full nine-domain catalogue.
+   */
+  function ensureCategoryCatalogueBaseline() {
+    if (!DATA || !Array.isArray(DATA.categories)) return;
+    const BASE = [
+      {
+        categoryKey: 1,
+        categoryName: "Incident Management",
+        sortOrder: 1,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 2,
+        categoryName: "Hazard & Observation Management",
+        sortOrder: 2,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 3,
+        categoryName: "Safety Performance Indices",
+        sortOrder: 3,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 4,
+        categoryName: "Consequence Management",
+        sortOrder: 4,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 5,
+        categoryName: "Assurance",
+        sortOrder: 5,
+        uxNote:
+          "Governance assurance visits, audits, and critical finding closure.",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 6,
+        categoryName: "Training & Competency Development",
+        sortOrder: 6,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 7,
+        categoryName: "Risk Control Programs",
+        sortOrder: 7,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 8,
+        categoryName: "Leadership & Safety Governance",
+        sortOrder: 8,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+      {
+        categoryKey: 9,
+        categoryName: "Systems Adoption & Digital Utilization",
+        sortOrder: 9,
+        uxNote: "",
+        kpiCount: 0,
+        latestMonthIndex: 0,
+      },
+    ];
+    const present = new Set(DATA.categories.map((c) => c.categoryKey));
+    for (let i = 0; i < BASE.length; i++) {
+      const b = BASE[i];
+      if (!present.has(b.categoryKey)) {
+        DATA.categories.push({ ...b });
+        present.add(b.categoryKey);
+      }
+    }
+    DATA.categories.sort(
+      (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+    );
+    if (Array.isArray(DATA.kpiDetailByCategory)) {
+      DATA.categories.forEach((cat) => {
+        const det = DATA.kpiDetailByCategory.find(
+          (x) => x.categoryKey === cat.categoryKey
+        );
+        if (det && Array.isArray(det.kpis) && det.kpis.length) {
+          cat.kpiCount = det.kpis.length;
+        }
       });
     }
   }
 
-  ensureLocationVulnerabilityCategory();
+  /** Resolve KPI display name for tooltips and map popups (preview catalogue + fact rows). */
+  function kpiNameForKey(kpiKey) {
+    const kk = String(kpiKey);
+    const blocks = DATA.kpiDetailByCategory || [];
+    for (let i = 0; i < blocks.length; i++) {
+      const kpis = blocks[i].kpis;
+      if (!kpis) continue;
+      const hit = kpis.find((x) => String(x.kpiKey) === kk);
+      if (hit && hit.kpiName) return hit.kpiName;
+    }
+    const fr = DATA.factRows;
+    if (fr && fr.length) {
+      const sample = fr.find((r) => String(r.kpiKey) === kk);
+      if (sample && sample.kpiName) return sample.kpiName;
+    }
+    return "KPI " + kk;
+  }
 
   /** Insights shell (`insights.html`): modern chrome + directory home; same logic as dashboard. */
   const insightShell =
@@ -183,7 +269,8 @@
   if (typeof Chart !== "undefined") {
     Chart.defaults.font.family = FONT_UI;
     Chart.defaults.font.size = 10;
-    Chart.defaults.color = "#231f20";
+    /** Default ink for all Chart.js text (legends, ticks, titles) */
+    Chart.defaults.color = CHART_INK;
   }
 
   /** States & UTs for filter dropdown (merged with any names present in data). */
@@ -331,12 +418,13 @@
 
   /**
    * Incident Management: add Fire + Property Damage (19 KPIs total). Seeded fact rows.
+   * Display names align with stakeholder list (Fire incidents / Property Damage incidents).
    */
   function previewAddIncidentFirePropertyKpis() {
     if (!DATA || !Array.isArray(DATA.factRows)) return;
     const INCIDENT_CAT = 1;
     const detail = DATA.kpiDetailByCategory.find(
-      (x) => x.categoryKey === INCIDENT_CAT
+      (x) => Number(x.categoryKey) === INCIDENT_CAT
     );
     if (!detail || !Array.isArray(detail.kpis)) return;
     const have = new Set(detail.kpis.map((k) => Number(k.kpiKey)));
@@ -433,15 +521,16 @@
   }
 
   /**
-   * Remove Risk Control Programs (7): S-4 / S-5 SRFA → Hazard (2); other KPIs → Consequence (4).
-   * Idempotent if category 7 is already absent.
+   * (Not invoked) Previously merged Risk Control (7) into Hazard / Consequence, which removed
+   * category 7 from the Categories list. Kept for reference; the preview shows all domains.
    */
   function previewStripRiskControlPrograms() {
     const RISK_CONTROL_CATEGORY_KEY = 7;
     const HAZARD_CAT = 2;
     const CONSEQUENCE_CAT = 4;
     const KPIS_TO_HAZARD = new Set([41, 42]);
-    const KPIS_TO_CONSEQUENCE = new Set([51, 52, 54]);
+    /** Exclude kpiKey 54 — used by Hazard (SI planned vs actual), not Risk Control merge. */
+    const KPIS_TO_CONSEQUENCE = new Set([51, 52]);
     if (
       !DATA ||
       !Array.isArray(DATA.categories) ||
@@ -525,21 +614,26 @@
     if (!DATA || !Array.isArray(DATA.factRows)) return;
 
     function stripCategory(k) {
-      DATA.categories = (DATA.categories || []).filter((c) => c.categoryKey !== k);
-      DATA.factRows = (DATA.factRows || []).filter((r) => r.categoryKey !== k);
+      const kk = Number(k);
+      DATA.categories = (DATA.categories || []).filter(
+        (c) => Number(c.categoryKey) !== kk
+      );
+      DATA.factRows = (DATA.factRows || []).filter(
+        (r) => Number(r.categoryKey) !== kk
+      );
       if (DATA.monthlyByCategory) {
         DATA.monthlyByCategory = DATA.monthlyByCategory.filter(
-          (x) => x.categoryKey !== k
+          (x) => Number(x.categoryKey) !== kk
         );
       }
       if (DATA.kpiDetailByCategory) {
         DATA.kpiDetailByCategory = DATA.kpiDetailByCategory.filter(
-          (x) => x.categoryKey !== k
+          (x) => Number(x.categoryKey) !== kk
         );
       }
       if (DATA.businessBreakdown) {
         DATA.businessBreakdown = DATA.businessBreakdown.filter(
-          (x) => x.categoryKey !== k
+          (x) => Number(x.categoryKey) !== kk
         );
       }
     }
@@ -591,22 +685,23 @@
 
     const assuranceKpis = [
       {
+        kpiKey: 503,
+        kpiName: "Incident Key Learning implementation %",
+        unitType: "PercentOrRate",
+        latestValue: 81,
+      },
+      {
         kpiKey: 501,
-        kpiName: "FRC Compliance Rate %",
+        kpiName: "FRC compliance Rate",
         unitType: "PercentOrRate",
         latestValue: 88,
       },
       {
         kpiKey: 502,
-        kpiName: "Standard Implementation %",
+        kpiName:
+          "% Standard Implementation against the top critical Safety Standards (4 nos.)",
         unitType: "PercentOrRate",
         latestValue: 72,
-      },
-      {
-        kpiKey: 503,
-        kpiName: "Key Learning Implementation %",
-        unitType: "PercentOrRate",
-        latestValue: 81,
       },
     ];
     DATA.categories.push({
@@ -684,14 +779,61 @@
 
     DATA.monthlyByCategory.push({
       categoryKey: ASSURANCE_CATEGORY_KEY,
-      series: rollupSeries(ASSURANCE_CATEGORY_KEY, 501),
+      series: rollupSeries(ASSURANCE_CATEGORY_KEY, 503),
     });
   }
 
+  /** Hazard category: SI planned vs actual (preview-seeded from SI rounds rows). */
+  function previewAddHazardSiPlannedActualKpi() {
+    if (!DATA || !Array.isArray(DATA.factRows)) return;
+    const haz = 2;
+    const siKpi = 54;
+    const block = DATA.kpiDetailByCategory.find((x) => x.categoryKey === haz);
+    if (!block || !Array.isArray(block.kpis)) return;
+    const siMeta = {
+      kpiKey: siKpi,
+      kpiName: "Safety Interaction (SI) – Planned vs. Actual",
+      unitType: "PercentOrRate",
+      latestValue: 84.2,
+    };
+    if (!block.kpis.some((k) => Number(k.kpiKey) === siKpi)) {
+      block.kpis.push(siMeta);
+      const cat = DATA.categories.find((c) => c.categoryKey === haz);
+      if (cat) cat.kpiCount = block.kpis.length;
+    }
+    if (
+      DATA.factRows.some(
+        (r) => r.categoryKey === haz && Number(r.kpiKey) === siKpi
+      )
+    ) {
+      return;
+    }
+    const template = DATA.factRows.filter(
+      (r) => r.categoryKey === haz && Number(r.kpiKey) === 53
+    );
+    if (!template.length) return;
+    const newRows = template.map((r) => {
+      const v = Number(r.value);
+      const n = Number.isFinite(v)
+        ? Math.min(100, Math.max(0, Math.round(v * 2.35 + 22)))
+        : 0;
+      return {
+        ...r,
+        kpiKey: siKpi,
+        kpiName: siMeta.kpiName,
+        value: n,
+      };
+    });
+    DATA.factRows.push(...newRows);
+    const catSync = DATA.categories.find((c) => c.categoryKey === haz);
+    if (catSync) catSync.kpiCount = block.kpis.length;
+  }
+
   previewApplyDataMetaTitles();
-  previewStripRiskControlPrograms();
   previewAddIncidentFirePropertyKpis();
   previewCategoryDataBootstrap();
+  previewAddHazardSiPlannedActualKpi();
+  ensureCategoryCatalogueBaseline();
 
   /** Detail table rows per page (keep in sync with styles.css --detail-table-body-rows) */
   const PAGE_SIZE = 5;
@@ -704,6 +846,7 @@
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
 
+  const INCIDENT_MANAGEMENT_CATEGORY_KEY = 1;
   const SPI_CATEGORY_KEY = 3;
   const HAZARD_CATEGORY_KEY = 2;
   /**
@@ -718,21 +861,85 @@
   const CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS = new Set([
     LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY,
   ]);
-  /** Percent speedometer (Adani_Safety_MIS_Theme.json: bad → good / teal). */
+  /**
+   * Leading vs lagging — used on the Categories list (#categories) chips only.
+   */
+  const CATEGORY_NATURE_BY_KEY = {
+    1: {
+      kind: "lagging",
+      label: "Lagging",
+      blurb:
+        "Incident counts, severity, and loss-time outcomes after events occur.",
+    },
+    2: {
+      kind: "leading",
+      label: "Leading",
+      blurb:
+        "Proactive observations, hazards, conditions, and planned interactions.",
+    },
+    3: {
+      kind: "lagging",
+      label: "Lagging (rate-based)",
+      blurb:
+        "Composite rate indices (e.g. TRIR, LTIFR) normalised by exposure.",
+    },
+    4: {
+      kind: "lagging",
+      label: "Lagging",
+      blurb: "Post-event consequence management and CMP follow-through.",
+    },
+    5: {
+      kind: "lagging",
+      label: "Lagging",
+      blurb:
+        "Assurance audits and manhour / exposure base for rate denominators.",
+    },
+    6: {
+      kind: "leading",
+      label: "Leading",
+      blurb: "Training coverage, competency, and programme intensity.",
+    },
+    7: {
+      kind: "leading",
+      label: "Leading / preventive",
+      blurb: "SRFA and preventive risk-control measures.",
+    },
+    8: {
+      kind: "strategic",
+      label: "Strategic",
+      blurb: "Governance and leadership signals (not in this preview build).",
+    },
+    9: {
+      kind: "leading",
+      label: "Leading",
+      blurb: "Digital adoption and system utilisation.",
+    },
+  };
+
+  function categoryListChipLeadingLagging(catKey) {
+    const n = CATEGORY_NATURE_BY_KEY[catKey];
+    const lagging = n && n.kind === "lagging";
+    return {
+      label: lagging ? "Lagging" : "Leading",
+      chipKind: lagging ? "lagging" : "leading",
+    };
+  }
+  /** Adani approved palette — #00B16B #006DB6 #8E278F #F04C23 #E6E7E8 (charts: KPI dashboard only). */
+  const ADANI_GREEN = "#00B16B";
+  const ADANI_BLUE = "#006DB6";
+  const ADANI_PURPLE = "#8E278F";
+  const ADANI_ORANGE = "#F04C23";
+  const ADANI_GREY = "#E6E7E8";
+  /** Percent speedometer arc: concern → OK using brand hues. */
   const SPEEDOMETER_ARC_HEX = [
-    "#DC2626",
-    "#EA580C",
-    "#F59E0B",
-    "#00A3A3",
-    "#0D9488",
+    ADANI_ORANGE,
+    "#FF8A50",
+    "#F5C400",
+    ADANI_GREEN,
+    ADANI_BLUE,
   ];
-  /** Assurance — all three preview KPIs use the speedometer. */
-  const ASSURANCE_SPEEDOMETER_KPI_KEYS = new Set(["501", "502", "503"]);
-  const TRAINING_SAKSHAM_SPEEDOMETER_KPI_KEY = "49";
-  const SYSTEMS_SAFEX_SPEEDOMETER_KPI_KEY = "50";
-  const LOCATION_VULN_CAT_KEY = 10;
-  const LOCATION_VULN_SOURCE_CAT = 2;
-  const LOCATION_VULN_KPI_KEYS = new Set([13, 38, 39, 40, 45, 46, 53]);
+  /** Incident Key Learning (501): dual Group vs business gauge when selected in Assurance. */
+  const INCIDENT_KEY_LEARNING_SPEEDOMETER_KPI_KEY = "501";
   const EVENT_LEVEL_LABELS = [
     "0 Near Miss",
     "1 Minor",
@@ -742,11 +949,10 @@
     "5 Catastrophic",
     "No Level",
   ];
-  /** Dim_KPI category 3 order — TRI first. */
-  const SPI_KPI_ORDER = [21, 16, 17, 18, 20, 29];
-  /** Risk quadrant bubble: X ≈ concern / reporting culture (Near Miss FR), Y = Fatality rate (%). */
-  const SPI_QUADRANT_X_KPI = 20;
-  const SPI_QUADRANT_Y_KPI = 16;
+  /** Safety Performance Indices (category 3): Fatality rate → LTIFR → LTISR → TRIR → Vehicle rate → Near Miss FR. */
+  const SPI_KPI_ORDER = [16, 17, 18, 21, 29, 20];
+  /** Heat map row order (matches reference: Fatality → LTIFR → LTISR → Near Miss FR → Incident rate → Vehicle). */
+  const SPI_HEATMAP_KPI_ORDER = [16, 17, 18, 20, 21, 29];
   /** Approximate centroids for India states/UTs (preview map). */
   const STATE_CENTROID_BY_STATE = {
     "Andaman and Nicobar Islands": [11.7401, 92.6586],
@@ -817,6 +1023,10 @@
       h = Math.imul(h, 16777619);
     }
     return h >>> 0;
+  }
+
+  function formatBusinessSiteRowLabel(bu) {
+    return bu;
   }
 
   /** Deterministic event-severity bucket per fact row (preview — replace with model field when available). */
@@ -938,16 +1148,22 @@
     return VS_PERIOD_CAPTION[mode] || VS_PERIOD_CAPTION.vs_last_month;
   }
 
-  /** IA: visible journey — aligns with header nav (Home / Categories); no duplicate controls. */
-  function journeyStepsHtml(step) {
-    function item(n, label, isActive) {
+  /** IA: visible journey — aligns with header nav (Home / Categories); step 3 shows current category on KPI drill. */
+  function journeyStepsHtml(step, step3Label) {
+    const s3 =
+      step3Label != null && String(step3Label).trim() !== ""
+        ? String(step3Label).trim()
+        : "Explore KPIs";
+    function item(n, label, isActive, extraAttrs) {
       const cls = isActive ? " route-steps__item--active" : "";
       const cur = isActive ? ' aria-current="step"' : "";
+      const attrs = extraAttrs || "";
       return (
         '<span class="route-steps__item' +
         cls +
         '"' +
         cur +
+        attrs +
         ">" +
         n +
         " " +
@@ -955,13 +1171,17 @@
         "</span>"
       );
     }
+    const thirdAttrs =
+      step === 3 ? ' id="cat-heading" tabindex="-1"' : "";
     return (
-      '<nav class="route-steps" aria-label="Journey: Home, Categories, Explore KPIs">' +
+      '<nav class="route-steps" aria-label="Journey: Home, Categories, ' +
+      escapeAttr(s3) +
+      '">' +
       item(1, "Home", step === 1) +
       '<span class="route-steps__sep" aria-hidden="true">→</span>' +
       item(2, "Categories", step === 2) +
       '<span class="route-steps__sep" aria-hidden="true">→</span>' +
-      item(3, "Explore KPIs", step === 3) +
+      item(3, s3, step === 3, thirdAttrs) +
       "</nav>"
     );
   }
@@ -977,6 +1197,14 @@
       .replace(/&/g, "&amp;")
       .replace(/"/g, "&quot;")
       .replace(/</g, "&lt;");
+  }
+
+  function escapeHtmlMultiline(s) {
+    if (s == null) return "";
+    return String(s)
+      .split("\n")
+      .map((line) => escapeHtml(line))
+      .join("<br>");
   }
 
   const EXPORT_DL_ICON_SVG =
@@ -997,15 +1225,130 @@
     );
   }
 
-  function chartBlockTitleHtml(innerSpansHtml, dataId, slug) {
+  /**
+   * Chart title row: label + hint, optional “i” info (hover/focus shows parameters),
+   * JPEG export. infoText: plain lines separated by \n (escaped).
+   */
+  function chartBlockTitleHtml(innerSpansHtml, dataId, slug, infoText) {
+    const sid = escapeAttr(String(slug || dataId || "chart"));
+    const insightOnly = infoText ? chartHelpInsightOnly(infoText) : "";
+    const tip =
+      insightOnly &&
+      '<span class="chart-info-wrap">' +
+        '<button type="button" class="chart-info-btn" aria-describedby="ti-' +
+        sid +
+        '" aria-label="What this chart shows">i</button>' +
+        '<span class="chart-info-tooltip" id="ti-' +
+        sid +
+        '" role="tooltip">' +
+        escapeHtmlMultiline(insightOnly) +
+        "</span></span>";
     return (
       '<h3 class="chart-analytics-title chart-analytics-title--toolbar">' +
       '<span class="chart-analytics-title__text">' +
       innerSpansHtml +
       "</span>" +
+      (tip || "") +
       chartDownloadButton(dataId, slug) +
       "</h3>"
     );
+  }
+
+  const CHART_HELP = {
+    trend:
+      "Insight: Month-on-month trend for the active KPI.\nUses: Selected KPI(s), reference month, Versus mode window, Business unit, State, Site, Personal type, Vertical checkpoints.\nExport: JPEG via camera icon.",
+    spiTrend:
+      "Insight: How each Safety Performance Index KPI moves over the last months.\nUses: All SPI KPIs in parallel, same global filters and calendar end month as the page.\nExport: JPEG.",
+    hazardHeat:
+      "Insight: Leading hazard activity — density by week or month from preview heat map seed.\nUses: Hazard period toggle, Vs window, Business / Vertical filters.\nExport: JPEG.",
+    hazardBiz:
+      "Insight: Compare the selected KPI across business units (horizontal bars).\nUses: KPI scope checkboxes, Business filter, Vs comparison window.\nExport: JPEG.",
+    hazardVert:
+      "Insight: Share of the selected KPI across Field / O&M / Office / Projects for the Vs window.\nUses: Vertical checkpoints, KPI selection, filters.\nExport: JPEG.",
+    spiHeat:
+      "Insight: Six-month grid of SPI indices — each cell is the monthly average for your filters; shading runs light→dark within that KPI row (compare months for the same measure).\nRows use three color families: green (fatality / LTIFR / LTISR / vehicle), red (Near Miss FR), orange (TRIR).\nUses: All SPI KPIs, same filters as the rest of the page.\nExport: JPEG via camera icon.",
+    spiMix:
+      "Insight: 100% stacked trend of SPI KPI mix by month — see which indices dominate over time.\nUses: All SPI KPIs, filters.\nExport: JPEG.",
+    bizRadar:
+      "Insight: Radar comparing the same KPI across every preview business — shape shows balance.\nUses: Primary KPI from scope, Vs window for “latest” slice.\nExport: JPEG.",
+    vertical:
+      "Insight: Line across vertical checkpoints for the active KPI (latest month slice).\nUses: KPI selection, Vertical scope, Business / State filters.\nExport: JPEG.",
+    compareBu:
+      "Insight: Grouped bars — base period vs current period for the active KPI, every BU.\nUses: Vs mode (defines base vs current), KPI selection, filters.\nExport: JPEG.",
+  };
+
+  /** Chart "i" tooltip: keep Insight block only (drops Uses / Export lines). */
+  function chartHelpInsightOnly(raw) {
+    if (raw == null || raw === "") return "";
+    const s = String(raw);
+    const lower = s.toLowerCase();
+    const start = lower.indexOf("insight:");
+    if (start === -1) {
+      return s
+        .split("\n")
+        .filter(
+          (line) =>
+            !/^\s*uses:\s*/i.test(line) && !/^\s*export:\s*/i.test(line)
+        )
+        .join("\n")
+        .trim();
+    }
+    let end = s.length;
+    const u = lower.indexOf("\nuses:", start);
+    const e = lower.indexOf("\nexport:", start);
+    if (u !== -1) end = Math.min(end, u);
+    if (e !== -1) end = Math.min(end, e);
+    return s.slice(start, end).trim();
+  }
+
+  /** Trend chart subtitle under title: active filters only (no series window). */
+  function chartTrendHintFiltersOnly(f) {
+    if (!f) return "";
+    const parts = [];
+    if (f.monthFrom) {
+      const to = f.monthTo || f.refMonth || "";
+      parts.push(
+        "Calendar slice " +
+          formatMonthYear(f.monthFrom) +
+          " – " +
+          formatMonthYear(to)
+      );
+    }
+    parts.push(vsOptionLabel(f.vsMode || DEFAULT_VS_MODE));
+    if (f.business && f.business !== "all") parts.push(String(f.business));
+    if (f.state && f.state !== "all") parts.push(String(f.state));
+    if (f.site && f.site !== "all") parts.push("Site: " + String(f.site));
+    if (f.personalType && f.personalType !== "all") {
+      parts.push("Personal: " + String(f.personalType));
+    }
+    if (f.variable && f.variable.length) {
+      parts.push(
+        "Vertical " +
+          f.variable.length +
+          " checkpoint" +
+          (f.variable.length === 1 ? "" : "s")
+      );
+    }
+    return parts.join(" · ");
+  }
+
+  function trendInsightTooltipForChartLine(f) {
+    if (!f) return chartHelpInsightOnly(CHART_HELP.trend);
+    if (insightShell && shouldShowPercentSpeedometerChart(f.catKey, f)) {
+      return "Insight: % completion vs group average (preview gauge).";
+    }
+    return chartHelpInsightOnly(CHART_HELP.trend);
+  }
+
+  function refreshTrendInsightTooltips(f) {
+    const tiSpi = document.getElementById("ti-trend-spi");
+    if (tiSpi) {
+      tiSpi.textContent = chartHelpInsightOnly(CHART_HELP.spiTrend);
+    }
+    const tiLine = document.getElementById("ti-trend-line");
+    if (tiLine && f) {
+      tiLine.textContent = trendInsightTooltipForChartLine(f);
+    }
   }
 
   const LS_VARIABLE_FILTER = "mis-variable-checkpoints";
@@ -1017,13 +1360,13 @@
     : "adani_cat_main_view";
 
   const TREND_LINE_COLORS = [
-    "#006DB6",
-    "#00B16B",
-    "#E87722",
-    "#6B2D90",
-    "#C41230",
-    "#007A87",
-    "#5C6BC0",
+    ADANI_BLUE,
+    ADANI_GREEN,
+    ADANI_PURPLE,
+    ADANI_ORANGE,
+    "#1E9FD6",
+    "#26C9A0",
+    "#C77DCC",
   ];
 
   function hexToRgba(hex, alpha) {
@@ -1037,7 +1380,7 @@
 
   /** Default KPI checkbox seed when localStorage is empty (aligns with insights: incident = first five TRI block). */
   function defaultPreviewKpiSeed(catKey, kpisMeta) {
-    if (catKey === 1 && kpisMeta.length) {
+    if (catKey === INCIDENT_MANAGEMENT_CATEGORY_KEY && kpisMeta.length) {
       const want = ["1", "2", "3", "4", "5"];
       const valid = new Set(kpisMeta.map((k) => String(k.kpiKey)));
       const kept = want.filter((id) => valid.has(id));
@@ -1456,30 +1799,79 @@
     return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
+  /** Badge text for KPI unit type (Dim_KPI.Unit_Type → Count, % / Rate, Days, Hours). */
+  function kpiUnitTypeLabel(unitType) {
+    const u = String(unitType || "").trim();
+    if (u === "Count") return "Count";
+    if (u === "PercentOrRate") return "% / Rate";
+    if (u === "Days") return "Days";
+    if (u === "Hours") return "Hours";
+    return u || "—";
+  }
+
+  function kpiUnitTypeTitle(unitType) {
+    const u = String(unitType || "").trim();
+    if (u === "Count") return "Measure type: count";
+    if (u === "PercentOrRate") return "Measure type: percentage or rate";
+    if (u === "Days") return "Measure type: days";
+    if (u === "Hours") return "Measure type: hours";
+    return u ? "Measure type: " + u : "Measure type";
+  }
+
   function getCategory(catKey) {
-    return DATA.categories.find((c) => c.categoryKey === catKey);
+    const ck = Number(catKey);
+    return DATA.categories.find((c) => Number(c.categoryKey) === ck);
   }
 
   function getKpis(catKey) {
-    const k = DATA.kpiDetailByCategory.find((x) => x.categoryKey === catKey);
-    const list = k ? k.kpis.slice() : [];
-    if (catKey === SPI_CATEGORY_KEY) return list;
-    return list.filter((kpi) => !isTriKpiMeta(kpi));
+    const ck = Number(catKey);
+    const blocks = Array.isArray(DATA.kpiDetailByCategory)
+      ? DATA.kpiDetailByCategory
+      : [];
+    let k = blocks.find((x) => Number(x.categoryKey) === ck);
+    if (!k) {
+      k = blocks.find((x) => String(x.categoryKey) === String(catKey));
+    }
+    let list =
+      k && Array.isArray(k.kpis) ? k.kpis.slice() : [];
+    if (!list.length && Array.isArray(DATA.factRows)) {
+      const byKey = new Map();
+      for (let i = 0; i < DATA.factRows.length; i++) {
+        const r = DATA.factRows[i];
+        if (r == null) continue;
+        const rc = r.categoryKey;
+        if (Number(rc) !== ck && String(rc) !== String(ck)) continue;
+        const kk = Number(r.kpiKey);
+        if (Number.isNaN(kk)) continue;
+        if (byKey.has(kk)) continue;
+        byKey.set(kk, {
+          kpiKey: r.kpiKey,
+          kpiName: r.kpiName || "KPI " + kk,
+          unitType: r.unitType || "Count",
+          latestValue: null,
+        });
+      }
+      list = Array.from(byKey.values());
+    }
+    if (ck === SPI_CATEGORY_KEY) return list;
+    const filtered = list.filter((kpi) => !isTriKpiMeta(kpi));
+    return filtered.length ? filtered : list;
   }
 
   /** Preferred default KPI in dropdown (TRI / TRIR); fallback: first KPI in display order. */
   const TRI_LABEL_FULL = "Total Recordable Incident Rate (TRI)";
 
   function defaultKpiKeyForCategory(catKey, kpisMetaForUi) {
+    const cat = Number(catKey);
     const merged =
       kpisMetaForUi && kpisMetaForUi.length
         ? kpisMetaForUi
         : kpiListForFilterDropdown(catKey);
-    if (catKey === HAZARD_CATEGORY_KEY) {
+    if (cat === HAZARD_CATEGORY_KEY) {
       const sorted = sortKpisForDisplay(catKey, merged);
       return sorted.length ? String(sorted[0].kpiKey) : "38";
     }
-    if (catKey === SPI_CATEGORY_KEY) {
+    if (cat === SPI_CATEGORY_KEY) {
       const tri = merged.find((k) => isTriKpiMeta(k));
       if (tri) return String(tri.kpiKey);
     }
@@ -1504,8 +1896,9 @@
 
   /** KPI dropdown: TRIR / TRI only under Safety Performance Indices (category 3). */
   function kpiListForFilterDropdown(catKey) {
+    const cat = Number(catKey);
     let base = getKpis(catKey);
-    if (catKey === SPI_CATEGORY_KEY && !base.some(isTriKpiMeta)) {
+    if (cat === SPI_CATEGORY_KEY && !base.some(isTriKpiMeta)) {
       base = [
         {
           kpiKey: 21,
@@ -1560,113 +1953,6 @@
     if (host) host.innerHTML = "";
   }
 
-  function destroyLocBuLeafletMap() {
-    if (window.__adaniLocBuMap) {
-      try {
-        window.__adaniLocBuMap.remove();
-      } catch {
-        /* ignore */
-      }
-      window.__adaniLocBuMap = null;
-    }
-    const host = document.getElementById("chart-loc-bu-map");
-    if (host) host.innerHTML = "";
-  }
-
-  /** Single-flight loader for Google Maps JS + Leaflet.GridLayer.GoogleMutant (India BU map). */
-  var __adaniGoogleMapsLoadPromise = null;
-
-  function getGoogleMapsApiKey() {
-    try {
-      if (typeof window.__GOOGLE_MAPS_API_KEY__ === "string") {
-        const wk = window.__GOOGLE_MAPS_API_KEY__.trim();
-        if (wk) return wk;
-      }
-      const meta = document.querySelector('meta[name="google-maps-api-key"]');
-      if (meta) {
-        const mk = String(meta.getAttribute("content") || "").trim();
-        if (mk) return mk;
-      }
-    } catch {
-      /* ignore */
-    }
-    return "";
-  }
-
-  function loadGoogleMapsAndMutant() {
-    if (
-      typeof L !== "undefined" &&
-      L.gridLayer &&
-      L.gridLayer.googleMutant &&
-      typeof window.google !== "undefined" &&
-      window.google.maps
-    ) {
-      return Promise.resolve(true);
-    }
-    const key = getGoogleMapsApiKey();
-    if (!key) return Promise.resolve(false);
-    if (__adaniGoogleMapsLoadPromise) return __adaniGoogleMapsLoadPromise;
-
-    __adaniGoogleMapsLoadPromise = new Promise(function (resolve) {
-      function finishFail() {
-        __adaniGoogleMapsLoadPromise = null;
-        resolve(false);
-      }
-
-      function attachMutant() {
-        if (L.gridLayer && L.gridLayer.googleMutant) {
-          resolve(true);
-          return;
-        }
-        const s2 = document.createElement("script");
-        s2.src =
-          "https://unpkg.com/leaflet.gridlayer.googlemutant@0.14.1/dist/Leaflet.GoogleMutant.js";
-        s2.crossOrigin = "";
-        s2.onload = function () {
-          if (L.gridLayer && L.gridLayer.googleMutant) resolve(true);
-          else finishFail();
-        };
-        s2.onerror = finishFail;
-        document.head.appendChild(s2);
-      }
-
-      if (typeof window.google !== "undefined" && window.google.maps) {
-        attachMutant();
-        return;
-      }
-
-      const cbName = "__adaniGmapsApiReady";
-      window[cbName] = function () {
-        try {
-          delete window[cbName];
-        } catch {
-          window[cbName] = undefined;
-        }
-        attachMutant();
-      };
-
-      const s = document.createElement("script");
-      s.src =
-        "https://maps.googleapis.com/maps/api/js?key=" +
-        encodeURIComponent(key) +
-        "&callback=" +
-        cbName;
-      s.async = true;
-      s.defer = true;
-      s.onerror = function () {
-        try {
-          delete window[cbName];
-        } catch {
-          window[cbName] = undefined;
-        }
-        finishFail();
-      };
-      document.head.appendChild(s);
-    });
-
-    return __adaniGoogleMapsLoadPromise;
-  }
-
   function destroyCharts() {
     [
       "chart-line",
@@ -1683,7 +1969,6 @@
       }
     });
     destroySpiLeafletMap();
-    destroyLocBuLeafletMap();
     const spiHmHost = document.getElementById("spi-hazard-heatmap-host");
     if (spiHmHost) spiHmHost.innerHTML = "";
     try {
@@ -1734,16 +2019,6 @@
     }
   }
 
-  function resizeLocBuMapIfAny() {
-    if (window.__adaniLocBuMap && typeof window.__adaniLocBuMap.invalidateSize === "function") {
-      try {
-        window.__adaniLocBuMap.invalidateSize();
-      } catch {
-        /* ignore */
-      }
-    }
-  }
-
   function resizeAllChartsIndex() {
     [
       "chart-line",
@@ -1760,7 +2035,6 @@
       }
     });
     resizeSpiMapIfAny();
-    resizeLocBuMapIfAny();
     if (typeof window.__adaniSpeedometerGaugeRedraw === "function") {
       try {
         window.__adaniSpeedometerGaugeRedraw();
@@ -1770,277 +2044,201 @@
     }
   }
 
-  const spiQuadrantZonePlugin = {
-    id: "spiQuadrantZone",
-    beforeDatasetsDraw(chart) {
-      const mid = chart.options.plugins && chart.options.plugins.spiQuadrantMid;
-      const sx = chart.scales.x;
-      const sy = chart.scales.y;
-      if (!mid || mid.x == null || mid.y == null || !sx || !sy) return;
-      const { ctx, chartArea } = chart;
-      const px = sx.getPixelForValue(mid.x);
-      const py = sy.getPixelForValue(mid.y);
-      const L = chartArea.left;
-      const R = chartArea.right;
-      const T = chartArea.top;
-      const B = chartArea.bottom;
-      const zones = [
-        {
-          x: L,
-          y: T,
-          w: px - L,
-          h: py - T,
-          fill: "rgba(254, 240, 138, 0.5)",
-        },
-        {
-          x: px,
-          y: T,
-          w: R - px,
-          h: py - T,
-          fill: "rgba(253, 186, 116, 0.32)",
-        },
-        {
-          x: L,
-          y: py,
-          w: px - L,
-          h: B - py,
-          fill: "rgba(229, 231, 235, 0.4)",
-        },
-        {
-          x: px,
-          y: py,
-          w: R - px,
-          h: B - py,
-          fill: "rgba(187, 247, 208, 0.5)",
-        },
-      ];
-      for (let i = 0; i < zones.length; i++) {
-        const z = zones[i];
-        ctx.save();
-        ctx.fillStyle = z.fill;
-        ctx.fillRect(z.x, z.y, z.w, z.h);
-        ctx.restore();
-      }
+  const SPI_HM_PAL = {
+    green: {
+      light: [220, 255, 232],
+      dark: [13, 68, 48],
+      textDark: [15, 40, 30],
+      textLight: [255, 255, 255],
+    },
+    red: {
+      light: [255, 230, 240],
+      dark: [183, 28, 28],
+      textDark: [80, 24, 32],
+      textLight: [255, 255, 255],
+    },
+    orange: {
+      light: [255, 243, 224],
+      dark: [230, 81, 0],
+      textDark: [100, 48, 0],
+      textLight: [255, 255, 255],
     },
   };
 
-  const spiQuadrantLinePlugin = {
-    id: "spiQuadrantLine",
-    afterDatasetsDraw(chart) {
-      const mid = chart.options.plugins && chart.options.plugins.spiQuadrantMid;
-      const sx = chart.scales.x;
-      const sy = chart.scales.y;
-      if (!mid || mid.x == null || mid.y == null || !sx || !sy) return;
-      const { ctx, chartArea } = chart;
-      const px = sx.getPixelForValue(mid.x);
-      const py = sy.getPixelForValue(mid.y);
-      const L = chartArea.left;
-      const R = chartArea.right;
-      const T = chartArea.top;
-      const B = chartArea.bottom;
-      ctx.save();
-      ctx.strokeStyle = "rgba(35, 31, 32, 0.55)";
-      ctx.lineWidth = 1.25;
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.moveTo(px, T);
-      ctx.lineTo(px, B);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(L, py);
-      ctx.lineTo(R, py);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = "rgba(35, 31, 32, 0.75)";
-      ctx.font = "600 8px " + FONT_UI;
-      ctx.textAlign = "left";
-      ctx.fillText("Group avg", Math.min(px + 4, R - 52), T + 10);
-      ctx.restore();
-    },
-  };
+  function spiHeatmapPalette(kpiKey) {
+    const k = Number(kpiKey);
+    if (k === 20) return SPI_HM_PAL.red;
+    if (k === 21) return SPI_HM_PAL.orange;
+    return SPI_HM_PAL.green;
+  }
+
+  function lerpRgbSpiHm(a, b, t) {
+    return [
+      Math.round(a[0] + (b[0] - a[0]) * t),
+      Math.round(a[1] + (b[1] - a[1]) * t),
+      Math.round(a[2] + (b[2] - a[2]) * t),
+    ];
+  }
+
+  function styleForSpiHeatmapCell(tNorm, pal) {
+    const rgb = lerpRgbSpiHm(pal.light, pal.dark, tNorm);
+    const lum =
+      (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2]) / 255;
+    const textRgb = lum > 0.55 ? pal.textDark : pal.textLight;
+    return (
+      "background:rgb(" +
+      rgb.join(",") +
+      ");color:rgb(" +
+      textRgb.join(",") +
+      ")"
+    );
+  }
+
+  function formatSpiHeatmapValue(v) {
+    if (v == null || Number.isNaN(Number(v))) return "—";
+    const n = Number(v);
+    const a = Math.abs(n);
+    if (a > 0 && a < 1) return n.toFixed(4);
+    return n.toFixed(2);
+  }
 
   /**
-   * SPI cross-plot: Concern-style reporting (Near Miss FR %) vs Fatality rate (%),
-   * bubble size ∝ SPI row volume for that BU; quadrants split at group averages.
+   * SPI heat map: KPI rows × last six calendar months; per-row color scale (greens / Near Miss reds / Incident oranges).
    */
-  function renderSpiRiskQuadrantChart(snapPool, f) {
+  function renderSpiPerfHeatmapChart(snapPool, f) {
     const el = document.getElementById("chart-spi-bubble");
-    if (!el || typeof Chart === "undefined") return;
-    const prev = Chart.getChart(el);
-    if (prev) prev.destroy();
+    if (!el) return;
 
-    const winMonths = new Set(
-      bizUnitWindowMonths(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
-    );
-    const rows = snapPool.filter((r) => winMonths.has(r.yearMonth));
-
-    const BU_COLORS = [
-      "rgba(0, 109, 182, 0.55)",
-      "rgba(0, 177, 107, 0.55)",
-      "rgba(142, 39, 143, 0.5)",
-      "rgba(240, 76, 35, 0.5)",
-      "rgba(59, 130, 246, 0.5)",
-      "rgba(234, 179, 8, 0.55)",
-      "rgba(99, 102, 241, 0.5)",
-      "rgba(236, 72, 153, 0.45)",
-    ];
-    const BU_BORDERS = [
-      "#006DB6",
-      "#00a86b",
-      "#8E278F",
-      "#F04C23",
-      "#2563eb",
-      "#ca8a04",
-      "#4f46e5",
-      "#db2777",
-    ];
-
-    const points = [];
-    PREVIEW_BUSINESS_NAMES.forEach((previewBu, bi) => {
-      const buFact = factBusinessNameForPreview(previewBu);
-      const sub = rows.filter(
-        (r) => String(r.businessName || "").trim() === buFact
-      );
-      if (!sub.length) return;
-      const xRows = sub.filter(
-        (r) => String(r.kpiKey) === String(SPI_QUADRANT_X_KPI)
-      );
-      const yRows = sub.filter(
-        (r) => String(r.kpiKey) === String(SPI_QUADRANT_Y_KPI)
-      );
-      const xVals = xRows
-        .map((r) => Number(r.value))
-        .filter((v) => !Number.isNaN(v));
-      const yVals = yRows
-        .map((r) => Number(r.value))
-        .filter((v) => !Number.isNaN(v));
-      const x = xVals.length ? avg(xVals) : null;
-      const y = yVals.length ? avg(yVals) : null;
-      if (x == null || y == null) return;
-      const n = sub.length;
-      const rPx = Math.max(10, Math.min(38, 6 + Math.sqrt(n) * 2.2));
-      points.push({
-        x,
-        y,
-        r: rPx,
-        bu: previewBu,
-        n,
-        bg: BU_COLORS[bi % BU_COLORS.length],
-        bd: BU_BORDERS[bi % BU_BORDERS.length],
-      });
-    });
-
-    if (!points.length) {
-      points.push({
-        x: 2.5,
-        y: 0.12,
-        r: 18,
-        bu: "Preview (no BU slice)",
-        n: 0,
-        bg: "rgba(0, 109, 182, 0.35)",
-        bd: "#006DB6",
-      });
+    const colMonths = calendarClippedMonthKeys(f, 6);
+    if (!colMonths.length) {
+      el.innerHTML =
+        '<p class="spi-perf-hm-fallback">No months in range for this heat map.</p>';
+      el.setAttribute("aria-label", "SPI heat map: no data in calendar range.");
+      return;
     }
 
-    const xs = points.map((p) => p.x);
-    const ys = points.map((p) => p.y);
-    const midX = avg(xs);
-    const midY = avg(ys);
-    const padX = Math.max(0.4, (Math.max(...xs) - Math.min(...xs)) * 0.12 || 0.5);
-    const padY = Math.max(0.02, (Math.max(...ys) - Math.min(...ys)) * 0.15 || 0.03);
-
-    new Chart(el, {
-      type: "bubble",
-      plugins: [spiQuadrantZonePlugin, spiQuadrantLinePlugin],
-      data: {
-        datasets: [
-          {
-            label: "Business units",
-            data: points.map((p) => ({
-              x: p.x,
-              y: p.y,
-              r: p.r,
-              bu: p.bu,
-              n: p.n,
-            })),
-            backgroundColor: points.map((p) => p.bg),
-            borderColor: points.map((p) => p.bd),
-            borderWidth: 1.5,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        layout: { padding: { top: 14, right: 14, bottom: 10, left: 10 } },
-        plugins: {
-          legend: { display: false },
-          spiQuadrantMid: { x: midX, y: midY },
-          tooltip: {
-            callbacks: {
-              label(ctx) {
-                const raw = ctx.raw;
-                const bu = raw.bu || "—";
-                const n = raw.n != null ? raw.n : 0;
-                return (
-                  " " +
-                  bu +
-                  " · Concern rate " +
-                  Number(raw.x).toFixed(2) +
-                  "% · Fatality " +
-                  Number(raw.y).toFixed(3) +
-                  "% · Rows " +
-                  n
-                );
-              },
-            },
-          },
-        },
-        scales: {
-          x: {
-            type: "linear",
-            suggestedMin: Math.max(0, Math.min(...xs) - padX),
-            suggestedMax: Math.max(...xs) + padX,
-            ticks: { font: { size: 9 }, color: "#231F20" },
-            title: {
-              display: true,
-              text: "Concern reporting rate (Near Miss FR %)",
-              font: { size: 10 },
-              color: "#6D6E71",
-            },
-            grid: { color: "rgba(109, 110, 113, 0.14)" },
-          },
-          y: {
-            type: "linear",
-            beginAtZero: true,
-            suggestedMax: Math.max(...ys) + padY,
-            ticks: { font: { size: 9 }, color: "#231F20" },
-            title: {
-              display: true,
-              text: "Fatality rate (%)",
-              font: { size: 10 },
-              color: "#6D6E71",
-            },
-            grid: { color: "rgba(109, 110, 113, 0.2)" },
-          },
-        },
-      },
+    const monthShort = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    const colLabels = colMonths.map((ym) => {
+      const p = ym.split("-");
+      const mon = monthShort[Number(p[1]) - 1] || p[1];
+      const yy = String(p[0]).slice(2);
+      return mon + "\u2019" + yy;
     });
+
+    const kpisMeta = getKpis(SPI_CATEGORY_KEY);
+    const byKey = new Map(
+      kpisMeta.map((k) => [Number(k.kpiKey), k])
+    );
+
+    const matrix = [];
+    for (let ri = 0; ri < SPI_HEATMAP_KPI_ORDER.length; ri++) {
+      const kpid = SPI_HEATMAP_KPI_ORDER[ri];
+      const row = [];
+      for (let ci = 0; ci < colMonths.length; ci++) {
+        const ym = colMonths[ci];
+        const sub = snapPool.filter(
+          (r) =>
+            String(r.kpiKey) === String(kpid) &&
+            String(r.yearMonth) === String(ym)
+        );
+        const vals = sub
+          .map((r) => Number(r.value))
+          .filter((v) => !Number.isNaN(v));
+        row.push(vals.length ? avg(vals) : null);
+      }
+      matrix.push(row);
+    }
+
+    function normFnForRow(ri) {
+      const row = matrix[ri];
+      const vals = row.filter(
+        (v) => v != null && !Number.isNaN(Number(v))
+      );
+      if (!vals.length) {
+        return function () {
+          return 0.5;
+        };
+      }
+      const mn = Math.min.apply(null, vals);
+      const mx = Math.max.apply(null, vals);
+      if (mx <= mn) {
+        return function () {
+          return 0.5;
+        };
+      }
+      return function (v) {
+        if (v == null || Number.isNaN(Number(v))) return 0;
+        return (Number(v) - mn) / (mx - mn);
+      };
+    }
+
+    let html =
+      '<table class="spi-perf-heatmap-table" role="grid"><thead><tr><th class="spi-perf-hm-corner" scope="col"></th>';
+    for (let c = 0; c < colLabels.length; c++) {
+      html +=
+        '<th scope="col" class="spi-perf-hm-colhead">' +
+        escapeHtml(colLabels[c]) +
+        "</th>";
+    }
+    html += "</tr></thead><tbody>";
+    for (let r = 0; r < SPI_HEATMAP_KPI_ORDER.length; r++) {
+      const kpid = SPI_HEATMAP_KPI_ORDER[r];
+      const meta = byKey.get(kpid);
+      const rowLabel = meta
+        ? kpiDropdownLabel(meta)
+        : "KPI " + kpid;
+      const norm = normFnForRow(r);
+      const pal = spiHeatmapPalette(kpid);
+      html +=
+        '<tr><th scope="row" class="spi-perf-hm-rowhead">' +
+        escapeHtml(rowLabel) +
+        "</th>";
+      for (let c = 0; c < colMonths.length; c++) {
+        const v = matrix[r][c];
+        if (v == null || Number.isNaN(Number(v))) {
+          html += '<td class="spi-perf-hm-cell spi-perf-hm-cell--na">—</td>';
+        } else {
+          const t = norm(v);
+          html +=
+            '<td class="spi-perf-hm-cell" style="' +
+            escapeAttr(styleForSpiHeatmapCell(t, pal)) +
+            '">' +
+            escapeHtml(formatSpiHeatmapValue(v)) +
+            "</td>";
+        }
+      }
+      html += "</tr>";
+    }
+    html += "</tbody></table>";
+    el.innerHTML = html;
     el.setAttribute(
       "aria-label",
-      "Bubble quadrant chart: concern reporting rate versus fatality rate by business unit; bubble size reflects filtered SPI row volume; yellow top-left is higher risk, green bottom-right is lower risk; dashed lines are group averages."
+      "Safety performance indices heat map: SPI KPI rows by month; color intensity reflects relative value within each row for the current filters."
     );
   }
 
   const SPI_INSIGHT_PALETTE = [
-    { fill: "rgba(0, 109, 182, 0.38)", stroke: "#006DB6" },
-    { fill: "rgba(0, 177, 107, 0.42)", stroke: "#00a86b" },
-    { fill: "rgba(142, 39, 143, 0.38)", stroke: "#8E278F" },
-    { fill: "rgba(240, 76, 35, 0.38)", stroke: "#F04C23" },
-    { fill: "rgba(35, 31, 32, 0.22)", stroke: "#231F20" },
-    { fill: "rgba(0, 109, 182, 0.22)", stroke: "#005a94" },
-    { fill: "rgba(0, 177, 107, 0.26)", stroke: "#008f56" },
-    { fill: "rgba(142, 39, 143, 0.24)", stroke: "#6a1f6b" },
+    { fill: "rgba(0, 109, 182, 0.42)", stroke: ADANI_BLUE },
+    { fill: "rgba(0, 177, 107, 0.42)", stroke: ADANI_GREEN },
+    { fill: "rgba(142, 39, 143, 0.38)", stroke: ADANI_PURPLE },
+    { fill: "rgba(240, 76, 35, 0.35)", stroke: ADANI_ORANGE },
+    { fill: "rgba(230, 231, 235, 0.85)", stroke: "#9ca3af" },
+    { fill: "rgba(0, 109, 182, 0.28)", stroke: "#2E8FD0" },
+    { fill: "rgba(0, 177, 107, 0.3)", stroke: "#26C98A" },
+    { fill: "rgba(142, 39, 143, 0.28)", stroke: "#A855BC" },
   ];
 
   function spiChartMonthTick(ym) {
@@ -2145,6 +2343,13 @@
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
         plugins: {
+          subtitle: {
+            display: true,
+            text: spiMixCompositionCaption(f),
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 4 },
+          },
           legend: {
             display: true,
             position: "bottom",
@@ -2196,9 +2401,15 @@
             ticks: {
               maxRotation: 50,
               font: { size: 9 },
-              color: "#231F20",
+              color: CHART_INK,
             },
             grid: { color: "rgba(109, 110, 113, 0.1)" },
+            title: {
+              display: true,
+              text: "Month",
+              font: { size: 10 },
+              color: CHART_INK,
+            },
           },
           y: {
             stacked: true,
@@ -2206,7 +2417,7 @@
             max: 100,
             ticks: {
               font: { size: 9 },
-              color: "#231F20",
+              color: CHART_INK,
               callback(v) {
                 return v + "%";
               },
@@ -2215,9 +2426,9 @@
               display: true,
               text: "% of rows by KPI (same filters)",
               font: { size: 10 },
-              color: "#6D6E71",
+              color: CHART_INK,
             },
-            grid: { color: "rgba(109, 110, 113, 0.16)" },
+            grid: { color: "rgba(109, 110, 113, 0.085)" },
           },
         },
       },
@@ -2324,6 +2535,13 @@
           }
         },
         plugins: {
+          subtitle: {
+            display: true,
+            text: chartTrendHintFiltersOnly(f),
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 4 },
+          },
           legend: {
             display: datasets.length > 1,
             position: "bottom",
@@ -2362,132 +2580,34 @@
             grace: "12%",
             ticks: {
               font: { size: 9 },
-              color: "#231F20",
+              color: CHART_INK,
               padding: 4,
             },
-            grid: { color: "rgba(109, 110, 113, 0.2)" },
+            grid: { color: "rgba(109, 110, 113, 0.1)" },
+            title: {
+              display: true,
+              text: "KPI value",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+            },
           },
           x: {
             ticks: {
               font: { size: 9 },
               maxRotation: 45,
-              color: "#231F20",
+              color: CHART_INK,
               padding: 2,
             },
-            grid: { color: "rgba(109, 110, 113, 0.15)" },
+            grid: { color: "rgba(109, 110, 113, 0.08)" },
+            title: {
+              display: true,
+              text: "Month",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+            },
           },
         },
       },
-    });
-  }
-
-  /**
-   * Location Vulnerability: India map with one marker per preview BU (24); circle size ∝ row count.
-   */
-  function renderLocationVulnerabilityBuMap(snapRows, f) {
-    const el = document.getElementById("chart-loc-bu-map");
-    if (!el) return;
-    destroyLocBuLeafletMap();
-    const vsShort = vsOptionLabel((f && f.vsMode) || DEFAULT_VS_MODE);
-    const hint = document.getElementById("chart-loc-bu-map-hint");
-    if (hint) hint.textContent = "(map · row counts · 24 BUs · " + vsShort + ")";
-    if (typeof L === "undefined") {
-      el.innerHTML =
-        '<p class="chart-spi-map-fallback">Map unavailable. Load Leaflet to see business unit markers.</p>';
-      return;
-    }
-
-    const bus = PREVIEW_BUSINESS_NAMES.slice();
-    const counts = {};
-    bus.forEach((bu) => {
-      counts[bu] = 0;
-    });
-    snapRows.forEach((r) => {
-      const b = String(r.businessName || "").trim();
-      bus.forEach((bu) => {
-        if (factBusinessNameForPreview(bu) === b) counts[bu] += 1;
-      });
-    });
-
-    loadGoogleMapsAndMutant().then(function (useGoogle) {
-      const host = document.getElementById("chart-loc-bu-map");
-      if (!host || typeof L === "undefined") return;
-
-      const map = L.map(host, { scrollWheelZoom: true }).setView(
-        [22.6, 79.0],
-        4.5
-      );
-      if (
-        useGoogle &&
-        L.gridLayer &&
-        L.gridLayer.googleMutant
-      ) {
-        L.gridLayer
-          .googleMutant({ type: "roadmap" })
-          .addTo(map);
-      } else {
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          maxZoom: 19,
-          attribution: "&copy; OpenStreetMap contributors",
-        }).addTo(map);
-      }
-
-      const latLngs = [];
-      const indiaBounds = L.latLngBounds(
-        INDIA_MAP_BOUNDS_SW,
-        INDIA_MAP_BOUNDS_NE
-      );
-      bus.forEach((bu) => {
-        const n = counts[bu] || 0;
-        const fact = factBusinessNameForPreview(bu);
-        const state = FACT_BU_HOME_STATE[fact] || "Gujarat";
-        const base = STATE_CENTROID_BY_STATE[state] || [22.6, 79.0];
-        const h = hash32(bu + "|locbu");
-        const ox = ((h % 200) / 200 - 0.5) * 1.4;
-        const oy = (((h >> 9) % 200) / 200 - 0.5) * 1.4;
-        const ll = [base[0] + ox * 0.42, base[1] + oy * 0.42];
-        latLngs.push(ll);
-        const rad =
-          n === 0 ? 4 : Math.max(5, Math.min(28, Math.sqrt(n) * 2.8));
-        const mk = L.circleMarker(ll, {
-          radius: rad,
-          color: "#8E278F",
-          fillColor: "#006DB6",
-          fillOpacity: n === 0 ? 0.22 : 0.52,
-          weight: 2,
-        }).addTo(map);
-        const title =
-          escapeHtml(bu) + ": " + n + " rows · " + escapeHtml(fact);
-        mk.bindPopup(
-          "<strong>" +
-            escapeHtml(bu) +
-            "</strong><br>" +
-            n +
-            " rows (filtered)<br><span style=\"color:#6d6e71;font-size:11px\">Fact BU: " +
-            escapeHtml(fact) +
-            "</span>"
-        );
-        mk.bindTooltip(title, {
-          sticky: true,
-          direction: "auto",
-          opacity: 0.95,
-          className: "loc-bu-map-tooltip",
-        });
-      });
-      if (latLngs.length) {
-        latLngs.forEach((ll) => {
-          indiaBounds.extend(ll);
-        });
-        map.fitBounds(indiaBounds, { padding: [20, 20], maxZoom: 6 });
-      }
-      window.__adaniLocBuMap = map;
-      setTimeout(() => {
-        try {
-          map.invalidateSize();
-        } catch {
-          /* ignore */
-        }
-      }, 80);
     });
   }
 
@@ -2524,6 +2644,7 @@
         } catch {
           /* ignore */
         }
+        updateKpiToolbarButtonsVisibility("compare");
         requestAnimationFrame(() => {
           requestAnimationFrame(() => resizeAllChartsIndex());
         });
@@ -2558,6 +2679,10 @@
       } catch {
         /* ignore */
       }
+      updateKpiToolbarButtonsVisibility(charts ? "charts" : "table");
+      if (charts && enforceChartViewSingleKpiSelection() && currentCategoryKey != null) {
+        refreshCategoryView(currentCategoryKey);
+      }
       if (charts) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => resizeAllChartsIndex());
@@ -2575,9 +2700,21 @@
     if (initial === "compare" && !tabCompare) initial = "charts";
 
     apply(initial);
-    tabCharts?.addEventListener("click", () => apply("charts"));
-    tabTable?.addEventListener("click", () => apply("table"));
-    tabCompare?.addEventListener("click", () => apply("compare"));
+
+    /** Delegated tab switch — pointerup + click (debounced: same tap fires both on many devices) */
+    let viewTabLastMs = 0;
+    function onViewTabActivate(ev) {
+      const btn = ev.target.closest("button.view-tabs__btn[data-view]");
+      if (!btn || !main.contains(btn)) return;
+      const mode = btn.getAttribute("data-view");
+      if (mode !== "charts" && mode !== "table" && mode !== "compare") return;
+      const t = Date.now();
+      if (t - viewTabLastMs < 350) return;
+      viewTabLastMs = t;
+      apply(mode);
+    }
+    main.addEventListener("pointerup", onViewTabActivate);
+    main.addEventListener("click", onViewTabActivate);
   }
 
   /** Distinct hues for radar spokes (one color per business unit). */
@@ -2587,9 +2724,9 @@
     for (let i = 0; i < n; i++) {
       const h = Math.round((360 * i) / n + 14) % 360;
       out.push({
-        stroke: "hsl(" + h + " 72% 34%)",
-        fill: "hsla(" + h + " 68% 46% / 0.9)",
-        fillSoft: "hsla(" + h + " 62% 52% / 0.2)",
+        stroke: "hsl(" + h + " 62% 46%)",
+        fill: "hsla(" + h + " 58% 52% / 0.9)",
+        fillSoft: "hsla(" + h + " 55% 55% / 0.22)",
       });
     }
     return out;
@@ -2598,7 +2735,7 @@
   /**
    * By business: radar chart — one spoke per preview BU (24); value from filtered rows or 0.
    */
-  function renderBizBreakdown(fullNames, values, datasetLabel, unitType) {
+  function renderBizBreakdown(fullNames, values, datasetLabel, unitType, f) {
     const el = document.getElementById("chart-biz");
     const emptyEl = document.getElementById("chart-biz-empty");
     if (!el || typeof Chart === "undefined") return;
@@ -2628,6 +2765,11 @@
 
     el.style.display = "block";
     if (emptyEl) emptyEl.hidden = true;
+
+    const periodSub =
+      f && typeof f === "object" && f.refMonth
+        ? bizWindowRowsCaption(f)
+        : "";
 
     function radarBizLabel(name) {
       const s = String(name).trim();
@@ -2726,8 +2868,8 @@
                 null,
                 nums.map((n) => Number(n) || 0)
               ) * 1.12 || undefined,
-            angleLines: { color: "rgba(109, 110, 113, 0.28)" },
-            grid: { color: "rgba(109, 110, 113, 0.18)" },
+            angleLines: { color: "rgba(109, 110, 113, 0.15)" },
+            grid: { color: "rgba(109, 110, 113, 0.09)" },
             pointLabels: {
               font: {
                 size: 8.5,
@@ -2750,11 +2892,27 @@
               maxTicksLimit: 7,
               font: { size: 9, family: FONT_UI },
               backdropColor: "rgba(255,255,255,0.9)",
-              color: "#5a5c5f",
+              color: CHART_INK,
+            },
+            title: {
+              display: true,
+              text:
+                unitType === "PercentOrRate"
+                  ? "KPI value (%) — radial scale"
+                  : "KPI value — radial scale",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
             },
           },
         },
         plugins: {
+          subtitle: {
+            display: !!periodSub,
+            text: periodSub,
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 6 },
+          },
           legend: {
             display: true,
             position: "bottom",
@@ -2778,14 +2936,14 @@
                 size: 10,
                 family: FONT_UI,
               },
-              color: "#231F20",
+              color: CHART_INK,
             },
           },
           tooltip: {
             enabled: true,
             backgroundColor: "rgba(35, 31, 32, 0.96)",
             titleColor: "#ffffff",
-            bodyColor: "#f5f5f5",
+            bodyColor: "#ffffff",
             borderColor: "#006DB6",
             borderWidth: 1,
             padding: 12,
@@ -2868,27 +3026,11 @@
 
   function speedometerPrimaryKpiKey(catKey, f) {
     const keys = effectiveKpiKeysForChartSeries(catKey, f);
-    if (!keys.length) return null;
+    if (!keys.length || keys.length > 1) return null;
     const primary = keys[0];
-    if (
-      catKey === ASSURANCE_CATEGORY_KEY &&
-      ASSURANCE_SPEEDOMETER_KPI_KEYS.has(primary)
-    ) {
-      return primary;
-    }
-    if (
-      catKey === TRAINING_CATEGORY_KEY &&
-      primary === TRAINING_SAKSHAM_SPEEDOMETER_KPI_KEY
-    ) {
-      return primary;
-    }
-    if (
-      catKey === SYSTEMS_ADOPTION_CATEGORY_KEY &&
-      primary === SYSTEMS_SAFEX_SPEEDOMETER_KPI_KEY
-    ) {
-      return primary;
-    }
-    return null;
+    const meta = getKpis(catKey).find((x) => String(x.kpiKey) === String(primary));
+    if (!meta || meta.unitType !== "PercentOrRate") return null;
+    return primary;
   }
 
   function shouldShowPercentSpeedometerChart(catKey, f) {
@@ -2902,6 +3044,19 @@
     const nums = rows.map((r) => Number(r.value)).filter(Number.isFinite);
     if (!nums.length) return 0;
     return avg(nums);
+  }
+
+  /** Group roll-up for KPI 501 (all BUs): same Vs window / geo / vertical filters, business ignored. */
+  function incidentKeyLearningGroupPercent(poolAll, f) {
+    const snapPool = applyNonMonthFiltersExceptBusiness(poolAll, f, true);
+    const winMonths = new Set(effectiveBizWindowMonths(f));
+    const rows = snapPool.filter((r) => winMonths.has(r.yearMonth));
+    const nums = rows
+      .filter((r) => String(r.kpiKey) === INCIDENT_KEY_LEARNING_SPEEDOMETER_KPI_KEY)
+      .map((r) => Number(r.value))
+      .filter(Number.isFinite);
+    if (!nums.length) return 0;
+    return Math.max(0, Math.min(100, avg(nums)));
   }
 
   function readFilters(catKey) {
@@ -3004,7 +3159,11 @@
     const from = f && f.monthFrom;
     const to = (f && f.monthTo) || ref;
     if (!from) return base;
-    return base.filter((ym) => ym >= from && ym <= to);
+    const clipped = base.filter((ym) => ym >= from && ym <= to);
+    if (clipped.length) return clipped;
+    if (ref && base.includes(ref)) return [ref];
+    if (base.length) return [base[base.length - 1]];
+    return ref ? [ref] : [];
   }
 
   /** Fixed-length month keys ending at calendar “to”, clipped to from–to range. */
@@ -3014,7 +3173,9 @@
     const from = f && f.monthFrom;
     const to = (f && f.monthTo) || end;
     if (!from) return months;
-    return months.filter((ym) => ym >= from && ym <= to);
+    const clipped = months.filter((ym) => ym >= from && ym <= to);
+    if (clipped.length) return clipped;
+    return end ? [end] : months.slice(-1);
   }
 
   function rowDummySite(r) {
@@ -3076,16 +3237,8 @@
 
 
   function getRowsForCategory(catKey) {
-    if (catKey === LOCATION_VULN_CAT_KEY) {
-      return DATA.factRows
-        .filter(
-          (r) =>
-            r.categoryKey === LOCATION_VULN_SOURCE_CAT &&
-            LOCATION_VULN_KPI_KEYS.has(Number(r.kpiKey))
-        )
-        .map((r) => ({ ...r, categoryKey: LOCATION_VULN_CAT_KEY }));
-    }
-    return DATA.factRows.filter((r) => r.categoryKey === catKey);
+    const ck = Number(catKey);
+    return DATA.factRows.filter((r) => Number(r.categoryKey) === ck);
   }
 
   function distinctSorted(rows, pick) {
@@ -3097,12 +3250,55 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
-  function getFilterConfig(catKey) {
+  function getFilterConfig(_catKey) {
     return {
-      showKpi: catKey !== LOCATION_VULN_CAT_KEY,
-      showState: catKey === LOCATION_VULN_CAT_KEY,
+      showKpi: true,
+      showState: false,
       showBusiness: true,
     };
+  }
+
+  function categoryShowsKpiToolbar(catKey) {
+    return getFilterConfig(catKey).showKpi;
+  }
+
+  /** Chart view: one KPI checkbox; Table / Comparison allow multi-select. */
+  function updateKpiToolbarButtonsVisibility(mode) {
+    if (currentCategoryKey == null || !categoryShowsKpiToolbar(currentCategoryKey)) {
+      return;
+    }
+    const all = document.getElementById("f-kpi-all");
+    const none = document.getElementById("f-kpi-none");
+    if (!all || !none) return;
+    const showMulti = mode !== "charts";
+    all.hidden = !showMulti;
+    none.hidden = !showMulti;
+  }
+
+  function enforceChartViewSingleKpiSelection() {
+    if (currentCategoryKey == null || !categoryShowsKpiToolbar(currentCategoryKey)) {
+      return false;
+    }
+    const main = document.getElementById("cat-main-view");
+    if (!main || main.dataset.view !== "charts") return false;
+    const panel = document.getElementById("f-kpi-panel");
+    if (!panel) return false;
+    const boxes = panel.querySelectorAll('input[name="f-kpi-cb"]');
+    if (!boxes.length) return false;
+    const catKey = currentCategoryKey;
+    const checked = Array.from(boxes).filter((b) => b.checked);
+    if (checked.length <= 1) return false;
+
+    const ordered = orderKpiKeysForCharts(
+      catKey,
+      checked.map((x) => x.value)
+    );
+    const keepKey = ordered[0] ? String(ordered[0]) : String(checked[0].value);
+    boxes.forEach((cb) => {
+      cb.checked = String(cb.value) === keepKey;
+    });
+    saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
+    return true;
   }
 
   function avg(nums) {
@@ -3110,42 +3306,68 @@
     return nums.reduce((a, b) => a + b, 0) / nums.length;
   }
 
-  /** Incident Management: TRI first, then wireframe order (ΔRepeat, ΔFatal, Man-days, Vehicle). */
+  /**
+   * Incident Management: stakeholder order (Fatality → … → Investigation Closure %).
+   * Keys: 56/57 = Fire incidents / Property Damage incidents (preview-seeded).
+   */
   const INCIDENT_KPI_ORDER = [
-    21,
-    1,
-    2,
-    3,
-    4,
-    5,
-    7,
     8,
-    INCIDENT_FIRE_KPI_KEY,
-    INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
     9,
     10,
     11,
     12,
-    14,
-    15,
     19,
+    14,
     22,
+    4,
+    3,
+    7,
     28,
+    INCIDENT_FIRE_KPI_KEY,
+    INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
+    1,
+    2,
+    5,
+    15,
     44,
   ];
-  /** Hazard & Observation (leading): activity first + S-4/S-5 SRFA (from former Risk Control). */
-  const HAZARD_KPI_ORDER = [38, 13, 6, 39, 40, 41, 42, 45, 46, 53, 21];
+  /**
+   * Hazard & Observation (leading): stakeholder sequence
+   * (Spotting → closures → SRFA → Near Miss → SI/action % → Unsafe Acts/hr → Life saved).
+   * Other keys in category (e.g. S-4/S-5 SRFA, TRI) follow via sortKpisForDisplay rest.
+   */
+  const HAZARD_KPI_ORDER = [38, 39, 40, 13, 45, 46, 53, 54, 6];
   /** Consequence Management + compliance KPIs moved from Risk Control. */
-  const CONSEQUENCE_KPI_ORDER = [23, 24, 25, 26, 27, 51, 52, 54];
+  /**
+   * Consequence Management (4): Fatality vs CMP → LTI vs CMP → totals → category → job band.
+   * Other KPIs in this category (e.g. from former Risk Control) follow in sortKpisForDisplay.
+   */
+  const CONSEQUENCE_KPI_ORDER = [23, 24, 25, 26, 27];
+  /**
+   * Training & Competency Development (6): conducted → intensity → executive index →
+   * frontline index → SAKSHAM.
+   */
+  const TRAINING_KPI_ORDER = [34, 35, 37, 36, 49];
+  /**
+   * Leadership & Safety Governance (8): council → taskforce → walkthrough →
+   * observations / CAPA (Felt leadership actions).
+   */
+  const LEADERSHIP_KPI_ORDER = [47, 48, 43, 55];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
+    const cat = Number(catKey);
     const list = kpisMeta.slice();
-    if (catKey === 1) {
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
-      return INCIDENT_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
+    if (cat === 1) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
+      const ordered = INCIDENT_KPI_ORDER.map((id) => map.get(id)).filter(
+        Boolean
+      );
+      const used = new Set(ordered.map((k) => Number(k.kpiKey)));
+      const rest = list.filter((k) => !used.has(Number(k.kpiKey)));
+      return ordered.concat(rest);
     }
-    if (catKey === HAZARD_CATEGORY_KEY) {
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
+    if (cat === HAZARD_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
       const ordered = HAZARD_KPI_ORDER.map((id) => map.get(id)).filter(
         Boolean
       );
@@ -3154,31 +3376,46 @@
       );
       return ordered.concat(rest);
     }
-    if (catKey === ASSURANCE_CATEGORY_KEY) {
-      const order = [501, 502, 503];
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
+    if (cat === ASSURANCE_CATEGORY_KEY) {
+      const order = [503, 501, 502];
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
       return order.map((id) => map.get(id)).filter(Boolean);
     }
-    if (catKey === CONSEQUENCE_MANAGEMENT_CATEGORY_KEY) {
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
+    if (cat === CONSEQUENCE_MANAGEMENT_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
       return CONSEQUENCE_KPI_ORDER.map((id) => map.get(id))
         .filter(Boolean)
         .concat(
           list.filter((k) => !CONSEQUENCE_KPI_ORDER.includes(Number(k.kpiKey)))
         );
     }
-    if (catKey === SPI_CATEGORY_KEY) {
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
+    if (cat === SPI_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
       const ordered = SPI_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
       const rest = list.filter(
         (k) => !SPI_KPI_ORDER.includes(Number(k.kpiKey))
       );
       return ordered.concat(rest);
     }
-    if (catKey === LOCATION_VULN_CAT_KEY) {
-      const order = [13, 38, 39, 40, 45, 46, 53];
-      const map = new Map(list.map((k) => [k.kpiKey, k]));
-      return order.map((id) => map.get(id)).filter(Boolean);
+    if (cat === TRAINING_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
+      const ordered = TRAINING_KPI_ORDER.map((id) => map.get(id)).filter(
+        Boolean
+      );
+      const rest = list.filter(
+        (k) => !TRAINING_KPI_ORDER.includes(Number(k.kpiKey))
+      );
+      return ordered.concat(rest);
+    }
+    if (cat === LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
+      const ordered = LEADERSHIP_KPI_ORDER.map((id) => map.get(id)).filter(
+        Boolean
+      );
+      const rest = list.filter(
+        (k) => !LEADERSHIP_KPI_ORDER.includes(Number(k.kpiKey))
+      );
+      return ordered.concat(rest);
     }
     const tri = list.find((k) => isTriKpiMeta(k));
     if (!tri) return list;
@@ -3358,6 +3595,131 @@
     return [ref];
   }
 
+  /** Vs window months for BU/radar/snap rows, clipped to Calendar from–to when set. */
+  function effectiveBizWindowMonths(f) {
+    const mode = (f && f.vsMode) || DEFAULT_VS_MODE;
+    const ref = (f && f.refMonth) || getRefMonth();
+    let months = bizUnitWindowMonths(mode, ref);
+    const from = f && f.monthFrom;
+    const to = (f && f.monthTo) || ref;
+    if (from) {
+      months = months.filter((ym) => ym >= from && ym <= to);
+    }
+    if (!months.length && ref) {
+      months = [ref];
+    }
+    return months;
+  }
+
+  function formatMonthRangeShort(months) {
+    if (!months || !months.length) return "—";
+    const sorted = months.slice().filter(Boolean).sort();
+    if (!sorted.length) return "—";
+    const a = sorted[0];
+    const b = sorted[sorted.length - 1];
+    if (a === b) return formatMonthYear(a);
+    return formatMonthYear(a) + " – " + formatMonthYear(b);
+  }
+
+  function calendarSliceCaption(f) {
+    if (!f || !f.monthFrom) return "";
+    const to = f.monthTo || f.refMonth || "";
+    return (
+      " · Calendar slice " +
+      formatMonthYear(f.monthFrom) +
+      "–" +
+      formatMonthYear(to)
+    );
+  }
+
+  /** Human-readable current vs comparison periods (same windows as KPI tiles / BU compare bars). */
+  function comparisonVsPeriodCaption(f) {
+    const ref = f.refMonth;
+    const mode = f.vsMode || DEFAULT_VS_MODE;
+    const m1 = monthAdd(ref, -1);
+    const m2 = monthAdd(ref, -2);
+    const m3 = monthAdd(ref, -3);
+    const m4 = monthAdd(ref, -4);
+    const m5 = monthAdd(ref, -5);
+    let curPart = "";
+    let basePart = "";
+    if (mode === "vs_last_month" || mode === "vs_yesterday") {
+      curPart = formatMonthYear(ref) + " (current)";
+      basePart = formatMonthYear(m1) + " (comparison)";
+    } else if (mode === "vs_last_year") {
+      curPart = "CY YTD through " + formatMonthYear(ref);
+      basePart = "PY YTD through " + formatMonthYear(monthAdd(ref, -12));
+    } else if (mode === "vs_last_week") {
+      curPart = formatMonthRangeShort([ref, m1]) + " (current)";
+      basePart = formatMonthRangeShort([m2, m3]) + " (comparison)";
+    } else if (mode === "vs_last_quarter") {
+      curPart = formatMonthRangeShort([ref, m1, m2]) + " (current)";
+      basePart = formatMonthRangeShort([m3, m4, m5]) + " (comparison)";
+    } else {
+      curPart = formatMonthYear(ref) + " (current)";
+      basePart = formatMonthYear(m1) + " (comparison)";
+    }
+    return (
+      curPart +
+      " vs " +
+      basePart +
+      calendarSliceCaption(f)
+    );
+  }
+
+  /** Trend line / SPI multi-line: months from `effectiveChartMonths` (Vs mode + calendar clip). */
+  function trendSeriesPeriodCaption(f) {
+    const months = effectiveChartMonths(f);
+    const n = months.length;
+    const range = formatMonthRangeShort(months);
+    return (
+      "Series: " +
+      range +
+      (n !== 1 ? " (" + n + " mo)" : "") +
+      calendarSliceCaption(f)
+    );
+  }
+
+  /** By business / radar / vertical / scatter: months rolled into each snapshot row. */
+  function bizWindowRowsCaption(f) {
+    const months = effectiveBizWindowMonths(f);
+    const n = months.length;
+    const range = formatMonthRangeShort(months);
+    return (
+      "Aggregated: " +
+      range +
+      (n !== 1 ? " (" + n + " mo)" : "") +
+      calendarSliceCaption(f)
+    );
+  }
+
+  /** SPI 100% stacked mix: up to 12 months ending at calendar “to”. */
+  function spiMixCompositionCaption(f) {
+    const months = calendarClippedMonthKeys(f, 12);
+    const n = months.length;
+    const range = formatMonthRangeShort(months);
+    return (
+      "Months: " +
+      range +
+      (n !== 1 ? " (" + n + " mo)" : "") +
+      calendarSliceCaption(f)
+    );
+  }
+
+  /** Short subtitle for SPI heat map (no duplicate calendar lines). */
+  function spiHeatmapChartHint(f) {
+    const months = calendarClippedMonthKeys(f, 6);
+    if (!months.length) {
+      return "Adjust the calendar range to include months.";
+    }
+    const range = formatMonthRangeShort(months);
+    return (
+      "Monthly averages · " +
+      range +
+      " · darker = higher within that KPI row"
+    );
+  }
+
   /**
    * @param {boolean} [primaryOnly] If true, keep only the first selected KPI (for BU / vertical / radar windows).
    */
@@ -3392,6 +3754,27 @@
     });
   }
 
+  /**
+   * Same as `applyNonMonthFilters` for the primary KPI, but rolls up across all businesses
+   * (for Group-level metrics vs a single BU slice).
+   */
+  function applyNonMonthFiltersExceptBusiness(rows, f, primaryOnly) {
+    const keys = primaryOnly
+      ? [String(f.kpi)]
+      : f.kpiKeys && f.kpiKeys.length
+        ? f.kpiKeys.map(String)
+        : [String(f.kpi)];
+    return rows.filter((r) => {
+      if (!keys.includes(String(r.kpiKey))) return false;
+      if (f.state !== "all" && r.state !== f.state) return false;
+      if (f.unitType !== "all" && r.unitType !== f.unitType) return false;
+      if (!rowMatchesVariable(r, f.variable)) return false;
+      if (!rowMatchesSiteFilter(r, f)) return false;
+      if (!rowMatchesPersonalTypeFilter(r, f)) return false;
+      return true;
+    });
+  }
+
   function pctChange(cur, prev) {
     if (prev == null || cur == null) return null;
     const p = Number(prev);
@@ -3414,6 +3797,20 @@
     return sign + p.toFixed(1) + "%";
   }
 
+  /** BU matrix table: CSS classes for pastel +/− styling (styles.css .bu-cell__value--*). */
+  function matrixVsValueClass(pct) {
+    if (pct == null || Number.isNaN(Number(pct))) {
+      return "bu-cell__value bu-cell__value--na";
+    }
+    const p = Number(pct);
+    if (Math.abs(p) < 1e-9) {
+      return "bu-cell__value bu-cell__value--neutral";
+    }
+    return p > 0
+      ? "bu-cell__value bu-cell__value--pos"
+      : "bu-cell__value bu-cell__value--neg";
+  }
+
   /** KPI tile Vs line: same signed % and direction as buildKpiDetailMetrics (matches table when one BU is filtered). */
   function tileVsDisplay(item) {
     const raw = item.vsPct;
@@ -3427,7 +3824,8 @@
   }
 
   function buildKpiDetailMetrics(catKey, kpisMeta, f) {
-    const sorted = sortKpisForDisplay(catKey, kpisMeta);
+    const meta = Array.isArray(kpisMeta) ? kpisMeta : [];
+    const sorted = sortKpisForDisplay(catKey, meta);
     const base = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
     const ref = f.refMonth;
     const mode = f.vsMode || DEFAULT_VS_MODE;
@@ -3445,7 +3843,8 @@
       function aggMonth(ym) {
         if (!ym) return null;
         const rows = base.filter(
-          (r) => r.kpiKey === kk && r.yearMonth === ym
+          (r) =>
+            String(r.kpiKey) === String(kk) && String(r.yearMonth) === String(ym)
         );
         if (!rows.length) return null;
         if (add) {
@@ -3541,8 +3940,8 @@
       if (!ym) return null;
       const rows = basePool.filter(
         (r) =>
-          r.kpiKey === kk &&
-          r.yearMonth === ym &&
+          String(r.kpiKey) === String(kk) &&
+          String(r.yearMonth) === String(ym) &&
           String(r.businessName || "").trim() === bu
       );
       if (!rows.length) return null;
@@ -3550,6 +3949,111 @@
         return rows.reduce((a, r) => a + Number(r.value), 0);
       }
       return avg(rows.map((r) => r.value));
+    }
+
+    function aggMonthsRolling(endYm, numMonths) {
+      const yms = rollingMonthsFrom(endYm, numMonths);
+      const vals = yms.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+      if (!vals.length) return null;
+      if (add) return vals.reduce((a, b) => a + b, 0);
+      return avg(vals);
+    }
+
+    function avgMonthsList(yms) {
+      const vals = yms.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+      if (!vals.length) return null;
+      return avg(vals);
+    }
+
+    let cur;
+    let baseVal;
+    if (mode === "vs_last_month" || mode === "vs_yesterday") {
+      cur = aggMonth(ref);
+      baseVal = aggMonth(m1);
+    } else if (mode === "vs_last_year") {
+      const ytdM = monthsYtdThrough(ref);
+      const pyM = priorYearYtdMonths(ref);
+      if (add) {
+        const cv = ytdM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        const bv = pyM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        cur = cv.length ? cv.reduce((a, b) => a + b, 0) : null;
+        baseVal = bv.length ? bv.reduce((a, b) => a + b, 0) : null;
+      } else {
+        const cv = ytdM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        const bv = pyM.map(aggMonth).filter((v) => v != null && !Number.isNaN(v));
+        cur = cv.length ? avg(cv) : null;
+        baseVal = bv.length ? avg(bv) : null;
+      }
+    } else if (mode === "vs_last_week") {
+      if (add) {
+        cur = aggMonthsRolling(ref, 2);
+        baseVal = aggMonthsRolling(m2, 2);
+      } else {
+        cur = avgMonthsList([ref, m1]);
+        baseVal = avgMonthsList([m2, m3]);
+      }
+    } else if (mode === "vs_last_quarter") {
+      if (add) {
+        cur = aggMonthsRolling(ref, 3);
+        baseVal = aggMonthsRolling(m3, 3);
+      } else {
+        cur = avgMonthsList([ref, m1, m2]);
+        baseVal = avgMonthsList([m3, m4, m5]);
+      }
+    } else {
+      cur = aggMonth(ref);
+      baseVal = aggMonth(m1);
+    }
+
+    return {
+      pct: pctChange(cur, baseVal),
+      cur: cur,
+      baseVal: baseVal,
+    };
+  }
+
+  /**
+   * Group roll-up across all preview BUs — same Vs windows as `buKpiVsPct`
+   * (used for Assurance comparison: Group vs business units).
+   */
+  function groupKpiVsPct(basePool, kpiMeta, f) {
+    const kk = kpiMeta.kpiKey;
+    const ut = kpiMeta.unitType;
+    const add = isAdditiveUnit(ut);
+    const ref = f.refMonth;
+    const mode = f.vsMode || DEFAULT_VS_MODE;
+    const m1 = monthAdd(ref, -1);
+    const m2 = monthAdd(ref, -2);
+    const m3 = monthAdd(ref, -3);
+    const m4 = monthAdd(ref, -4);
+    const m5 = monthAdd(ref, -5);
+    const bus = PREVIEW_BUSINESS_NAMES.slice();
+
+    function aggMonth(ym) {
+      if (!ym) return null;
+      const buVals = [];
+      bus.forEach((previewBu) => {
+        const b = factBusinessNameForPreview(previewBu);
+        const rows = basePool.filter(
+          (r) =>
+            r.kpiKey === kk &&
+            r.yearMonth === ym &&
+            String(r.businessName || "").trim() === b
+        );
+        if (!rows.length) return;
+        let v;
+        if (add) {
+          v = rows.reduce((a, r) => a + Number(r.value), 0);
+        } else {
+          v = avg(rows.map((r) => r.value));
+        }
+        buVals.push(v);
+      });
+      if (!buVals.length) return null;
+      if (add) {
+        return buVals.reduce((a, b) => a + b, 0);
+      }
+      return avg(buVals);
     }
 
     function aggMonthsRolling(endYm, numMonths) {
@@ -3799,9 +4303,13 @@
     else if (vDir === "down") tile.classList.add("multi-kpi-tile--trend-down");
     const infoTitle = escapeAttr(vsFilterComparisonTooltip(vsMode));
     const vsLbl = vsOptionLabel(vsMode || DEFAULT_VS_MODE);
+    const typeLbl = kpiUnitTypeLabel(item.unitType);
+    const typeTitle = kpiUnitTypeTitle(item.unitType);
     tile.setAttribute(
       "aria-label",
       item.kpiName +
+        ". " +
+        typeLbl +
         ". Value " +
         formatValue(item.value, item.unitType) +
         ". " +
@@ -3811,9 +4319,15 @@
         "."
     );
     tile.innerHTML =
+      '<div class="multi-kpi-tile__head">' +
       '<div class="multi-kpi-tile__name">' +
       escapeHtml(item.kpiName) +
       "</div>" +
+      '<span class="multi-kpi-tile__type-badge" title="' +
+      escapeAttr(typeTitle) +
+      '">' +
+      escapeHtml(typeLbl) +
+      "</span></div>" +
       '<div class="multi-kpi-tile__value-row">' +
       '<span class="multi-kpi-tile__val">' +
       formatValue(item.value, item.unitType) +
@@ -3843,8 +4357,8 @@
     }
     function openCompareForKpi() {
       applyToolbarSingleKpiSelection(catKey, item.kpiKey);
-      const tabc = document.getElementById("view-tab-compare");
-      if (tabc) tabc.click();
+      const tCharts = document.getElementById("view-tab-charts");
+      if (tCharts) tCharts.click();
     }
     tile.addEventListener("click", function (e) {
       if (e.target.closest(".multi-kpi-tile__info")) return;
@@ -3951,27 +4465,42 @@
       curData.push(c != null && !Number.isNaN(Number(c)) ? Number(c) : 0);
       baseData.push(b != null && !Number.isNaN(Number(b)) ? Number(b) : 0);
     });
+    const isAssurance = catKey === ASSURANCE_CATEGORY_KEY;
+    if (isAssurance) {
+      const g = groupKpiVsPct(basePool, kMeta, f);
+      const gc =
+        g.cur != null && !Number.isNaN(Number(g.cur)) ? Number(g.cur) : 0;
+      const gb =
+        g.baseVal != null && !Number.isNaN(Number(g.baseVal))
+          ? Number(g.baseVal)
+          : 0;
+      curData.unshift(gc);
+      baseData.unshift(gb);
+    }
+    const labelList = isAssurance
+      ? ["Group"].concat(bus.map(locCompareBizLabel))
+      : bus.map(locCompareBizLabel);
     const vsShort = vsOptionLabel(f.vsMode || DEFAULT_VS_MODE);
     const unit = kMeta.unitType || "";
     const yTitle = unit === "PercentOrRate" ? "Value (%)" : "Value";
     new Chart(el, {
       type: "bar",
       data: {
-        labels: bus.map(locCompareBizLabel),
+        labels: labelList,
         datasets: [
           {
             label: "Comparison (base) · " + vsShort,
             data: baseData,
-            backgroundColor: "#8E278F",
-            borderColor: "#6a1d6b",
+            backgroundColor: "rgba(142, 39, 143, 0.45)",
+            borderColor: ADANI_PURPLE,
             borderWidth: 1,
           },
           {
             label: "Current period",
             data: curData,
-            backgroundColor: "#006DB6",
+            backgroundColor: "rgba(0, 109, 182, 0.5)",
             borderWidth: 1,
-            borderColor: "#004a80",
+            borderColor: ADANI_BLUE,
           },
         ],
       },
@@ -3980,26 +4509,37 @@
         maintainAspectRatio: false,
         interaction: { mode: "index", intersect: false },
         layout: {
-          padding: { top: 10, right: 12, bottom: 64, left: 10 },
+          padding: { top: 4, right: 6, bottom: 28, left: 6 },
         },
         plugins: {
+          subtitle: {
+            display: true,
+            text: comparisonVsPeriodCaption(f),
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 4 },
+          },
           legend: {
             display: true,
             position: "bottom",
+            align: "center",
             labels: {
-              boxWidth: 12,
+              boxWidth: 10,
+              padding: 4,
               font: {
                 size: 9,
                 family: FONT_UI,
               },
-              color: "#231F20",
+              color: CHART_INK,
             },
           },
           tooltip: {
             callbacks: {
               title(items) {
                 const i = items[0].dataIndex;
-                return bus[i] != null ? String(bus[i]) : "";
+                if (isAssurance && i === 0) return "Group";
+                const bi = isAssurance ? i - 1 : i;
+                return bus[bi] != null ? String(bus[bi]) : "";
               },
             },
           },
@@ -4018,42 +4558,62 @@
               },
               maxRotation: 60,
               minRotation: 45,
-              color: "#231F20",
+              color: CHART_INK,
               padding: 4,
+            },
+            title: {
+              display: true,
+              text: isAssurance ? "Group / business unit" : "Business unit",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+              padding: { top: 2, bottom: 0 },
             },
           },
           y: {
             beginAtZero: true,
             grace: "5%",
-            ticks: { font: { size: 9 }, color: "#6D6E71" },
-            grid: { color: "rgba(109, 110, 113, 0.18)" },
+            ticks: { font: { size: 9 }, color: CHART_INK },
+            grid: { color: "rgba(109, 110, 113, 0.09)" },
             title: {
               display: true,
               text: yTitle,
               font: { size: 10, family: FONT_UI },
-              color: "#6D6E71",
+              color: CHART_INK,
+              padding: { top: 0, bottom: 4 },
             },
           },
         },
       },
     });
     const hint = document.getElementById("chart-bu-compare-hint");
-    if (hint) hint.textContent = "(" + vsShort + " · 2 bars per BU)";
+    if (hint) {
+      hint.textContent =
+        "(" +
+        vsShort +
+        " · 2 bars per column" +
+        (isAssurance ? " · Group + all BUs" : " · all BUs") +
+        ") · " +
+        comparisonVsPeriodCaption(f);
+    }
     const titleEl = document.getElementById("chart-bu-compare-title");
-    if (titleEl)
+    if (titleEl) {
       titleEl.textContent =
-        shortKpiHeaderLabel(kMeta.kpiName) + " — comparison by business";
+        shortKpiHeaderLabel(kMeta.kpiName) +
+        (isAssurance
+          ? " — Group vs business comparison"
+          : " — comparison by business");
+    }
   }
 
   const HAZARD_CHART_FILL = [
-    "rgba(0, 109, 182, 0.78)",
-    "rgba(0, 177, 107, 0.78)",
-    "rgba(142, 39, 143, 0.72)",
-    "rgba(240, 76, 35, 0.75)",
-    "rgba(59, 130, 246, 0.7)",
-    "rgba(234, 179, 8, 0.8)",
-    "rgba(99, 102, 241, 0.72)",
-    "rgba(236, 72, 153, 0.7)",
+    "rgba(0, 109, 182, 0.65)",
+    "rgba(0, 177, 107, 0.62)",
+    "rgba(142, 39, 143, 0.58)",
+    "rgba(240, 76, 35, 0.55)",
+    "rgba(0, 109, 182, 0.45)",
+    "rgba(0, 177, 107, 0.48)",
+    "rgba(142, 39, 143, 0.48)",
+    "rgba(240, 76, 35, 0.45)",
   ];
 
   function hazardChartColors(n) {
@@ -4262,6 +4822,8 @@
     /** Primary panel: same week/month heatmap as Safety Performance Indices (Hazard category). */
     renderSpiHazardHeatmap(f);
 
+    const hazardRollupCaption = bizWindowRowsCaption(f);
+
     const byBizVals = {};
     snapRows.forEach((r) => {
       const b = r.businessName || "—";
@@ -4317,6 +4879,13 @@
             maintainAspectRatio: false,
             layout: { padding: { top: 6, right: 14, bottom: 6, left: 4 } },
             plugins: {
+              subtitle: {
+                display: true,
+                text: hazardRollupCaption,
+                color: CHART_INK,
+                font: { size: 8.5, family: FONT_UI },
+                padding: { bottom: 4 },
+              },
               legend: { display: false },
               tooltip: {
                 callbacks: {
@@ -4335,12 +4904,27 @@
               x: {
                 beginAtZero: true,
                 grace: "6%",
-                ticks: { font: { size: 9, family: FONT_UI }, color: "#231F20" },
-                grid: { color: "rgba(109, 110, 113, 0.18)" },
+                ticks: { font: { size: 9, family: FONT_UI }, color: CHART_INK },
+                grid: { color: "rgba(109, 110, 113, 0.09)" },
+                title: {
+                  display: true,
+                  text:
+                    utChart === "PercentOrRate"
+                      ? "KPI value (%)"
+                      : "KPI value",
+                  font: { size: 10, family: FONT_UI },
+                  color: CHART_INK,
+                },
               },
               y: {
-                ticks: { font: { size: 8, family: FONT_UI }, color: "#231F20" },
+                ticks: { font: { size: 8, family: FONT_UI }, color: CHART_INK },
                 grid: { display: false },
+                title: {
+                  display: true,
+                  text: "Business unit",
+                  font: { size: 10, family: FONT_UI },
+                  color: CHART_INK,
+                },
               },
             },
           },
@@ -4394,6 +4978,13 @@
           cutout: "56%",
           layout: { padding: { top: 4, right: 8, bottom: 4, left: 8 } },
           plugins: {
+            subtitle: {
+              display: true,
+              text: hazardRollupCaption,
+              color: CHART_INK,
+              font: { size: 8.5, family: FONT_UI },
+              padding: { bottom: 4 },
+            },
             legend: {
               display: true,
               position: "bottom",
@@ -4464,11 +5055,7 @@
     ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, rFill, Math.PI, 2 * Math.PI, false);
     ctx.closePath();
-    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy - R * 0.35, rFill);
-    grad.addColorStop(0, "rgba(13, 148, 136, 0.22)");
-    grad.addColorStop(0.5, "rgba(0, 163, 163, 0.14)");
-    grad.addColorStop(1, "rgba(248, 250, 252, 0.92)");
-    ctx.fillStyle = grad;
+    ctx.fillStyle = "#eef1f4";
     ctx.fill();
     ctx.restore();
 
@@ -4509,18 +5096,185 @@
     const tx = cx + labelR * Math.cos(theta);
     const ty = cy + labelR * Math.sin(theta);
     ctx.font = "600 " + Math.max(13, Math.round(R * 0.2)) + "px " + FONT_UI;
-    ctx.fillStyle = "#111827";
+    ctx.fillStyle = "#334155";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.fillText(Math.round(p) + "%", tx, ty);
   }
 
-  function renderPercentSpeedometerChart(canvasEl, percent) {
-    canvasEl.setAttribute("data-speedometer-gauge", "1");
-    canvasEl.setAttribute(
-      "aria-label",
-      "Speedometer: selected KPI rate for the current Vs window"
+  /**
+   * Dual semi-circular gauge (reference: outer scale + inner scale, Group vs Business on % SPI).
+   * Outer arc: traffic-light thirds; inner arc: orange (0–75%) + grey (75–100%); light needle = Group,
+   * dark blue tick = Business; purple tick on inner = Business.
+   */
+  function drawDualGaugeSpeedometerCanvas(canvasEl, groupPct, bizPct) {
+    const g = Math.max(0, Math.min(100, Number(groupPct) || 0));
+    const b = Math.max(0, Math.min(100, Number(bizPct) || 0));
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvasEl.getBoundingClientRect();
+    let cssW = rect.width;
+    let cssH = rect.height;
+    if (cssW < 2 || cssH < 2) {
+      const wrap = canvasEl.parentElement;
+      if (wrap) {
+        cssW = wrap.clientWidth || 320;
+        cssH = wrap.clientHeight || 220;
+      } else {
+        cssW = 320;
+        cssH = 220;
+      }
+    }
+    canvasEl.width = Math.max(1, Math.round(cssW * dpr));
+    canvasEl.height = Math.max(1, Math.round(cssH * dpr));
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, cssW, cssH);
+
+    const padX = Math.max(10, cssW * 0.06);
+    const padB = Math.max(30, cssH * 0.2);
+    const cx = cssW / 2;
+    const cy = cssH - padB;
+    const R = Math.min(cssW - 2 * padX, (cssH - padB) * 1.05) * 0.48;
+
+    function pToTheta(pct) {
+      return Math.PI + (Math.PI * pct) / 100;
+    }
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, R * 0.88, Math.PI, 2 * Math.PI, false);
+    ctx.closePath();
+    ctx.fillStyle = "#eef1f4";
+    ctx.fill();
+    ctx.restore();
+
+    const rInnerMid = R * 0.58;
+    const lwIn = Math.max(6, R * 0.1);
+    ctx.lineWidth = lwIn;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(cx, cy, rInnerMid, pToTheta(0), pToTheta(75), false);
+    ctx.strokeStyle = "#FFAB40";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, rInnerMid, pToTheta(75), pToTheta(100), false);
+    ctx.strokeStyle = "#ECEFF1";
+    ctx.stroke();
+
+    const rOuterMid = R * 0.92;
+    const lwOut = Math.max(8, R * 0.1);
+    ctx.lineWidth = lwOut;
+    const t1 = 100 / 3;
+    const t2 = (2 * 100) / 3;
+    const outerCols = ["#E57373", "#FFD54F", "#66BB6A"];
+    const segBounds = [0, t1, t2, 100];
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(
+        cx,
+        cy,
+        rOuterMid,
+        pToTheta(segBounds[i]),
+        pToTheta(segBounds[i + 1]),
+        false
+      );
+      ctx.strokeStyle = outerCols[i];
+      ctx.stroke();
+    }
+
+    const tb = pToTheta(b);
+    const tg = pToTheta(g);
+    ctx.lineWidth = Math.max(3, R * 0.04);
+    ctx.strokeStyle = ADANI_PURPLE;
+    ctx.beginPath();
+    ctx.moveTo(
+      cx + Math.cos(tb) * rInnerMid * 0.82,
+      cy + Math.sin(tb) * rInnerMid * 0.82
     );
+    ctx.lineTo(
+      cx + Math.cos(tb) * rInnerMid * 1.12,
+      cy + Math.sin(tb) * rInnerMid * 1.12
+    );
+    ctx.stroke();
+
+    const needleLen = rOuterMid * 0.88;
+    ctx.lineWidth = Math.max(2, R * 0.025);
+    ctx.strokeStyle = "#4FC3F7";
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(
+      cx + Math.cos(tg) * needleLen,
+      cy + Math.sin(tg) * needleLen
+    );
+    ctx.stroke();
+
+    const tickR0 = rInnerMid * 1.05;
+    const tickR1 = rOuterMid * 1.02;
+    ctx.lineWidth = Math.max(4, R * 0.035);
+    ctx.strokeStyle = "#0D47A1";
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(tb) * tickR0, cy + Math.sin(tb) * tickR0);
+    ctx.lineTo(cx + Math.cos(tb) * tickR1, cy + Math.sin(tb) * tickR1);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, Math.max(5, R * 0.065), 0, 2 * Math.PI);
+    ctx.fillStyle = "#1565C0";
+    ctx.fill();
+
+    ctx.font = "600 " + Math.max(10, Math.round(R * 0.14)) + "px " + FONT_UI;
+    ctx.fillStyle = "#334155";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillText(
+      "Group " + Math.round(g) + "% · Business " + Math.round(b) + "%",
+      cx,
+      cy + R * 0.1
+    );
+
+    ctx.font = "500 " + Math.max(8, Math.round(R * 0.095)) + "px " + FONT_UI;
+    ctx.fillStyle = "#64748b";
+    ctx.textAlign = "center";
+    ctx.fillText("0% — 100% (same scale for both rings)", cx, cy + R * 0.26);
+  }
+
+  function renderDualGaugeSpeedometerChart(canvasEl, groupPct, bizPct, f) {
+    canvasEl.setAttribute("data-speedometer-gauge", "1");
+    canvasEl.classList.add("chart-line--dual-gauge");
+    let lastG = Number(groupPct) || 0;
+    let lastB = Number(bizPct) || 0;
+    function redraw() {
+      drawDualGaugeSpeedometerCanvas(canvasEl, lastG, lastB);
+    }
+    redraw();
+    window.__adaniSpeedometerGaugeRedraw = redraw;
+    const cap =
+      "Dual gauge: Group " +
+      Math.round(lastG) +
+      "%, Business " +
+      Math.round(lastB) +
+      "% · " +
+      (f && f.refMonth ? bizWindowRowsCaption(f) : "Vs window");
+    canvasEl.setAttribute("aria-label", cap);
+  }
+
+  function renderPercentSpeedometerChart(canvasEl, percent, f) {
+    canvasEl.classList.remove("chart-line--dual-gauge");
+    canvasEl.setAttribute("data-speedometer-gauge", "1");
+    const pk =
+      f && f.catKey != null ? speedometerPrimaryKpiKey(f.catKey, f) : null;
+    const km =
+      pk && f
+        ? getKpis(f.catKey).find((x) => String(x.kpiKey) === String(pk))
+        : null;
+    const kpiPart = km ? kpiDropdownLabel(km) + " · " : "";
+    const cap =
+      f && f.refMonth
+        ? "Speedometer: " + kpiPart + bizWindowRowsCaption(f)
+        : "Speedometer: " + (km ? kpiDropdownLabel(km) + " · " : "") + "Vs window";
+    canvasEl.setAttribute("aria-label", cap);
     let lastPct = Number(percent) || 0;
     function redraw() {
       drawPercentSpeedometerCanvas(canvasEl, lastPct);
@@ -4533,10 +5287,16 @@
    * Consequence Management / KPIs 24–25: CMP accountability — three 100% stacked
    * bars (preview proportions; match design reference).
    */
-  function renderCmpAccountabilityBreakdownChart(canvasEl) {
+  function renderCmpAccountabilityBreakdownChart(canvasEl, f) {
+    const vsShort = vsOptionLabel((f && f.vsMode) || DEFAULT_VS_MODE);
+    const periodLine =
+      "Design preview · Ref. " +
+      formatMonthYear((f && f.refMonth) || "") +
+      " · " +
+      vsShort;
     canvasEl.setAttribute(
       "aria-label",
-      "CMP accountability breakdown: three stacked percentage bars"
+      "CMP accountability breakdown: three stacked percentage bars. " + periodLine
     );
     function seg(label, color, triple) {
       return {
@@ -4552,17 +5312,17 @@
       data: {
         labels: ["", "Action Category", "Job Band"],
         datasets: [
-          seg("CMP Done", "#36D391", [72, null, null]),
-          seg("Training", "#5DA5F9", [null, 32, null]),
-          seg("PPE", "#A78BFA", [null, 22, null]),
-          seg("Procedure", "#22D3EE", [null, 18, null]),
-          seg("L1-L3", "#FBBF24", [null, null, 25]),
-          seg("L4-L6", "#FB923C", [null, null, 30]),
-          seg("L7+", "#FDE047", [null, null, 17]),
+          seg("CMP Done", ADANI_GREEN, [72, null, null]),
+          seg("Training", "#2E9FE6", [null, 32, null]),
+          seg("PPE", "#A855BC", [null, 22, null]),
+          seg("Procedure", "#4FC3F7", [null, 18, null]),
+          seg("L1-L3", "#FFD54F", [null, null, 25]),
+          seg("L4-L6", ADANI_ORANGE, [null, null, 30]),
+          seg("L7+", "#FFEE58", [null, null, 17]),
           {
             label: "Not Done",
             data: [28, 28, 28],
-            backgroundColor: "#F87171",
+            backgroundColor: "#FF8A80",
             borderWidth: 0,
             stack: "cmp",
             borderRadius: { topLeft: 4, topRight: 4 },
@@ -4581,6 +5341,13 @@
           },
         },
         plugins: {
+          subtitle: {
+            display: true,
+            text: periodLine,
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 2 },
+          },
           legend: {
             display: true,
             position: "bottom",
@@ -4611,13 +5378,19 @@
             stacked: true,
             ticks: {
               font: { size: 9, family: FONT_UI },
-              color: "#231F20",
+              color: CHART_INK,
               maxRotation: 0,
             },
             grid: { display: false },
             border: {
               display: true,
-              color: "rgba(109, 110, 113, 0.45)",
+              color: "rgba(109, 110, 113, 0.28)",
+            },
+            title: {
+              display: true,
+              text: "CMP breakdown dimension",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
             },
           },
           y: {
@@ -4627,22 +5400,22 @@
             ticks: {
               stepSize: 25,
               font: { size: 10, family: FONT_UI },
-              color: "#231F20",
+              color: CHART_INK,
               padding: 6,
             },
             border: {
               display: true,
-              color: "rgba(109, 110, 113, 0.45)",
+              color: "rgba(109, 110, 113, 0.28)",
             },
             grid: {
-              color: "rgba(109, 110, 113, 0.35)",
+              color: "rgba(109, 110, 113, 0.2)",
               borderDash: [2, 4],
             },
             title: {
               display: true,
               text: "% of Total Incidents",
               font: { size: 10, family: FONT_UI },
-              color: "#6D6E71",
+              color: CHART_INK,
               padding: { top: 0, bottom: 6, left: 0, right: 0 },
             },
           },
@@ -4652,7 +5425,128 @@
   }
 
   /**
-   * Trend + (SPI: quadrant + KPI row-mix) or (by business + by vertical). SPI secondary charts use all KPIs in category; trend line uses the KPI dropdown.
+   * By vertical (checkpoint line) — same roll-up window as By business (radar).
+   */
+  function renderVerticalCheckpointLineChart(f, snapRows, utChart) {
+    const vertMap = {};
+    snapRows.forEach((r) => {
+      const vx = getRowCheckpoint(r);
+      if (!vertMap[vx]) vertMap[vx] = [];
+      vertMap[vx].push(Number(r.value));
+    });
+    const vertLabelsFull = Object.keys(vertMap).sort((a, b) =>
+      a.localeCompare(b)
+    );
+    function shortVertLabel(name) {
+      const s = String(name);
+      return s.length > 14 ? s.slice(0, 13) + "…" : s;
+    }
+    const vertLabels = vertLabelsFull.map(shortVertLabel);
+    const vertData = vertLabelsFull.map((label) => {
+      const vals = vertMap[label];
+      if (utChart && isAdditiveUnit(utChart)) {
+        return vals.reduce(
+          (a, x) => a + (Number.isFinite(x) ? x : 0),
+          0
+        );
+      }
+      const nums = vals.filter((x) => Number.isFinite(x));
+      return nums.length ? avg(nums) : 0;
+    });
+
+    const elVert = document.getElementById("chart-verticals");
+    if (
+      !elVert ||
+      !vertLabels.length ||
+      typeof Chart === "undefined"
+    ) {
+      return;
+    }
+    new Chart(elVert, {
+      type: "line",
+      data: {
+        labels: vertLabels,
+        datasets: [
+          {
+            label: "By vertical",
+            data: vertData,
+            borderColor: "#006DB6",
+            backgroundColor: "rgba(0, 109, 182, 0.18)",
+            fill: true,
+            tension: 0.35,
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: "#006DB6",
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        layout: {
+          padding: { top: 12, right: 20, bottom: 16, left: 28 },
+        },
+        plugins: {
+          subtitle: {
+            display: true,
+            text: bizWindowRowsCaption(f),
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 4 },
+          },
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const i = items[0].dataIndex;
+                return vertLabelsFull[i] || "";
+              },
+            },
+          },
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grace: "6%",
+            ticks: {
+              font: { size: 10 },
+              color: CHART_INK,
+              padding: 6,
+            },
+            grid: { color: "rgba(109, 110, 113, 0.1)" },
+            title: {
+              display: true,
+              text: "Value",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+              padding: { top: 0, bottom: 8, left: 0, right: 0 },
+            },
+          },
+          x: {
+            ticks: {
+              font: { size: 9 },
+              maxRotation: 40,
+              minRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10,
+              color: CHART_INK,
+              padding: 4,
+            },
+            grid: { color: "rgba(109, 110, 113, 0.065)" },
+            title: {
+              display: true,
+              text: "Vertical checkpoint",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Trend + (SPI: by vertical only) or (by business + by vertical). SPI uses multi-KPI line + vertical for focused KPI.
    */
   function buildCharts(catKey, f) {
     destroyCharts();
@@ -4660,9 +5554,7 @@
     const poolAll = getRowsForCategory(catKey);
     const filteredTrend = applyChartFilter(poolAll, f);
     const snapPool = applyNonMonthFilters(poolAll, f, true);
-    const winMonths = new Set(
-      bizUnitWindowMonths(f.vsMode || DEFAULT_VS_MODE, f.refMonth)
-    );
+    const winMonths = new Set(effectiveBizWindowMonths(f));
     const snapRows = snapPool.filter((r) => winMonths.has(r.yearMonth));
 
     const monthSet = new Set();
@@ -4692,10 +5584,39 @@
     }
 
     if (catKey === SPI_CATEGORY_KEY) {
-      const spiPoolAllKpis = applyNonMonthFiltersAllKpis(poolAll, f);
-      renderSpiRiskQuadrantChart(spiPoolAllKpis, f);
-      renderSpiInsightsChart(spiPoolAllKpis, f);
-      renderSpiKpiTrendLineChart(poolAll, f);
+      const snapPoolSpi = applyNonMonthFilters(poolAll, f, true);
+      const winMonthsSpi = new Set(effectiveBizWindowMonths(f));
+      const snapRowsSpi = snapPoolSpi.filter((r) =>
+        winMonthsSpi.has(r.yearMonth)
+      );
+      const elLineSpi = document.getElementById("chart-line");
+      const lineChartHostSpi = elLineSpi
+        ? elLineSpi.closest(".chart-box")
+        : null;
+      if (lineChartHostSpi) {
+        lineChartHostSpi.classList.remove("chart-box--cmp-breakdown");
+        lineChartHostSpi.classList.remove("chart-box--assurance-gauge");
+      }
+      if (
+        shouldShowPercentSpeedometerChart(catKey, f) &&
+        elLineSpi &&
+        typeof Chart !== "undefined"
+      ) {
+        if (lineChartHostSpi) {
+          lineChartHostSpi.classList.add("chart-box--speedometer-gauge");
+        }
+        const spdPct = Math.max(
+          0,
+          Math.min(100, speedometerPercentFromSnapRows(catKey, snapRowsSpi, f))
+        );
+        renderPercentSpeedometerChart(elLineSpi, spdPct, f);
+      } else {
+        if (lineChartHostSpi) {
+          lineChartHostSpi.classList.remove("chart-box--speedometer-gauge");
+        }
+        renderSpiKpiTrendLineChart(poolAll, f);
+      }
+      renderVerticalCheckpointLineChart(f, snapRowsSpi, utChart);
       updateChartHints(f);
       return;
     }
@@ -4730,12 +5651,25 @@
       typeof Chart !== "undefined"
     ) {
       if (lineChartHost) lineChartHost.classList.add("chart-box--cmp-breakdown");
-      renderCmpAccountabilityBreakdownChart(elLine);
+      renderCmpAccountabilityBreakdownChart(elLine, f);
     } else if (showSpeedometerGauge && elLine) {
       if (lineChartHost) {
         lineChartHost.classList.add("chart-box--speedometer-gauge");
       }
-      renderPercentSpeedometerChart(elLine, speedometerPct);
+      const pkSpd = speedometerPrimaryKpiKey(catKey, f);
+      if (
+        pkSpd === INCIDENT_KEY_LEARNING_SPEEDOMETER_KPI_KEY &&
+        Number(catKey) === ASSURANCE_CATEGORY_KEY
+      ) {
+        renderDualGaugeSpeedometerChart(
+          elLine,
+          incidentKeyLearningGroupPercent(poolAll, f),
+          Math.max(0, Math.min(100, speedometerPct)),
+          f
+        );
+      } else {
+        renderPercentSpeedometerChart(elLine, speedometerPct, f);
+      }
     } else if (elLine && lineLabels.length && lineSets.length) {
       elLine.setAttribute(
         "aria-label",
@@ -4754,6 +5688,13 @@
             padding: { top: 12, right: 16, bottom: 14, left: 22 },
           },
           plugins: {
+            subtitle: {
+              display: true,
+              text: trendSeriesPeriodCaption(f),
+              color: CHART_INK,
+              font: { size: 8.5, family: FONT_UI },
+              padding: { bottom: 4 },
+            },
             legend: {
               display: lineSets.length > 1,
               position: "bottom",
@@ -4782,29 +5723,35 @@
               grace: "12%",
               ticks: {
                 font: { size: 10 },
-                color: "#231F20",
+                color: CHART_INK,
                 padding: 6,
               },
-              grid: { color: "rgba(109, 110, 113, 0.2)" },
+              grid: { color: "rgba(109, 110, 113, 0.1)" },
+              title: {
+                display: true,
+                text: "KPI value",
+                font: { size: 10, family: FONT_UI },
+                color: CHART_INK,
+              },
             },
             x: {
               ticks: {
                 font: { size: 10 },
                 maxRotation: 45,
-                color: "#231F20",
+                color: CHART_INK,
                 padding: 4,
               },
-              grid: { color: "rgba(109, 110, 113, 0.15)" },
+              grid: { color: "rgba(109, 110, 113, 0.08)" },
+              title: {
+                display: true,
+                text: "Month",
+                font: { size: 10, family: FONT_UI },
+                color: CHART_INK,
+              },
             },
           },
         },
       });
-    }
-
-    if (catKey === LOCATION_VULN_CAT_KEY) {
-      renderLocationVulnerabilityBuMap(snapRows, f);
-      updateChartHints(f);
-      return;
     }
 
     const byBizVals = {};
@@ -4824,136 +5771,44 @@
     }
     const radarNames = PREVIEW_BUSINESS_NAMES.slice();
     const radarValues = radarNames.map((n) => aggBizWindowForPreviewLabel(n));
-    renderBizBreakdown(radarNames, radarValues, lineSeriesName, utChart);
-
-    /** By vertical (checkpoint mapping) — same roll-up window as By business. */
-    const vertMap = {};
-    snapRows.forEach((r) => {
-      const vx = getRowCheckpoint(r);
-      if (!vertMap[vx]) vertMap[vx] = [];
-      vertMap[vx].push(Number(r.value));
-    });
-    const vertLabelsFull = Object.keys(vertMap).sort((a, b) =>
-      a.localeCompare(b)
+    const radarDisplayLabels = radarNames.map((n) =>
+      formatBusinessSiteRowLabel(n)
     );
-    function shortVertLabel(name) {
-      const s = String(name);
-      return s.length > 14 ? s.slice(0, 13) + "…" : s;
-    }
-    const vertLabels = vertLabelsFull.map(shortVertLabel);
-    const vertData = vertLabelsFull.map((label) => {
-      const vals = vertMap[label];
-      if (utChart && isAdditiveUnit(utChart)) {
-        return vals.reduce(
-          (a, x) => a + (Number.isFinite(x) ? x : 0),
-          0
-        );
-      }
-      const nums = vals.filter((x) => Number.isFinite(x));
-      return nums.length ? avg(nums) : 0;
-    });
+    renderBizBreakdown(
+      radarDisplayLabels,
+      radarValues,
+      lineSeriesName,
+      utChart,
+      f
+    );
 
-    const elVert = document.getElementById("chart-verticals");
-    if (elVert && vertLabels.length) {
-      new Chart(elVert, {
-        type: "line",
-        data: {
-          labels: vertLabels,
-          datasets: [
-            {
-              label: "By vertical",
-              data: vertData,
-              borderColor: "#006DB6",
-              backgroundColor: "rgba(0, 109, 182, 0.18)",
-              fill: true,
-              tension: 0.35,
-              borderWidth: 2,
-              pointRadius: 3,
-              pointBackgroundColor: "#006DB6",
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          layout: {
-            padding: { top: 12, right: 20, bottom: 16, left: 28 },
-          },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                title(items) {
-                  const i = items[0].dataIndex;
-                  return vertLabelsFull[i] || "";
-                },
-              },
-            },
-          },
-          scales: {
-            y: {
-              beginAtZero: true,
-              grace: "6%",
-              ticks: {
-                font: { size: 10 },
-                color: "#231F20",
-                padding: 6,
-              },
-              grid: { color: "rgba(109, 110, 113, 0.2)" },
-              title: {
-                display: true,
-                text: "Value",
-                font: { size: 10, family: FONT_UI },
-                color: "#6D6E71",
-                padding: { top: 0, bottom: 8, left: 0, right: 0 },
-              },
-            },
-            x: {
-              ticks: {
-                font: { size: 9 },
-                maxRotation: 40,
-                minRotation: 0,
-                autoSkip: true,
-                maxTicksLimit: 10,
-                color: "#231F20",
-                padding: 4,
-              },
-              grid: { color: "rgba(109, 110, 113, 0.12)" },
-            },
-          },
-        },
-      });
-    }
+    renderVerticalCheckpointLineChart(f, snapRows, utChart);
 
     updateChartHints(f);
   }
 
   function updateChartHints(f) {
-    const mode = f.vsMode || DEFAULT_VS_MODE;
-    const ref = f.refMonth;
     const trendEl = document.getElementById("chart-trend-hint");
     const lineTitleEl = document.getElementById("chart-line-title");
     const bizEl = document.getElementById("chart-biz-hint");
     const vertEl = document.getElementById("chart-vertical-hint");
-    const n = chartMonthsForVsMode(mode, ref).length;
     const showCmpAcc =
       f &&
       shouldShowCmpAccountabilityChart(f.catKey, f);
     const showSpeedometerSpd =
       f && shouldShowPercentSpeedometerChart(f.catKey, f);
+    const showDualGaugeIk =
+      f &&
+      showSpeedometerSpd &&
+      speedometerPrimaryKpiKey(f.catKey, f) ===
+        INCIDENT_KEY_LEARNING_SPEEDOMETER_KPI_KEY;
     const hmHintEl = document.getElementById("chart-hm-hint");
+    const kpiScopeTitleEl = document.getElementById("kpi-charts-scope-title");
     if (lineTitleEl && f && f.catKey != null) {
-      if (f.catKey === SPI_CATEGORY_KEY) {
-        const list = kpiListForFilterDropdown(SPI_CATEGORY_KEY);
-        const pk = String(
-          f.kpiKeys && f.kpiKeys.length ? f.kpiKeys[0] : f.kpi || ""
-        );
-        const k = list.find((x) => String(x.kpiKey) === pk);
-        lineTitleEl.textContent = k ? kpiDropdownLabel(k) : "SPI KPI trends";
-      } else if (showCmpAcc) {
+      if (showCmpAcc) {
         lineTitleEl.textContent =
           "CMP ACCOUNTABILITY - BREAKDOWN ANALYSIS";
-      } else {
+      } else if (showSpeedometerSpd || showDualGaugeIk) {
         const list = kpiListForFilterDropdown(f.catKey);
         let keys =
           f.kpiKeys && f.kpiKeys.length
@@ -4973,6 +5828,31 @@
           lineTitleEl.textContent =
             keys.length > 1 ? a + " +" + (keys.length - 1) + " more" : a;
         }
+      } else {
+        lineTitleEl.textContent = "Trend";
+      }
+    }
+    if (kpiScopeTitleEl && f && categoryShowsKpiToolbar(f.catKey)) {
+      const list = kpiListForFilterDropdown(f.catKey);
+      let keys =
+        f.kpiKeys && f.kpiKeys.length
+          ? f.kpiKeys.map(String)
+          : f.kpi
+            ? [String(f.kpi)]
+            : [];
+      if (!keys.length && f.kpi) keys = [String(f.kpi)];
+      if (keys.length <= 1) {
+        const k = list.find(
+          (x) => String(x.kpiKey) === String(keys[0] || f.kpi)
+        );
+        kpiScopeTitleEl.textContent = k
+          ? kpiDropdownLabel(k)
+          : TRI_LABEL_FULL;
+      } else {
+        const first = list.find((x) => String(x.kpiKey) === keys[0]);
+        const a = first ? kpiDropdownLabel(first) : keys[0];
+        kpiScopeTitleEl.textContent =
+          keys.length > 1 ? a + " +" + (keys.length - 1) + " more" : a;
       }
     }
     const isHazard = f && f.catKey === HAZARD_CATEGORY_KEY;
@@ -4985,74 +5865,45 @@
           ? "month"
           : "week";
       hmHintEl.textContent =
-        hmMode === "month" ? "(heatmap · month)" : "(heatmap · week)";
+        (hmMode === "month" ? "(heatmap · month" : "(heatmap · week") +
+        " · ref " +
+        formatMonthYear(f.refMonth) +
+        ")";
     }
     if (trendEl && f && f.catKey === SPI_CATEGORY_KEY) {
-      trendEl.textContent =
-        mode === "vs_last_year"
-          ? "(lines · 12 mo)"
-          : "(lines · " + n + " mo)";
-    } else if (trendEl) {
-      if (showSpeedometerSpd) {
+      trendEl.textContent = showSpeedometerSpd
+        ? (showDualGaugeIk
+            ? "Group vs business gauge · " + chartTrendHintFiltersOnly(f)
+            : "Speedometer · " + chartTrendHintFiltersOnly(f))
+        : "SPI KPI lines · " + chartTrendHintFiltersOnly(f);
+    } else if (trendEl && f) {
+      if (showDualGaugeIk) {
         trendEl.textContent =
-          mode === "vs_last_year"
-            ? "(speedometer · 12 mo)"
-            : "(speedometer · " + n + " mo)";
+          "Group vs business gauge · " + chartTrendHintFiltersOnly(f);
+      } else if (showSpeedometerSpd) {
+        trendEl.textContent =
+          "Speedometer · " + chartTrendHintFiltersOnly(f);
       } else if (showCmpAcc) {
-        trendEl.textContent = "% of Fatal Incident";
-      } else {
         trendEl.textContent =
-          mode === "vs_last_year"
-            ? "(lines · 12 mo)"
-            : "(lines · " + n + " mo)";
+          "% of Fatal Incident · " + chartTrendHintFiltersOnly(f);
+      } else {
+        trendEl.textContent = chartTrendHintFiltersOnly(f);
       }
     }
-    const bizHint = {
-      vs_yesterday: "(radar · all BUs · latest mo)",
-      vs_last_month: "(radar · all BUs · latest mo)",
-      vs_last_week: "(radar · all BUs · 2 mo)",
-      vs_last_quarter: "(radar · all BUs · 3 mo)",
-      vs_last_year: "(radar · all BUs · YTD window)",
-    };
-    const bizHintHazard = {
-      vs_yesterday: "(h-bars · all BUs · latest mo)",
-      vs_last_month: "(h-bars · all BUs · latest mo)",
-      vs_last_week: "(h-bars · all BUs · 2 mo)",
-      vs_last_quarter: "(h-bars · all BUs · 3 mo)",
-      vs_last_year: "(h-bars · all BUs · YTD window)",
-    };
-    const vertHint = {
-      vs_yesterday: "(vertical · latest mo)",
-      vs_last_month: "(vertical · latest mo)",
-      vs_last_week: "(vertical · 2 mo)",
-      vs_last_quarter: "(vertical · 3 mo)",
-      vs_last_year: "(vertical · YTD window)",
-    };
-    const vertHintHazard = {
-      vs_yesterday: "(doughnut · latest mo)",
-      vs_last_month: "(doughnut · latest mo)",
-      vs_last_week: "(doughnut · 2 mo)",
-      vs_last_quarter: "(doughnut · 3 mo)",
-      vs_last_year: "(doughnut · YTD window)",
-    };
-    const bh = isHazard
-      ? bizHintHazard[mode] || "(h-bars)"
-      : bizHint[mode] || "(share)";
-    if (bizEl) bizEl.textContent = bh;
-    if (vertEl) {
-      vertEl.textContent = isHazard
-        ? vertHintHazard[mode] || "(doughnut)"
-        : vertHint[mode] || "(vertical)";
+    if (bizEl) {
+      if (isHazard) {
+        bizEl.textContent =
+          "(h-bars · all BUs) · " + bizWindowRowsCaption(f);
+      } else {
+        bizEl.textContent = bizWindowRowsCaption(f);
+      }
     }
-    const spiBubbleHint = document.getElementById("chart-spi-bubble-hint");
-    const spiMapHint = document.getElementById("chart-spi-map-hint");
-    const spiRoll =
-      mode === "vs_last_year"
-        ? "(cross-plot · all SPI KPIs · YTD)"
-        : "(cross-plot · all SPI KPIs · Vs window)";
-    const spiMapRoll = "(100% stack · all SPI KPIs · 12 mo)";
-    if (spiBubbleHint) spiBubbleHint.textContent = spiRoll;
-    if (spiMapHint) spiMapHint.textContent = spiMapRoll;
+    if (vertEl && f) {
+      vertEl.textContent =
+        (isHazard ? "(doughnut · vertical) · " : "By vertical · ") +
+        bizWindowRowsCaption(f);
+    }
+    refreshTrendInsightTooltips(f);
   }
 
   function sortRows(rows, key, asc, pool, f) {
@@ -5236,13 +6087,18 @@
         : [f.business].filter(Boolean);
 
     const thead = document.querySelector("#tbl-detail thead tr");
+    const buColLabel = "BU";
     if (thead) {
       if (!colKpis.length) {
         thead.innerHTML =
-          '<th scope="col" class="bu-matrix__th-bu">BU</th><th scope="col" class="bu-matrix__th-empty">—</th>';
+          '<th scope="col" class="bu-matrix__th-bu">' +
+          escapeHtml(buColLabel) +
+          '</th><th scope="col" class="bu-matrix__th-empty">—</th>';
       } else {
         thead.innerHTML =
-          '<th scope="col" class="bu-matrix__th-bu">BU</th>' +
+          '<th scope="col" class="bu-matrix__th-bu">' +
+          escapeHtml(buColLabel) +
+          "</th>" +
           colKpis
             .map(
               (k) =>
@@ -5300,6 +6156,7 @@
 
     tbody.innerHTML = buRows
       .map((bu, ri) => {
+        const rowLabel = formatBusinessSiteRowLabel(bu);
         const cells = colKpis
           .map((k, ki) => {
             const eff = cellEff[ri][ki];
@@ -5309,7 +6166,7 @@
               '<td class="bu-matrix__cell">' +
               '<div class="bu-cell bu-cell--pbi">' +
               '<div class="bu-cell__databar bu-cell__databar--diverging" role="img" aria-label="' +
-              escapeAttr(bu + ", " + k.kpiName + ": " + pctStr) +
+              escapeAttr(rowLabel + ", " + k.kpiName + ": " + pctStr) +
               '">' +
               '<div class="bu-cell__track-split">' +
               '<div class="bu-cell__half bu-cell__half--neg">' +
@@ -5321,7 +6178,9 @@
               '<div class="bu-cell__fill bu-cell__fill--pos" style="width:' +
               divW.right +
               '%"></div></div></div>' +
-              '<span class="bu-cell__value">' +
+              '<span class="' +
+              matrixVsValueClass(eff.value) +
+              '">' +
               escapeHtml(pctStr) +
               "</span></div></div></td>"
             );
@@ -5331,7 +6190,7 @@
           '<tr class="' +
           (ri % 2 === 0 ? "bu-matrix__row--even" : "bu-matrix__row--odd") +
           '"><th scope="row" class="bu-matrix__bu">' +
-          escapeHtml(bu) +
+          escapeHtml(rowLabel) +
           "</th>" +
           cells +
           "</tr>"
@@ -5345,19 +6204,74 @@
     const elFrom = document.getElementById("f-dt-from");
     const elTo = document.getElementById("f-dt-to");
     if (!elFrom || !elTo) return;
+    const monthMode =
+      elFrom.type === "month" && elTo.type === "month";
+
+    function clampYm(ym) {
+      if (!ym || ym.length < 7) return mb.max;
+      const y = ym.slice(0, 7);
+      if (y < mb.min) return mb.min;
+      if (y > mb.max) return mb.max;
+      return y;
+    }
+
+    if (monthMode) {
+      elFrom.min = mb.min;
+      elFrom.max = mb.max;
+      elTo.min = mb.min;
+      elTo.max = mb.max;
+
+      let toYm =
+        elTo.value && elTo.value.length >= 7 ? elTo.value.slice(0, 7) : "";
+      if (!toYm) toYm = mb.max;
+      toYm = clampYm(toYm);
+      elTo.value = toYm;
+
+      let fromYm =
+        elFrom.value && elFrom.value.length >= 7
+          ? elFrom.value.slice(0, 7)
+          : "";
+      if (!fromYm) {
+        let m = toYm;
+        for (let i = 0; i < 11; i++) m = monthAdd(m, -1);
+        const startYm = m < mb.min ? mb.min : m;
+        fromYm = clampYm(startYm);
+      } else {
+        fromYm = clampYm(fromYm);
+      }
+      if (fromYm > toYm) {
+        fromYm = toYm;
+      }
+      elFrom.value = fromYm;
+      return;
+    }
+
     const minD = mb.min + "-01";
     const maxD = lastDayOfMonthYm(mb.max);
     elFrom.min = minD;
     elFrom.max = maxD;
     elTo.min = minD;
     elTo.max = maxD;
-    if (!elTo.value || elTo.value.length < 8) elTo.value = maxD;
-    const endYm = elTo.value.slice(0, 7);
-    let m = endYm;
-    for (let i = 0; i < 11; i++) m = monthAdd(m, -1);
-    if (!elFrom.value || elFrom.value.length < 8) {
+
+    let toYm =
+      elTo.value && elTo.value.length >= 7 ? elTo.value.slice(0, 7) : "";
+    toYm = clampYm(toYm);
+    elTo.value = lastDayOfMonthYm(toYm);
+
+    let fromYm =
+      elFrom.value && elFrom.value.length >= 7 ? elFrom.value.slice(0, 7) : "";
+    if (!fromYm) {
+      let m = toYm;
+      for (let i = 0; i < 11; i++) m = monthAdd(m, -1);
       const startYm = m < mb.min ? mb.min : m;
-      elFrom.value = startYm + "-01";
+      fromYm = clampYm(startYm);
+      elFrom.value = fromYm + "-01";
+    } else {
+      fromYm = clampYm(fromYm);
+      elFrom.value = fromYm + "-01";
+    }
+    if (fromYm > toYm) {
+      elFrom.value = toYm + "-01";
     }
   }
 
@@ -5433,8 +6347,21 @@
   }
 
   function exportChartOrHostToJpeg(id, slug) {
+    if (id === "chart-spi-bubble") {
+      const host = document.getElementById("chart-spi-bubble");
+      if (!host) return;
+      captureElementToCanvas(host).then((canvas) => {
+        if (!canvas) return;
+        canvas.toBlob((blob) => {
+          if (blob) {
+            triggerDownloadBlob(blob, slugExportFilename(slug) + ".jpg");
+          }
+        }, "image/jpeg", 0.92);
+        announce("Downloaded as JPEG.");
+      });
+      return;
+    }
     if (
-      id === "chart-loc-bu-map" ||
       id === "chart-spi-map" ||
       id === "spi-hazard-heatmap-capture"
     ) {
@@ -5680,21 +6607,19 @@
     const f = readFilters(catKey);
     if (!f) return;
 
-    const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
-
-    const presentationSeed = [
-      String(catKey),
-      f.vsMode || "",
-      f.refMonth || "",
-      f.state || "",
-      f.business || "",
-      String(f.kpi || ""),
-      JSON.stringify(f.kpiKeys || []),
-      JSON.stringify(f.variable || {}),
-    ].join("|");
-
     const multiWrap = document.getElementById("multi-kpi-wrap");
     if (multiWrap) {
+      const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
+      const presentationSeed = [
+        String(catKey),
+        f.vsMode || "",
+        f.refMonth || "",
+        f.state || "",
+        f.business || "",
+        String(f.kpi || ""),
+        JSON.stringify(f.kpiKeys || []),
+        JSON.stringify(f.variable || {}),
+      ].join("|");
       if (!aggList.length) {
         multiWrap.innerHTML =
           '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Adjust Vs or geography filters.</div>';
@@ -5813,15 +6738,25 @@
       siteOpts +
       "</select></div>";
     const calendarFieldHtml =
-      '<div class="field field--calendar-range field--calendar-compact">' +
-      '<span class="field-label field-label--inline" id="f-cal-lbl">Calendar</span>' +
-      '<div class="field-calendar-range" role="group" aria-labelledby="f-cal-lbl">' +
-      '<label class="visually-hidden" for="f-dt-from">From date</label>' +
-      '<input type="date" id="f-dt-from" class="toolbar-date" />' +
-      '<span class="field-calendar-sep" aria-hidden="true">→</span>' +
-      '<label class="visually-hidden" for="f-dt-to">To date</label>' +
-      '<input type="date" id="f-dt-to" class="toolbar-date" />' +
-      "</div></div>";
+      catKey === SPI_CATEGORY_KEY
+        ? '<div class="field field--calendar-range field--calendar-compact">' +
+          '<span class="field-label field-label--inline" id="f-cal-lbl">Calendar</span>' +
+          '<div class="field-calendar-range" role="group" aria-labelledby="f-cal-lbl">' +
+          '<label class="visually-hidden" for="f-dt-from">From month</label>' +
+          '<input type="month" id="f-dt-from" class="toolbar-date toolbar-month" />' +
+          '<span class="field-calendar-sep" aria-hidden="true">→</span>' +
+          '<label class="visually-hidden" for="f-dt-to">To month</label>' +
+          '<input type="month" id="f-dt-to" class="toolbar-date toolbar-month" />' +
+          "</div></div>"
+        : '<div class="field field--calendar-range field--calendar-compact">' +
+          '<span class="field-label field-label--inline" id="f-cal-lbl">Calendar</span>' +
+          '<div class="field-calendar-range" role="group" aria-labelledby="f-cal-lbl">' +
+          '<label class="visually-hidden" for="f-dt-from">From date</label>' +
+          '<input type="date" id="f-dt-from" class="toolbar-date" />' +
+          '<span class="field-calendar-sep" aria-hidden="true">→</span>' +
+          '<label class="visually-hidden" for="f-dt-to">To date</label>' +
+          '<input type="date" id="f-dt-to" class="toolbar-date" />' +
+          "</div></div>";
     const personalFieldHtml =
       '<div class="field"><label class="field-label" for="f-personal">Personal type</label>' +
       '<select id="f-personal">' +
@@ -5868,30 +6803,63 @@
       filterCoreInner +
       kpiSurfaceHtml +
       "</div>";
-    const lineChartTitleInner =
-      '<span class="chart-analytics-title__label" id="chart-line-title">' +
-      escapeHtml(TRI_LABEL_FULL) +
-      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span>';
-    const lineChartBoxHtml =
+    const kpiChartsScopeWrap = (innerRowHtml) =>
+      '<div class="kpi-charts-scope" id="kpi-charts-scope">' +
+      '<div class="kpi-charts-scope__head">' +
+      '<span class="kpi-charts-scope__title" id="kpi-charts-scope-title"></span>' +
+      "</div>" +
+      innerRowHtml +
+      "</div>";
+    const trendLineChartTitleInner =
+      '<span class="chart-analytics-title__label" id="chart-line-title">Trend</span> <span id="chart-trend-hint" class="chart-box__hint">Monthly values · Vs window</span>';
+    const trendLineChartBoxHtml =
       '<div class="chart-box">' +
-      chartBlockTitleHtml(lineChartTitleInner, "chart-line", "trend") +
-      '<div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for the selected KPI in the trend window"></canvas></div></div>';
+      chartBlockTitleHtml(
+        trendLineChartTitleInner,
+        "chart-line",
+        "trend-line",
+        CHART_HELP.trend
+      ) +
+      '<div class="chart-canvas-wrap"><canvas id="chart-line" role="img" aria-label="Line chart: monthly values for the selected KPI"></canvas></div></div>';
+    const standardThreeChartsInner =
+      '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
+      trendLineChartBoxHtml +
+      '<div class="chart-box chart-box--biz">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">Same KPI · every BU · latest window</span>',
+        "chart-biz",
+        "by-business-radar",
+        CHART_HELP.bizRadar
+      ) +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Radar chart: KPI value by business unit across all preview businesses"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
+      '<div class="chart-box">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">Checkpoints vs KPI · latest month</span>',
+        "chart-verticals",
+        "by-vertical",
+        CHART_HELP.vertical
+      ) +
+      '<div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
     const spiLineChartTitleInner =
-      '<span class="chart-analytics-title__label" id="chart-line-title">' +
-      escapeHtml("SPI KPI trends") +
-      '</span> <span id="chart-trend-hint" class="chart-box__hint">(lines · 12 mo)</span>';
+      '<span class="chart-analytics-title__label" id="chart-line-title">Trend</span> <span id="chart-trend-hint" class="chart-box__hint">SPI KPI lines · Vs window</span>';
     const spiLineChartBoxHtml =
       '<div class="chart-box chart-box--spi-kpi-trend">' +
-      chartBlockTitleHtml(spiLineChartTitleInner, "chart-line", "trend") +
-      '<div class="chart-canvas-wrap chart-canvas-wrap--spi-trend"><canvas id="chart-line" role="img" aria-label="Line chart: monthly average for each SPI KPI in the trend window"></canvas></div></div>';
+      chartBlockTitleHtml(
+        spiLineChartTitleInner,
+        "chart-line",
+        "trend-spi",
+        CHART_HELP.spiTrend
+      ) +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--spi-trend"><canvas id="chart-line" role="img" aria-label="Line chart: SPI KPI trends"></canvas></div></div>';
     /** Same SPI heatmap visual; used on Leading Hazard for Hazard Spotting (primary panel). */
     const hazardLeadingHeatmapBoxHtml =
       '<div class="chart-box chart-box--spi-hazard-hm chart-box--hazard-leading-hm">' +
       chartBlockTitleHtml(
-        '<span class="spi-hm-chart-title" id="spi-hm-heading">Hazard Spotting</span> ' +
-        '<span class="chart-box__hint" id="chart-hm-hint">(heatmap · week)</span>',
+        '<span class="spi-hm-chart-title" id="spi-hm-heading">Heat map</span> ' +
+        '<span class="chart-box__hint" id="chart-hm-hint">Week or month density</span>',
         "spi-hazard-heatmap-capture",
-        "spi-hazard-heatmap"
+        "spi-hazard-heatmap",
+        CHART_HELP.hazardHeat
       ) +
       '<div class="spi-hm-period-bar">' +
       '<span class="spi-hm-period-label">Period</span>' +
@@ -5909,84 +6877,53 @@
       hazardLeadingHeatmapBoxHtml +
       '<div class="chart-box chart-box--biz chart-box--hazard-bu">' +
       chartBlockTitleHtml(
-        '<span class="chart-analytics-title__label">BU comparison</span> <span id="chart-biz-hint" class="chart-box__hint">(bars · all BUs)</span>',
+        '<span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">Horizontal bars · selected KPI · all BUs</span>',
         "chart-biz",
-        "bu-comparison"
+        "bu-comparison",
+        CHART_HELP.hazardBiz
       ) +
       '<div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Horizontal bar chart: selected KPI by business unit"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
       '<div class="chart-box chart-box--hazard-vert">' +
       chartBlockTitleHtml(
-        '<span class="chart-analytics-title__label">Vertical mix</span> <span id="chart-vertical-hint" class="chart-box__hint">(doughnut · Vs window)</span>',
+        '<span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">Doughnut · share in Vs window</span>',
         "chart-verticals",
-        "vertical-mix"
+        "vertical-mix",
+        CHART_HELP.hazardVert
       ) +
       '<div class="chart-canvas-wrap chart-canvas-wrap--hazard-doughnut"><canvas id="chart-verticals" role="img" aria-label="Doughnut chart: share of selected KPI by vertical"></canvas></div></div></div>';
+    const spiTwoChartsInner =
+      '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: SPI KPI trends and by vertical">' +
+      spiLineChartBoxHtml +
+      '<div class="chart-box">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">Vertical checkpoints · Vs window</span>',
+        "chart-verticals",
+        "spi-by-vertical",
+        CHART_HELP.vertical
+      ) +
+      '<div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
     const chartsRowHtml =
       catKey === SPI_CATEGORY_KEY
-        ? '<div class="cat-charts cat-charts--spi" role="group" aria-label="Charts: SPI KPI trends, quadrant analysis, SPI KPI mix">' +
-          spiLineChartBoxHtml +
-          '<div class="chart-box chart-box--spi-bubble">' +
-          chartBlockTitleHtml(
-            '<span class="chart-analytics-title__label">Quadrant analysis</span> <span id="chart-spi-bubble-hint" class="chart-box__hint">(all SPI KPIs · cross-plot)</span>',
-            "chart-spi-bubble",
-            "quadrant"
-          ) +
-          '<div class="chart-canvas-wrap chart-canvas-wrap--spi-bubble"><canvas id="chart-spi-bubble" role="img" aria-label="Bubble quadrant chart: concern reporting rate versus fatality rate by business unit"></canvas></div></div>' +
-          '<div class="chart-box chart-box--spi-map">' +
-          chartBlockTitleHtml(
-            '<span class="chart-analytics-title__label">SPI mix over time</span> <span id="chart-spi-map-hint" class="chart-box__hint">(all SPI KPIs · 100% · 12 mo)</span>',
-            "chart-spi-insights",
-            "spi-kpi-mix"
-          ) +
-          '<div class="chart-spi-map-host chart-spi-map-host--insights" id="chart-spi-map" role="region" aria-label="SPI one hundred percent stacked mix by month"></div></div></div>'
+        ? kpiChartsScopeWrap(spiTwoChartsInner)
         : catKey === HAZARD_CATEGORY_KEY
-          ? hazardChartsRowHtml
-        : catKey === LOCATION_VULN_CAT_KEY
-          ? '<div class="cat-charts cat-charts--loc-map" role="group" aria-label="Location vulnerability: BU map">' +
-            '<div class="chart-box chart-box--loc-bu-map">' +
-            chartBlockTitleHtml(
-              '<span class="chart-analytics-title__label">By business (India map)</span> <span id="chart-loc-bu-map-hint" class="chart-box__hint">(map · row counts · 24 BUs)</span>',
-              "chart-loc-bu-map",
-              "india-bu-map"
-            ) +
-            '<div class="chart-spi-map-host chart-spi-map-host--loc-bu" id="chart-loc-bu-map" role="presentation" aria-label="Map of India: circle size by filtered row count per business unit"></div></div></div>'
-          : '<div class="cat-charts" role="group" aria-label="Charts for filtered data">' +
-            lineChartBoxHtml +
-            '<div class="chart-box chart-box--biz">' +
-            chartBlockTitleHtml(
-              '<span class="chart-analytics-title__label">By business</span> <span id="chart-biz-hint" class="chart-box__hint">(radar · all BUs)</span>',
-              "chart-biz",
-              "by-business-radar"
-            ) +
-            '<div class="chart-canvas-wrap chart-canvas-wrap--biz"><canvas id="chart-biz" role="img" aria-label="Radar chart: KPI value by business unit across all preview businesses"></canvas><p id="chart-biz-empty" class="chart-biz-empty" hidden></p></div></div>' +
-            '<div class="chart-box">' +
-            chartBlockTitleHtml(
-              '<span class="chart-analytics-title__label">By vertical</span> <span id="chart-vertical-hint" class="chart-box__hint">(vertical · latest mo)</span>',
-              "chart-verticals",
-              "by-vertical"
-            ) +
-            '<div class="chart-canvas-wrap"><canvas id="chart-verticals" role="img" aria-label="Values by vertical for the selected KPI and Versus window"></canvas></div></div></div>';
+          ? kpiChartsScopeWrap(hazardChartsRowHtml)
+          : kpiChartsScopeWrap(standardThreeChartsInner);
     const compareTabHtml =
       '<button type="button" role="tab" id="view-tab-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-compare" tabindex="-1" data-view="compare">Comparison view</button>';
     const comparePanelHtml =
       '<div id="view-panel-compare" class="view-panel view-panel--compare" role="tabpanel" aria-labelledby="view-tab-compare" hidden><div class="chart-box chart-box--bu-compare">' +
-      '<h3 class="chart-analytics-title chart-analytics-title--toolbar">' +
-      '<span class="chart-analytics-title__text">' +
-      '<span class="chart-analytics-title__label" id="chart-bu-compare-title">KPI comparison by business</span> <span id="chart-bu-compare-hint" class="chart-box__hint">(grouped bars · all BUs)</span>' +
-      "</span>" +
-      chartDownloadButton("chart-bu-compare", "comparison-by-bu") +
-      '</h3><div class="chart-canvas-wrap chart-canvas-wrap--bu-compare"><canvas id="chart-bu-compare" role="img" aria-label="Grouped bar chart: comparison period versus current KPI value for each business unit"></canvas></div></div></div>';
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label" id="chart-bu-compare-title">BU comparison — current vs base</span> <span id="chart-bu-compare-hint" class="chart-box__hint">Grouped bars · same KPI · all BUs</span>',
+        "chart-bu-compare",
+        "comparison-by-bu",
+        CHART_HELP.compareBu
+      ) +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--bu-compare"><canvas id="chart-bu-compare" role="img" aria-label="Grouped bar chart: base vs current period by business unit"></canvas></div></div></div>';
     wrap.innerHTML =
       '<div class="cat-top-bar">' +
       '<div class="cat-top-bar__lead">' +
-      journeyStepsHtml(3) +
-      '<div class="cat-top-bar__title">' +
-      '<nav class="breadcrumb" aria-label="Breadcrumb">' +
-      '<ol><li><a href="#categories" id="bc-cats">Categories</a></li><li aria-current="page">' +
-      '<h2 class="cat-heading" id="cat-heading" tabindex="-1">' +
-      escapeHtml(cat.categoryName) +
-      "</h2></li></ol></nav>" +
-      "</div></div>" +
+      journeyStepsHtml(3, cat.categoryName) +
+      "</div>" +
       '<fieldset class="cat-toolbar cat-toolbar--compact" aria-label="Refine results">' +
       '<legend class="visually-hidden">Refine results</legend>' +
       '<div class="cat-toolbar__inner" role="group">' +
@@ -6007,12 +6944,10 @@
       '<button type="button" class="btn btn--reset-compact" id="f-reset">Reset</button>' +
       "</div></div></fieldset>" +
       "</div>" +
-      (catKey === LOCATION_VULN_CAT_KEY
-        ? ""
-        : '<fieldset class="kpi-summary-region">' +
-          '<legend class="visually-hidden">KPI summary for current filters</legend>' +
-          '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
-          "</fieldset>") +
+      '<fieldset class="kpi-summary-region">' +
+      '<legend class="visually-hidden">KPI summary for current filters</legend>' +
+      '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
+      "</fieldset>" +
       '<div class="cat-main-view cat-main-view--charts" id="cat-main-view" data-view="charts">' +
       '<div class="view-tabs" role="tablist" aria-label="Chart, table, or comparison view">' +
       '<button type="button" role="tab" id="view-tab-charts" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-charts" data-view="charts">Chart view</button>' +
@@ -6056,8 +6991,6 @@
 
     if (insightShell) {
       wrap.innerHTML = wrap.innerHTML
-        .replace('class="breadcrumb"', 'class="breadcrumb m2-breadcrumb"')
-        .replace('class="cat-heading"', 'class="cat-heading m2-cat-heading"')
         .replace(
           '<div class="table-zone">',
           '<div class="table-zone m2-table-zone m2-evidence-zone">'
@@ -6116,6 +7049,24 @@
         .querySelectorAll('#f-kpi-panel input[name="f-kpi-cb"]')
         .forEach((cb) => {
           cb.addEventListener("change", () => {
+            if (cfg.showKpi) {
+              const main = document.getElementById("cat-main-view");
+              if (main && main.dataset.view === "charts") {
+                const boxes = document.querySelectorAll(
+                  '#f-kpi-panel input[name="f-kpi-cb"]'
+                );
+                const checkedAfter = Array.from(boxes).filter((b) => b.checked);
+                if (checkedAfter.length > 1 && cb.checked) {
+                  boxes.forEach((b) => {
+                    if (b !== cb) b.checked = false;
+                  });
+                }
+                const after = Array.from(boxes).filter((b) => b.checked);
+                if (after.length === 0 && boxes.length) {
+                  boxes[0].checked = true;
+                }
+              }
+            }
             saveKpiSelection(catKey, readSelectedKpiKeysFromDom());
             updateKpiScopeCount();
             onFilterChange();
@@ -6219,7 +7170,11 @@
       '<svg class="landing__start-arrow" width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
       '<path fill="currentColor" d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8-8-8z"/>' +
       "</svg>" +
-      "</button></div>";
+      "</button></div>" +
+      '<div class="landing__doc-row" role="navigation" aria-label="Help and KPI reference">' +
+      '<a class="landing__doc-btn" href="guide.html">How to use this dashboard</a>' +
+      '<a class="landing__doc-btn landing__doc-btn--secondary" href="kpi-reference.html">KPI details &amp; measures</a>' +
+      "</div>";
 
     root.innerHTML = "";
     root.appendChild(box);
@@ -6316,6 +7271,7 @@
         const interactive = !CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(
           cat.categoryKey
         );
+        const ll = categoryListChipLeadingLagging(cat.categoryKey);
         const el = interactive
           ? document.createElement("button")
           : document.createElement("div");
@@ -6329,11 +7285,18 @@
         el.setAttribute(
           "aria-label",
           interactive
-            ? cat.categoryName + ", " + cat.kpiCount + " KPIs, open dashboard"
+            ? cat.categoryName +
+                ", " +
+                cat.kpiCount +
+                " KPIs, " +
+                ll.label +
+                ", open dashboard"
             : cat.categoryName +
                 ", " +
                 cat.kpiCount +
-                " KPIs, not in preview"
+                " KPIs, " +
+                ll.label +
+                ", not in preview"
         );
         if (!interactive) {
           el.setAttribute("aria-disabled", "true");
@@ -6349,9 +7312,9 @@
           "</span>" +
           '<span class="m2-cat-row__main">' +
           '<span class="m2-cat-row__chip m2-cat-row__chip--' +
-          (interactive ? "live" : "muted") +
+          ll.chipKind +
           '">' +
-          (interactive ? "Available" : "Not in Preview") +
+          ll.label +
           "</span>" +
           '<span class="m2-cat-row__title">' +
           escapeHtml(cat.categoryName) +
@@ -6417,7 +7380,7 @@
       journeyStepsHtml(2) +
       '<div class="home-intro home-intro--launchpad">' +
       '<h2 id="home-h">Categories</h2>' +
-      '<p class="home-lede">All <strong>safety domains</strong> below are available in this preview—including <strong>Incident Management</strong>, <strong>Hazard &amp; Observation (Leading)</strong>, <strong>Assurance</strong>, <strong>Safety Performance Indices</strong>, and <strong>Location Vulnerability</strong>. Use <strong>Home</strong> in the header to return to the start screen.</p>' +
+      '<p class="home-lede">Nine <strong>safety domains</strong> are listed below; each card shows whether measures in that domain are <strong>leading</strong> or <strong>lagging</strong> indicators. Use <strong>Home</strong> in the header to return to the start screen.</p>' +
       '<div class="home-tools" role="search">' +
       '<label class="home-search-label" for="cat-q">Find category or KPI</label>' +
       '<input id="cat-q" class="home-search" type="search" placeholder="Category or KPI name (e.g. Incident, LTI…)" autocomplete="off" />' +
@@ -6472,6 +7435,7 @@
         const active = !CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(
           cat.categoryKey
         );
+        const ll = categoryListChipLeadingLagging(cat.categoryKey);
         const el = active
           ? document.createElement("button")
           : document.createElement("div");
@@ -6483,11 +7447,17 @@
         el.setAttribute(
           "aria-label",
           active
-            ? cat.categoryName + ", " + cat.kpiCount + " KPIs"
+            ? cat.categoryName +
+                ", " +
+                cat.kpiCount +
+                " KPIs, " +
+                ll.label
             : cat.categoryName +
                 ", " +
                 cat.kpiCount +
-                " KPIs. Not in preview."
+                " KPIs, " +
+                ll.label +
+                ". Not in preview."
         );
         if (!active) {
           el.setAttribute("aria-disabled", "true");
@@ -6503,10 +7473,10 @@
           '<span class="category-card__icon">' +
           categoryIconSvg(cat.categoryKey) +
           "</span>" +
-          '<span class="category-card__lp-badge ' +
-          (active ? "category-card__lp-badge--live" : "category-card__lp-badge--muted") +
+          '<span class="category-card__lp-badge category-card__lp-badge--' +
+          ll.chipKind +
           '">' +
-          (active ? "Available" : "Not in Preview") +
+          ll.label +
           "</span></div>" +
           '<div class="category-card__lp-body">' +
           '<span class="category-card__name">' +
