@@ -864,6 +864,10 @@ body {
   grid-row: 1;
 }
 
+.m2-cat-dir-intro .categories-page__title {
+  margin: 0 0 8px;
+}
+
 .home-intro--launchpad .home-lede {
   grid-column: 1;
   grid-row: 2;
@@ -4849,6 +4853,16 @@ body:has(.cat-view) .kpi-charts-scope {
   font-weight: 700;
   color: var(--text-heading);
   letter-spacing: -0.02em;
+}
+
+/* Category Selection page (#categories): match guide "How to use this dashboard" title weight */
+.categories-page__title {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-heading);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .doc-page__back {

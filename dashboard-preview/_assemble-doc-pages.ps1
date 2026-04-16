@@ -112,6 +112,8 @@ $kpiRefHtml = @"
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html">How to use</a>
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="kpi-reference.html" aria-current="page">KPI details</a>
           </nav>
+          <span class="data-refreshed">Data refreshed: Daily</span>
+          <span class="last-updated">Last updated <time datetime="2026-04-14">Tuesday, April 14, 2026</time></span>
         </div>
       </header>
 
@@ -292,6 +294,7 @@ $guideHtml = @"
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html" aria-current="page">How to use</a>
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="kpi-reference.html">KPI details</a>
           </nav>
+          <span class="data-refreshed">Data refreshed: Daily</span>
           <span class="last-updated">Last updated <time datetime="2026-04-14">Tuesday, April 14, 2026</time></span>
         </div>
       </header>

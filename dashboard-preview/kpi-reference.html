@@ -105,6 +105,8 @@
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html">How to use</a>
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="kpi-reference.html" aria-current="page">KPI details</a>
           </nav>
+          <span class="data-refreshed">Data refreshed: Daily</span>
+          <span class="last-updated">Last updated <time datetime="2026-04-14">Tuesday, April 14, 2026</time></span>
         </div>
       </header>
 
@@ -216,49 +218,49 @@
             <tr>
               <td class="doc-table__num">8</td>
               <td>Incident Management</td>
-              <td>No. LTI</td>
+              <td>LTI Count</td>
               <td>Count</td>
-              <td>Count of No. LTI for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of LTI Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 9 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">9</td>
               <td>Incident Management</td>
-              <td>No. MTC</td>
+              <td>MTC Count</td>
               <td>Count</td>
-              <td>Count of No. MTC for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of MTC Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 10 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">10</td>
               <td>Incident Management</td>
-              <td>No. RWC</td>
+              <td>RWC Count</td>
               <td>Count</td>
-              <td>Count of No. RWC for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of RWC Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 11 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">11</td>
               <td>Incident Management</td>
-              <td>No. FAC</td>
+              <td>FAC Count</td>
               <td>Count</td>
-              <td>Count of No. FAC for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of FAC Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 12 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">12</td>
               <td>Incident Management</td>
-              <td>Delta of LTI count</td>
+              <td>Δ LTI Count</td>
               <td>Count</td>
-              <td>Count of Delta of LTI count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of Δ LTI Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 14 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">13</td>
               <td>Incident Management</td>
-              <td>Delta of Repeat incident count</td>
+              <td>Δ Repeat Incident Count</td>
               <td>Count</td>
-              <td>Count of Delta of Repeat incident count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of Δ Repeat Incident Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 15 )</code></td>
             </tr>
             <tr>
@@ -324,9 +326,9 @@
             <tr>
               <td class="doc-table__num">19</td>
               <td>Hazard &amp; Observation Management</td>
-              <td>No. Near Miss</td>
+              <td>Near Miss Count</td>
               <td>Count</td>
-              <td>Count of No. Near Miss for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
+              <td>Count of Near Miss Count for the reporting period and active BU / geography / vertical filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 13 )</code></td>
             </tr>
             <tr>
@@ -348,9 +350,9 @@
             <tr>
               <td class="doc-table__num">22</td>
               <td>Hazard &amp; Observation Management</td>
-              <td>% Completion of SRFA</td>
+              <td>SRFA Completion %</td>
               <td>% / rate</td>
-              <td>Percentage or rate for % Completion of SRFA for the reporting period and active filters (preview wireframe model).</td>
+              <td>Percentage or rate for SRFA Completion % for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 40 )</code></td>
             </tr>
             <tr>
@@ -383,7 +385,7 @@
     </section>
 
     <section class="doc-kpi-cat" id="cat-3">
-      <h2>Safety Performance Indices</h2>
+      <h2>Safety Performance Indices (SPI)</h2>
       <div class="doc-table-wrap">
         <table class="doc-table doc-table--wide">
           <thead>
@@ -399,15 +401,15 @@
           <tbody>
             <tr>
               <td class="doc-table__num">26</td>
-              <td>Safety Performance Indices</td>
-              <td>Fatality rate</td>
+              <td>Safety Performance Indices (SPI)</td>
+              <td>Fatality Rate</td>
               <td>% / rate</td>
-              <td>Percentage or rate for Fatality rate for the reporting period and active filters (preview wireframe model).</td>
+              <td>Percentage or rate for Fatality Rate for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 16 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">27</td>
-              <td>Safety Performance Indices</td>
+              <td>Safety Performance Indices (SPI)</td>
               <td>LTIFR</td>
               <td>% / rate</td>
               <td>Percentage or rate for LTIFR for the reporting period and active filters (preview wireframe model).</td>
@@ -415,7 +417,7 @@
             </tr>
             <tr>
               <td class="doc-table__num">28</td>
-              <td>Safety Performance Indices</td>
+              <td>Safety Performance Indices (SPI)</td>
               <td>LTISR</td>
               <td>% / rate</td>
               <td>Percentage or rate for LTISR for the reporting period and active filters (preview wireframe model).</td>
@@ -423,15 +425,15 @@
             </tr>
             <tr>
               <td class="doc-table__num">29</td>
-              <td>Safety Performance Indices</td>
-              <td>Near Miss FR</td>
+              <td>Safety Performance Indices (SPI)</td>
+              <td>Near Miss Rate</td>
               <td>% / rate</td>
-              <td>Percentage or rate for Near Miss FR for the reporting period and active filters (preview wireframe model).</td>
+              <td>Percentage or rate for Near Miss Rate for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 20 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">30</td>
-              <td>Safety Performance Indices</td>
+              <td>Safety Performance Indices (SPI)</td>
               <td>TRIR</td>
               <td>% / rate</td>
               <td>Percentage or rate for TRIR for the reporting period and active filters (preview wireframe model).</td>
@@ -439,10 +441,10 @@
             </tr>
             <tr>
               <td class="doc-table__num">31</td>
-              <td>Safety Performance Indices</td>
-              <td>Vehicle incident rate</td>
+              <td>Safety Performance Indices (SPI)</td>
+              <td>Vehicle Incident Rate</td>
               <td>% / rate</td>
-              <td>Percentage or rate for Vehicle incident rate for the reporting period and active filters (preview wireframe model).</td>
+              <td>Percentage or rate for Vehicle Incident Rate for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 29 )</code></td>
             </tr>
           </tbody>
@@ -511,7 +513,7 @@
     </section>
 
     <section class="doc-kpi-cat" id="cat-5">
-      <h2>Workforce Exposure &amp; Manhour Base</h2>
+      <h2>Assurance and Compliance</h2>
       <div class="doc-table-wrap">
         <table class="doc-table doc-table--wide">
           <thead>
@@ -527,34 +529,34 @@
           <tbody>
             <tr>
               <td class="doc-table__num">37</td>
-              <td>Workforce Exposure &amp; Manhour Base</td>
-              <td>Total safe man hrs</td>
+              <td>Assurance and Compliance</td>
+              <td>Current Safe Man Hours</td>
               <td>Hours</td>
-              <td>Total hours for Total safe man hrs for the reporting period and active filters (preview wireframe model).</td>
+              <td>Total hours for Current Safe Man Hours for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 30 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">38</td>
-              <td>Workforce Exposure &amp; Manhour Base</td>
-              <td>Total Man hrs ( Employee)</td>
+              <td>Assurance and Compliance</td>
+              <td>Man Hrs (Employee)</td>
               <td>Hours</td>
-              <td>Total hours for Total Man hrs ( Employee) for the reporting period and active filters (preview wireframe model).</td>
+              <td>Total hours for Man Hrs (Employee) for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 31 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">39</td>
-              <td>Workforce Exposure &amp; Manhour Base</td>
-              <td>Total Man hrs ( Contractor)</td>
+              <td>Assurance and Compliance</td>
+              <td>Man Hrs (Contractor)</td>
               <td>Hours</td>
-              <td>Total hours for Total Man hrs ( Contractor) for the reporting period and active filters (preview wireframe model).</td>
+              <td>Total hours for Man Hrs (Contractor) for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 32 )</code></td>
             </tr>
             <tr>
               <td class="doc-table__num">40</td>
-              <td>Workforce Exposure &amp; Manhour Base</td>
-              <td>Total Man hrs ( Employee + Contractor)</td>
+              <td>Assurance and Compliance</td>
+              <td>Total Man Hours</td>
               <td>Hours</td>
-              <td>Total hours for Total Man hrs ( Employee + Contractor) for the reporting period and active filters (preview wireframe model).</td>
+              <td>Total hours for Total Man Hours for the reporting period and active filters (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 33 )</code></td>
             </tr>
           </tbody>
@@ -824,9 +826,9 @@
             <tr>
               <td class="doc-table__num">59</td>
               <td>Location Vulnerability (preview map)</td>
-              <td>No. Near Miss</td>
+              <td>Near Miss Count</td>
               <td>Count</td>
-              <td>Count of No. Near Miss for the reporting period and active BU / geography / vertical filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td>Count of Near Miss Count for the reporting period and active BU / geography / vertical filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 13 )</code></td>
             </tr>
             <tr>
@@ -848,9 +850,9 @@
             <tr>
               <td class="doc-table__num">62</td>
               <td>Location Vulnerability (preview map)</td>
-              <td>% Completion of SRFA</td>
+              <td>SRFA Completion %</td>
               <td>% / rate</td>
-              <td>Percentage or rate for % Completion of SRFA for the reporting period and active filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
+              <td>Percentage or rate for SRFA Completion % for the reporting period and active filters (preview wireframe model). Also surfaced on the Location Vulnerability map layer for the same filtered scope (preview wireframe model).</td>
               <td><code>CALCULATE ( SUM ( Fact[Value] ), Dim_KPI[KPIKey] = 40 )</code></td>
             </tr>
             <tr>

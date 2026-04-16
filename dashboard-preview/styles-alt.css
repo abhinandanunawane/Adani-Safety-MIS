@@ -259,6 +259,7 @@ body:has(.shell.shell--modern) {
 /* Insights home — single hero card + short checklist (no research/IA essay panels) */
 .m2-v3--clean {
   gap: 6px;
+  grid-template-columns: 1fr;
 }
 
 .m2-v3__main--clean {
@@ -1006,8 +1007,9 @@ button.m2-cat-row {
 
 /* KPI scope block inside unified filter scroll strip */
 .shell--modern .cat-view--modern .cat-toolbar__kpi-surface {
-  max-width: none;
-  flex-shrink: 0;
+  flex: 1.15 1 0;
+  min-width: 0;
+  max-width: 100%;
   overflow: visible;
 }
 
@@ -1097,9 +1099,9 @@ button.m2-cat-row {
 
 /* Variable dropdown — Insights: matches index multi-select reference; compact scale */
 .shell--modern .field--variable {
-  flex: 0 1 auto;
+  flex: 1.1 1 0;
   min-width: 0;
-  max-width: 13rem;
+  max-width: none;
 }
 
 .shell--modern .cat-view .var-scope--toolbar .var-scope__summary {
@@ -1892,7 +1894,7 @@ button.m2-cat-row {
   flex: 1 1 0 !important;
 }
 
-/* Taller charts when Chart view tab is active */
+/* Taller charts when Trend & Distribution View tab is active */
 .shell--modern .m2-cat-main--charts .view-panel--charts .m2-charts--alt.cat-charts {
   height: auto !important;
   min-height: min(300px, 45vh) !important;

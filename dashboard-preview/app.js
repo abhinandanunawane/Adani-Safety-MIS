@@ -140,86 +140,103 @@
   stripLocationVulnerabilityCategory();
 
   /**
-   * If embedded data is partial or failed to load, merge in missing domain rows so the
-   * Categories list always shows the full nine-domain catalogue.
+   * Category Selection page: display order, names, and card descriptions (workbook "Categories" sheet).
+   * sortOrder controls grid order; categoryKey stays stable for routes and data joins.
+   * ensureCategoryCatalogueBaseline merges any missing keys from this catalogue into embedded data.
    */
+  const CATEGORY_SELECTION_CATALOG_META = [
+    {
+      categoryKey: 1,
+      sortOrder: 1,
+      categoryName: "Incident Management",
+      uxNote:
+        "Tracks occurrence, type, trends, and closure of all safety incidents across operations",
+    },
+    {
+      categoryKey: 3,
+      sortOrder: 2,
+      categoryName: "Safety Performance Indices (SPI)",
+      uxNote:
+        "Measures normalized safety performance using frequency, severity, and rate-based metrics",
+    },
+    {
+      categoryKey: 4,
+      sortOrder: 3,
+      categoryName: "Consequence Management",
+      uxNote:
+        "Tracks disciplinary actions and compliance taken in response to safety incidents",
+    },
+    {
+      categoryKey: 5,
+      sortOrder: 4,
+      categoryName: "Assurance and Compliance",
+      uxNote:
+        "Evaluates implementation of safety standards, learnings, and compliance across operations",
+    },
+    {
+      categoryKey: 2,
+      sortOrder: 5,
+      categoryName: "Hazard & Observation Management",
+      uxNote:
+        "Monitors proactive risk identification, near misses, unsafe acts, and closure effectiveness",
+    },
+    {
+      categoryKey: 7,
+      sortOrder: 6,
+      categoryName: "Risk Control Programs",
+      uxNote:
+        "Monitors effectiveness and closure of structured risk mitigation initiatives (e.g., SRFA)",
+    },
+    {
+      categoryKey: 8,
+      sortOrder: 7,
+      categoryName: "Leadership & Safety Governance",
+      uxNote:
+        "Tracks leadership engagement, safety reviews, and governance effectiveness",
+    },
+    {
+      categoryKey: 6,
+      sortOrder: 8,
+      categoryName: "Training & Competency Development",
+      uxNote:
+        "Evaluates workforce safety capability through training coverage, intensity, and skill development",
+    },
+    {
+      categoryKey: 9,
+      sortOrder: 9,
+      categoryName: "Digital & Technology Intervention",
+      uxNote:
+        "Measures adoption and utilization of safety systems and digital tools",
+    },
+  ];
+
+  function normalizeCategorySelectionCatalog() {
+    if (!DATA || !Array.isArray(DATA.categories)) return;
+    const byKey = new Map(
+      CATEGORY_SELECTION_CATALOG_META.map((m) => [Number(m.categoryKey), m])
+    );
+    DATA.categories.forEach((cat) => {
+      const m = byKey.get(Number(cat.categoryKey));
+      if (!m) return;
+      cat.sortOrder = m.sortOrder;
+      cat.categoryName = m.categoryName;
+      cat.uxNote = m.uxNote;
+    });
+    DATA.categories.sort(
+      (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0)
+    );
+  }
+
   function ensureCategoryCatalogueBaseline() {
     if (!DATA || !Array.isArray(DATA.categories)) return;
-    const BASE = [
-      {
-        categoryKey: 1,
-        categoryName: "Incident Management",
-        sortOrder: 1,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 2,
-        categoryName: "Hazard & Observation Management",
-        sortOrder: 2,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 3,
-        categoryName: "Safety Performance Indices",
-        sortOrder: 3,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 4,
-        categoryName: "Consequence Management",
-        sortOrder: 4,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 5,
-        categoryName: "Assurance",
-        sortOrder: 5,
-        uxNote:
-          "Governance assurance visits, audits, and critical finding closure.",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 6,
-        categoryName: "Training & Competency Development",
-        sortOrder: 6,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 7,
-        categoryName: "Risk Control Programs",
-        sortOrder: 7,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 8,
-        categoryName: "Leadership & Safety Governance",
-        sortOrder: 8,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-      {
-        categoryKey: 9,
-        categoryName: "Systems Adoption & Digital Utilization",
-        sortOrder: 9,
-        uxNote: "",
-        kpiCount: 0,
-        latestMonthIndex: 0,
-      },
-    ];
+    const BASE = CATEGORY_SELECTION_CATALOG_META.map((m) => ({
+      categoryKey: m.categoryKey,
+      categoryName: m.categoryName,
+      sortOrder: m.sortOrder,
+      uxNote: m.uxNote,
+      kpiCount: 0,
+      latestMonthIndex: 0,
+    }));
     const present = new Set(DATA.categories.map((c) => c.categoryKey));
     for (let i = 0; i < BASE.length; i++) {
       const b = BASE[i];
@@ -466,13 +483,13 @@
     const extraMeta = [
       {
         kpiKey: INCIDENT_FIRE_KPI_KEY,
-        kpiName: "Fire",
+        kpiName: "Fire Incident Count",
         unitType: "Count",
         latestValue: 0,
       },
       {
         kpiKey: INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
-        kpiName: "Property Damage",
+        kpiName: "Property Damage Count",
         unitType: "Count",
         latestValue: 0,
       },
@@ -705,30 +722,30 @@
     const assuranceKpis = [
       {
         kpiKey: 503,
-        kpiName: "Incident key learning implementation (%)",
+        kpiName: "Incident Key Learning Implementation %",
         unitType: "PercentOrRate",
         latestValue: 81,
       },
       {
         kpiKey: 501,
-        kpiName: "FRC compliance rate (%)",
+        kpiName: "FRC Compliance %",
         unitType: "PercentOrRate",
         latestValue: 88,
       },
       {
         kpiKey: 502,
         kpiName:
-          "% Standard implementation — top 4 critical safety standards",
+          "Critical Standards Implementation %",
         unitType: "PercentOrRate",
         latestValue: 72,
       },
     ];
     DATA.categories.push({
       categoryKey: ASSURANCE_CATEGORY_KEY,
-      categoryName: "Assurance",
+      categoryName: "Assurance and Compliance",
       sortOrder: 5,
       uxNote:
-        "Governance assurance visits, audits, and critical finding closure.",
+        "Evaluates implementation of safety standards, learnings, and compliance across operations",
       kpiCount: assuranceKpis.length,
       latestMonthIndex: 1,
     });
@@ -848,11 +865,81 @@
     if (catSync) catSync.kpiCount = block.kpis.length;
   }
 
+  /**
+   * Risk Control (7): remove KPIs that mirror Assurance and Compliance (cat 5) preview measures
+   * — Incident Key Learning %, FRC Compliance %, Critical Standards % (Dim keys 51 / 52 / 54).
+   * Hazard still uses kpiKey 54 as "SI Completion %" under category 2 only.
+   */
+  function previewStripRiskControlAssuranceDuplicateKpis() {
+    if (!DATA) return;
+    const RISK = 7;
+    const drop = new Set([51, 52, 54]);
+    const detail = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === RISK
+    );
+    if (detail && Array.isArray(detail.kpis)) {
+      detail.kpis = detail.kpis.filter((k) => !drop.has(Number(k.kpiKey)));
+    }
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter(
+        (r) =>
+          !(Number(r.categoryKey) === RISK && drop.has(Number(r.kpiKey)))
+      );
+    }
+    const mbc = DATA.monthlyByCategory.find(
+      (x) => Number(x.categoryKey) === RISK
+    );
+    if (mbc && Array.isArray(mbc.series) && Array.isArray(DATA.months)) {
+      const monthKeys = DATA.months.map((m) => m.yearMonth).filter(Boolean);
+      mbc.series = monthKeys.map((ym) => {
+        const nums = DATA.factRows
+          .filter(
+            (r) =>
+              String(r.yearMonth) === String(ym) &&
+              Number(r.categoryKey) === RISK
+          )
+          .map((r) => Number(r.value))
+          .filter((v) => Number.isFinite(v));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+    const bb = DATA.businessBreakdown.find(
+      (x) => Number(x.categoryKey) === RISK
+    );
+    if (bb && Array.isArray(bb.bars)) {
+      const lastYm =
+        DATA.months && DATA.months.length
+          ? DATA.months[DATA.months.length - 1].yearMonth
+          : null;
+      if (lastYm) {
+        for (let i = 0; i < bb.bars.length; i++) {
+          const b = bb.bars[i];
+          const name = String(b.business || "").trim();
+          if (!name) continue;
+          const sum = DATA.factRows
+            .filter(
+              (r) =>
+                Number(r.categoryKey) === RISK &&
+                String(r.yearMonth) === String(lastYm) &&
+                String(r.businessName || "").trim() === name
+            )
+            .reduce((acc, r) => acc + Number(r.value || 0), 0);
+          b.value = Math.round(sum * 100) / 100;
+        }
+      }
+    }
+  }
+
   previewApplyDataMetaTitles();
   previewAddIncidentFirePropertyKpis();
   previewCategoryDataBootstrap();
   previewAddHazardSiPlannedActualKpi();
+  previewStripRiskControlAssuranceDuplicateKpis();
   ensureCategoryCatalogueBaseline();
+  normalizeCategorySelectionCatalog();
 
   /** Detail table rows per page (keep in sync with styles.css --detail-table-body-rows) */
   const PAGE_SIZE = 5;
@@ -888,50 +975,55 @@
       kind: "lagging",
       label: "Lagging",
       blurb:
-        "Incident counts, severity, and loss-time outcomes after events occur.",
+        "Tracks occurrence, type, trends, and closure of all safety incidents across operations.",
     },
     2: {
       kind: "leading",
       label: "Leading",
       blurb:
-        "Proactive observations, hazards, conditions, and planned interactions.",
+        "Monitors proactive risk identification, near misses, unsafe acts, and closure effectiveness.",
     },
     3: {
       kind: "lagging",
       label: "Lagging (rate-based)",
       blurb:
-        "Composite rate indices (e.g. TRIR, LTIFR) normalised by exposure.",
+        "Measures normalized safety performance using frequency, severity, and rate-based metrics.",
     },
     4: {
       kind: "lagging",
       label: "Lagging",
-      blurb: "Post-event consequence management and CMP follow-through.",
+      blurb:
+        "Tracks disciplinary actions and compliance taken in response to safety incidents.",
     },
     5: {
       kind: "lagging",
       label: "Lagging",
       blurb:
-        "Assurance audits and manhour / exposure base for rate denominators.",
+        "Evaluates implementation of safety standards, learnings, and compliance across operations.",
     },
     6: {
       kind: "leading",
       label: "Leading",
-      blurb: "Training coverage, competency, and programme intensity.",
+      blurb:
+        "Evaluates workforce safety capability through training coverage, intensity, and skill development.",
     },
     7: {
       kind: "leading",
       label: "Leading / preventive",
-      blurb: "SRFA and preventive risk-control measures.",
+      blurb:
+        "Monitors effectiveness and closure of structured risk mitigation initiatives (e.g., SRFA).",
     },
     8: {
       kind: "strategic",
       label: "Strategic",
-      blurb: "Governance and leadership signals (not in this preview build).",
+      blurb:
+        "Tracks leadership engagement, safety reviews, and governance effectiveness (not in this preview build).",
     },
     9: {
       kind: "leading",
       label: "Leading",
-      blurb: "Digital adoption and system utilisation.",
+      blurb:
+        "Measures adoption and utilization of safety systems and digital tools.",
     },
   };
 
@@ -968,9 +1060,9 @@
     "5 Catastrophic",
     "No Level",
   ];
-  /** Safety Performance Indices (category 3): Fatality rate → LTIFR → LTISR → TRIR → Vehicle rate → Near Miss FR. */
+  /** Safety Performance Indices (category 3): Fatality Rate → LTIFR → LTISR → TRIR → Vehicle Incident Rate → Near Miss Rate. */
   const SPI_KPI_ORDER = [16, 17, 18, 21, 29, 20];
-  /** Heat map row order (matches reference: Fatality → LTIFR → LTISR → Near Miss FR → Incident rate → Vehicle). */
+  /** Heat map row order (matches reference: Fatality Rate → LTIFR → LTISR → Near Miss Rate → TRIR → Vehicle Incident Rate). */
   const SPI_HEATMAP_KPI_ORDER = [16, 17, 18, 20, 21, 29];
   /** Approximate centroids for India states/UTs (preview map). */
   const STATE_CENTROID_BY_STATE = {
@@ -1238,7 +1330,7 @@
     hazardVert:
       "Insight: Share of the selected KPI across Field / O&M / Office / Projects for the Current Period.\nUses: Vertical scope, KPI selection, filters.\nExport: JPEG.",
     spiHeat:
-      "Insight: Six-month grid of SPI indices — each cell is the monthly average for your filters; shading runs light→dark within that KPI row (compare months for the same measure).\nRows use three color families: green (fatality / LTIFR / LTISR / vehicle), red (Near Miss FR), orange (TRIR).\nUses: All SPI KPIs, same filters as the rest of the page.\nExport: JPEG via camera icon.",
+      "Insight: Six-month grid of SPI indices — each cell is the monthly average for your filters; shading runs light→dark within that KPI row (compare months for the same measure).\nRows use three color families: green (Fatality Rate / LTIFR / LTISR / vehicle), red (Near Miss Rate), orange (TRIR).\nUses: All SPI KPIs, same filters as the rest of the page.\nExport: JPEG via camera icon.",
     spiMix:
       "Insight: 100% stacked trend of SPI KPI mix by month — see which indices dominate over time.\nUses: All SPI KPIs, filters.\nExport: JPEG.",
     bizRadar:
@@ -1925,7 +2017,7 @@
   }
 
   /** Preferred default KPI in dropdown (TRI / TRIR); fallback: first KPI in display order. */
-  const TRI_LABEL_FULL = "Total Recordable Incident Rate (TRI)";
+  const TRI_LABEL_FULL = "TRIR";
 
   function defaultKpiKeyForCategory(catKey, kpisMetaForUi) {
     const cat = Number(catKey);
@@ -1967,7 +2059,7 @@
       base = [
         {
           kpiKey: 21,
-          kpiName: "TRIR (rate)",
+          kpiName: "TRIR",
           unitType: "PercentOrRate",
           latestValue: null,
         },
@@ -1980,6 +2072,7 @@
   function categoryMatchesSearchQuery(cat, qLower) {
     if (!qLower) return true;
     if ((cat.categoryName || "").toLowerCase().includes(qLower)) return true;
+    if ((cat.uxNote || "").toLowerCase().includes(qLower)) return true;
     return getKpis(cat.categoryKey).some((k) =>
       (k.kpiName || "").toLowerCase().includes(qLower)
     );
@@ -2652,7 +2745,14 @@
                     ? ctx.parsed.y
                     : Number(ctx.raw) || 0;
                 const ut = ctx.dataset.unitType || utChart;
-                return " " + formatValue(v, ut);
+                const name = ctx.dataset.label
+                  ? String(ctx.dataset.label)
+                  : "";
+                return (
+                  " " +
+                  (name ? name + ": " : "") +
+                  formatValue(v, ut)
+                );
               },
             },
           },
@@ -3217,18 +3317,15 @@
 
   function kpiScopeTitleWithPlusN(catKey, f) {
     const list = kpiListForFilterDropdown(catKey);
-    let keyStrs =
-      f.kpiKeys && f.kpiKeys.length
-        ? f.kpiKeys.map(String)
-        : f.kpi != null
-          ? [String(f.kpi)]
-          : [];
-    if (!keyStrs.length && f.kpi) keyStrs = [String(f.kpi)];
+    const keyStrs = effectiveKpiKeysForChartSeries(catKey, f);
     if (!keyStrs.length) return TRI_LABEL_FULL;
-    const first = list.find((x) => String(x.kpiKey) === keyStrs[0]);
-    const a = first ? shortKpiHeaderLabel(first.kpiName) : keyStrs[0];
-    if (keyStrs.length <= 1) return first ? kpiDropdownLabel(first) : a;
-    return a + " +" + (keyStrs.length - 1);
+    const first = list.find((x) => String(x.kpiKey) === String(keyStrs[0]));
+    if (keyStrs.length <= 1) {
+      return first ? kpiDropdownLabel(first) : String(keyStrs[0]);
+    }
+    const primaryName = first ? kpiDropdownLabel(first) : String(keyStrs[0]);
+    const n = keyStrs.length - 1;
+    return primaryName + " + " + n;
   }
 
   function shouldShowCmpAccountabilityChart(catKey, f) {
@@ -5009,7 +5106,7 @@
     const isHazardSpotting = f && String(f.kpi) === "38";
     const rowTitles = isHazardSpotting
       ? ["Unsafe Acts", "Unsafe Condition"]
-      : ["Hazard spotting", "Hazard closure"];
+      : ["Hazard Spotting Rate", "Hazard Closure %"];
     const matrix = [];
     for (let ri = 0; ri < rowTitles.length; ri++) {
       const row = [];
@@ -5118,7 +5215,7 @@
           n +
           "</strong> (" +
           momStr +
-          ") · <strong>Hazard closure</strong> indicators for the selected filters (preview sample).";
+          ") · <strong>Hazard Closure %</strong> indicators for the selected filters (preview sample).";
     }
   }
 
@@ -5167,7 +5264,97 @@
       if (altCanvas) altCanvas.hidden = on;
     }
 
-    if (HAZARD_SPEEDOMETER_KPI_KEYS.has(primaryKpiStr)) {
+    /** Multiple KPIs: multi-line trend on primary canvas (heatmap hidden). */
+    if (mode.multiKpi) {
+      showHeatmapElements(false);
+      if (altCanvas && typeof Chart !== "undefined") {
+        const monthSetM = new Set();
+        filteredTrend.forEach((r) => monthSetM.add(r.yearMonth));
+        const lineLabelsM = Array.from(monthSetM).sort();
+        const lineSetsM = trendDatasetsForPreview(
+          catKey,
+          f,
+          filteredTrend,
+          lineLabelsM,
+          "line"
+        );
+        if (lineLabelsM.length && lineSetsM.length) {
+          altCanvas.setAttribute(
+            "aria-label",
+            "Line chart: monthly trend for each selected Hazard KPI"
+          );
+          new Chart(altCanvas, {
+            type: "line",
+            data: {
+              labels: lineLabelsM,
+              datasets: lineSetsM,
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              layout: {
+                padding: { top: 10, right: 14, bottom: 10, left: 18 },
+              },
+              plugins: {
+                legend: {
+                  display: lineSetsM.length > 1,
+                  position: "bottom",
+                  labels: {
+                    boxWidth: 10,
+                    padding: 6,
+                    font: { size: 8, family: FONT_UI },
+                  },
+                },
+                subtitle: {
+                  display: true,
+                  text: bizWindowRowsCaption(f),
+                  color: CHART_INK,
+                  font: { size: 8.5, family: FONT_UI },
+                  padding: { bottom: 4 },
+                },
+                tooltip: {
+                  callbacks: {
+                    label(ctx) {
+                      const v =
+                        ctx.parsed && ctx.parsed.y != null
+                          ? ctx.parsed.y
+                          : Number(ctx.raw) || 0;
+                      const ut = ctx.dataset.unitType || "";
+                      const name = ctx.dataset.label
+                        ? String(ctx.dataset.label)
+                        : "";
+                      return (
+                        " " +
+                        (name ? name + ": " : "") +
+                        formatValue(v, ut)
+                      );
+                    },
+                  },
+                },
+              },
+              scales: {
+                y: {
+                  beginAtZero: false,
+                  grace: "12%",
+                  ticks: {
+                    font: { size: 9, family: FONT_UI },
+                    color: CHART_INK,
+                  },
+                  grid: { color: "rgba(109,110,113,0.09)" },
+                },
+                x: {
+                  ticks: {
+                    font: { size: 8, family: FONT_UI },
+                    color: CHART_INK,
+                  },
+                  grid: { color: "rgba(109,110,113,0.09)" },
+                },
+              },
+            },
+          });
+        }
+      }
+    } else if (HAZARD_SPEEDOMETER_KPI_KEYS.has(primaryKpiStr)) {
       showHeatmapElements(false);
       if (altCanvas) {
         const pct = speedometerPercentFromSnapRows(catKey, snapRows, f);
@@ -6508,7 +6695,9 @@
     } else if (elLine && lineLabels.length && lineSets.length) {
       elLine.setAttribute(
         "aria-label",
-        "Line chart: monthly average for the selected KPI in the trend window"
+        lineSets.length > 1
+          ? "Line chart: monthly average for each selected KPI in the trend window"
+          : "Line chart: monthly average for the selected KPI in the trend window"
       );
       new Chart(elLine, {
         type: "line",
@@ -6547,7 +6736,14 @@
                       ? ctx.parsed.y
                       : Number(ctx.raw) || 0;
                   const ut = ctx.dataset.unitType || utChart;
-                  return " " + formatValue(v, ut);
+                  const name = ctx.dataset.label
+                    ? String(ctx.dataset.label)
+                    : "";
+                  return (
+                    " " +
+                    (name ? name + ": " : "") +
+                    formatValue(v, ut)
+                  );
                 },
               },
             },
@@ -6694,25 +6890,7 @@
         lineTitleEl.textContent =
           "CMP ACCOUNTABILITY - BREAKDOWN ANALYSIS";
       } else if (showSpeedometerSpd || showDualGaugeIk) {
-        const list = kpiListForFilterDropdown(f.catKey);
-        let keys =
-          f.kpiKeys && f.kpiKeys.length
-            ? f.kpiKeys.map(String)
-            : f.kpi
-              ? [String(f.kpi)]
-              : [];
-        if (!keys.length && f.kpi) keys = [String(f.kpi)];
-        if (keys.length <= 1) {
-          const k = list.find(
-            (x) => String(x.kpiKey) === String(keys[0] || f.kpi)
-          );
-          lineTitleEl.textContent = k ? kpiDropdownLabel(k) : TRI_LABEL_FULL;
-        } else {
-          const first = list.find((x) => String(x.kpiKey) === keys[0]);
-          const a = first ? kpiDropdownLabel(first) : keys[0];
-          lineTitleEl.textContent =
-            keys.length > 1 ? a + " +" + (keys.length - 1) + " more" : a;
-        }
+        lineTitleEl.textContent = kpiScopeTitleWithPlusN(f.catKey, f);
       } else {
         lineTitleEl.textContent = kpiScopeTitleWithPlusN(f.catKey, f);
       }
@@ -8042,7 +8220,7 @@
     }
     announce(
       insightShell
-        ? "Insights home. Choose Explore Safety KPIs to browse safety domains."
+        ? "Insights home. Choose Explore Safety KPIs to browse categories."
         : "Adani Safety Performance Profile home."
     );
     updateHeaderNavState();
@@ -8062,10 +8240,10 @@
     box.innerHTML =
       '<div class="m2-cat-dir-head">' +
       '<div class="m2-cat-dir-intro">' +
-      '<h2 id="home-h">Safety domains</h2>' +
-      '<p class="m2-cat-dir-lede">Search by <strong>category or KPI name</strong>. All domains below open the same charts, table, comparison, and exports as the main dashboard preview—presented in the Insights layout.</p>' +
+      '<h2 id="home-h" class="categories-page__title">Categories</h2>' +
+      '<p class="m2-cat-dir-lede">Choose a category to analyze related safety KPIs and performance. All categories below open the same charts, table, comparison, and exports as the main dashboard preview—presented in the Insights layout.</p>' +
       '<div class="home-tools m2-cat-dir-search" role="search">' +
-      '<label class="home-search-label" for="cat-q">Find</label>' +
+      '<label class="home-search-label" for="cat-q">Search by category or KPI</label>' +
       '<input id="cat-q" class="home-search home-search--modern" type="search" placeholder="Category or KPI name…" autocomplete="off" />' +
       "</div></div></div>" +
       '<div class="m2-cat-directory-wrap">' +
@@ -8098,9 +8276,9 @@
       const o = opts || {};
       grid.innerHTML = "";
       const q = (query || "").trim().toLowerCase();
-      const cats = DATA.categories.filter((c) =>
-        categoryMatchesSearchQuery(c, q)
-      );
+      const cats = DATA.categories
+        .filter((c) => categoryMatchesSearchQuery(c, q))
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
       if (!cats.length) {
         grid.removeAttribute("role");
         grid.removeAttribute("aria-labelledby");
@@ -8228,10 +8406,10 @@
     box.className = "home-body home-body--launchpad";
     box.innerHTML =
       '<div class="home-intro home-intro--launchpad">' +
-      '<h2 id="home-h">Categories</h2>' +
-      '<p class="home-lede">Nine <strong>safety domains</strong> are listed below; each card shows whether measures in that domain are <strong>leading</strong> or <strong>lagging</strong> indicators. Use <strong>Home</strong> in the header to return to the start screen.</p>' +
+      '<h2 id="home-h" class="categories-page__title">Categories</h2>' +
+      '<p class="home-lede">Choose a category to analyze related safety KPIs and performance</p>' +
       '<div class="home-tools" role="search">' +
-      '<label class="home-search-label" for="cat-q">Find category or KPI</label>' +
+      '<label class="home-search-label" for="cat-q">Search by category or KPI</label>' +
       '<input id="cat-q" class="home-search" type="search" placeholder="Category or KPI name (e.g. Incident, LTI…)" autocomplete="off" />' +
       "</div>" +
       "</div>" +
@@ -8262,9 +8440,9 @@
       const o = opts || {};
       grid.innerHTML = "";
       const q = (query || "").trim().toLowerCase();
-      const cats = DATA.categories.filter((c) =>
-        categoryMatchesSearchQuery(c, q)
-      );
+      const cats = DATA.categories
+        .filter((c) => categoryMatchesSearchQuery(c, q))
+        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
       if (!cats.length) {
         grid.removeAttribute("role");
         grid.removeAttribute("aria-labelledby");
