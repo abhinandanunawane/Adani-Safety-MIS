@@ -6025,6 +6025,52 @@ body.shell--docs-body {
   padding-bottom: 4px;
 }
 
+.cat-view--leadership-meetings .lc-matrix-mode {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin: 0 0 6px;
+}
+
+.cat-view--leadership-meetings .lc-matrix-mode__lbl {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
+.cat-view--leadership-meetings .lc-matrix-mode__toggle {
+  display: inline-flex;
+  border: 1px solid rgba(0, 109, 182, 0.35);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.cat-view--leadership-meetings .lc-mode-btn {
+  margin: 0;
+  padding: 4px 14px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  border: none;
+  background: #f1f5f9;
+  color: #334155;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.cat-view--leadership-meetings .lc-mode-btn--active {
+  background: #006db6;
+  color: #fff;
+}
+
+.cat-view--leadership-meetings .lc-mode-btn:focus-visible {
+  outline: 2px solid #006db6;
+  outline-offset: 2px;
+  z-index: 1;
+}
+
 .cat-view--leadership-meetings .lc-title {
   margin: 0 0 2px;
   font-size: 0.95rem;
@@ -6079,6 +6125,13 @@ body.shell--docs-body {
   gap: 10px 14px;
   font-size: 0.68rem;
   color: #475569;
+}
+
+.cat-view--leadership-meetings .lc-legend__item--note {
+  flex-basis: 100%;
+  font-size: 0.6rem;
+  font-style: italic;
+  color: #64748b;
 }
 
 .cat-view--leadership-meetings .lc-legend__sw {
@@ -6150,6 +6203,27 @@ body.shell--docs-body {
   color: #006db6;
 }
 
+.cat-view--leadership-meetings .lc-matrix__bu-col {
+  padding: 3px 2px;
+  text-align: center;
+  font-weight: 600;
+  font-size: 0.58rem;
+  line-height: 1.1;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid #e2e8f0;
+  color: #334155;
+}
+
+.cat-view--leadership-meetings .lc-matrix__bu-col--sel {
+  box-shadow: inset 0 -3px 0 #006db6;
+  color: #006db6;
+}
+
 .cat-view--leadership-meetings .lc-matrix__bu {
   text-align: left;
   padding: 3px 6px;
@@ -6178,25 +6252,74 @@ body.shell--docs-body {
 }
 
 .cat-view--leadership-meetings .lc-cell {
-  height: 18px;
-  padding: 0;
+  min-height: 36px;
+  height: auto;
+  padding: 2px 3px;
+  text-align: center;
+  vertical-align: middle;
   border-bottom: 1px solid #f1f5f9;
   border-right: 1px solid #f1f5f9;
+  background: #fff;
 }
 
-.cat-view--leadership-meetings .lc-cell--green {
-  background: #22c55e;
-}
-.cat-view--leadership-meetings .lc-cell--yellow {
-  background: #facc15;
-}
+.cat-view--leadership-meetings .lc-cell--green,
+.cat-view--leadership-meetings .lc-cell--yellow,
 .cat-view--leadership-meetings .lc-cell--red {
-  background: #f87171;
+  background: #fff;
+}
+
+.cat-view--leadership-meetings .lc-cell-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1;
+}
+
+.cat-view--leadership-meetings .lc-cell-stack--muted .lc-dot {
+  opacity: 0.35;
+}
+
+.cat-view--leadership-meetings .lc-cell-stack--muted .lc-cell-countline {
+  opacity: 0.42;
+}
+
+.cat-view--leadership-meetings .lc-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cat-view--leadership-meetings .lc-dot--green {
+  background: #16a34a;
+}
+
+.cat-view--leadership-meetings .lc-dot--yellow {
+  background: #ca8a04;
+}
+
+.cat-view--leadership-meetings .lc-dot--red {
+  background: #dc2626;
+}
+
+.cat-view--leadership-meetings .lc-cell-countline {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.cat-view--leadership-meetings .lc-cell-suffix {
+  font-weight: 500;
+  color: #64748b;
+  font-size: 0.55rem;
 }
 
 .cat-view--leadership-meetings .lc-cell--filtered {
-  background: #e2e8f0 !important;
-  opacity: 0.55;
+  background: #f8fafc !important;
+  opacity: 1;
 }
 
 .cat-view--leadership-meetings .lc-cell--row-sel {

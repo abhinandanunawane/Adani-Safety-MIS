@@ -1031,6 +1031,16 @@
     "Training & competency forum",
     "Audit action review",
   ];
+  /** Month-view drill-down: department pillars (wireframe). */
+  const LEADERSHIP_DEPT_LABELS = [
+    "BSC",
+    "SRP",
+    "Contractor",
+    "Training",
+    "Logistic",
+    "Incident",
+    "Audit",
+  ];
   const VULNERABLE_LOCATION_CATEGORY_KEY = 10;
   /** Hazard KPIs aggregated on the Vulnerable Location map (see KPI reference). */
   const VULNERABLE_LOCATION_KPI_ORDER = [13, 38, 39, 40, 45, 46, 53];
@@ -8178,6 +8188,13 @@
       return f;
     }
 
+    function lcDeptAttended(bu, ym, deptIdx) {
+      return (
+        (hash32(String(bu) + "|" + String(ym) + "|dept|" + deptIdx) & 1) ===
+        0
+      );
+    }
+
     function lcRagFromCount(c) {
       if (c >= 7) return "green";
       if (c >= 5) return "yellow";
@@ -8190,6 +8207,7 @@
     const monthShown = new Set(months);
     const selBu = new Set();
     const selMo = new Set();
+    let matrixAxisMode = "bu";
 
     const wrap = document.createElement("div");
     wrap.className = "cat-view cat-view--leadership-meetings";
@@ -8252,7 +8270,13 @@
       "</div></div></fieldset></div>" +
       '<header class="lc-header">' +
       '<h2 class="lc-title">Meeting Compliance Tracking</h2>' +
-      '<p class="lc-subtitle">BU-wise monthly compliance overview (last 6 months)</p>' +
+      '<div class="lc-matrix-mode" role="group" aria-label="Matrix rows">' +
+      '<span class="lc-matrix-mode__lbl">View</span>' +
+      '<div class="lc-matrix-mode__toggle">' +
+      '<button type="button" class="lc-mode-btn lc-mode-btn--active" id="lc-mode-bu" aria-pressed="true">BU</button>' +
+      '<button type="button" class="lc-mode-btn" id="lc-mode-mo" aria-pressed="false">Month</button>' +
+      "</div></div>" +
+      '<p class="lc-subtitle" id="lc-matrix-subtitle">BU-wise monthly compliance overview (last 6 months)</p>' +
       '<details class="lc-objective-details">' +
       '<summary class="lc-objective-summary">Page objective</summary>' +
       '<p class="lc-objective"><strong>Objective.</strong> Visualize monthly meeting compliance across 24 business units (BUs), for 7 mandatory meeting types per month, with RAG for quick assessment and drill-down for detail.</p>' +
@@ -8262,9 +8286,10 @@
       '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--g"></span> Green = Full compliance (7/7)</span>' +
       '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--y"></span> Yellow = Partial (5–6)</span>' +
       '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--r"></span> Red = Low (≤4)</span>' +
+      '<span class="lc-legend__item lc-legend__item--note">Cells: colored dot (RAG) + meetings held / 7</span>' +
       "</div>" +
       '<div class="lc-matrix-scroll" tabindex="0">' +
-      '<table class="lc-matrix" id="lc-matrix" aria-label="BU by month RAG matrix">' +
+      '<table class="lc-matrix lc-matrix--bu-axis" id="lc-matrix" aria-label="Meeting compliance matrix">' +
       "<thead><tr>" +
       '<th scope="col" class="lc-matrix__corner">BU <span class="lc-matrix__hint">/ Month</span></th>' +
       "</tr></thead>" +
@@ -8425,41 +8450,132 @@
       return false;
     }
 
+    function rowPassesRagFilterMonth(ym) {
+      const busB = visibleBus();
+      for (let i = 0; i < busB.length; i++) {
+        const rag = lcRagFromCount(lcConductedCount(busB[i], ym));
+        if (ragShown.has(rag)) return true;
+      }
+      return false;
+    }
+
     function paintMatrix() {
       readRagShownFromDom();
       readBuShownFromDom();
       readMonthShownFromDom();
       const cols = visibleMonths();
-      const rows = visibleBus().filter((b) => rowPassesRagFilter(b));
+      const busV = visibleBus();
       const theadRow = wrap.querySelector("#lc-matrix thead tr");
+      const tb = wrap.querySelector("#lc-matrix-body");
+      const mat = wrap.querySelector("#lc-matrix");
+
+      function lcCellInnerHtml(c, rag, filtered) {
+        const fade = filtered ? " lc-cell-stack--muted" : "";
+        return (
+          '<span class="lc-cell-stack' +
+          fade +
+          '"><span class="lc-dot lc-dot--' +
+          rag +
+          '" aria-hidden="true"></span><span class="lc-cell-countline"><span class="lc-cell-count">' +
+          String(c) +
+          '</span><span class="lc-cell-suffix">/7</span></span></span>'
+        );
+      }
+
+      if (matrixAxisMode === "bu") {
+        mat.setAttribute(
+          "aria-label",
+          "Meeting compliance: business units by month"
+        );
+        const rows = busV.filter((b) => rowPassesRagFilter(b));
+        theadRow.innerHTML =
+          '<th scope="col" class="lc-matrix__corner">BU <span class="lc-matrix__hint">/ Month</span></th>' +
+          cols
+            .map(
+              (ym) =>
+                '<th scope="col" class="lc-matrix__mo' +
+                (selMo.has(ym) ? " lc-matrix__mo--sel" : "") +
+                '" data-lc-colhead="' +
+                escapeAttr(ym) +
+                '" title="Select month for drill-down">' +
+                escapeHtml(spiChartMonthTick(ym)) +
+                "</th>"
+            )
+            .join("");
+        tb.innerHTML = rows
+          .map((bu) => {
+            const rowSel = selBu.has(bu) ? " lc-matrix__row--sel" : "";
+            let tr =
+              '<tr class="lc-matrix__row' +
+              rowSel +
+              '"><th scope="row" class="lc-matrix__bu" data-lc-rowhead="' +
+              escapeAttr(bu) +
+              '" title="Select BU for drill-down">' +
+              escapeHtml(bu) +
+              "</th>";
+            for (let j = 0; j < cols.length; j++) {
+              const ym = cols[j];
+              const c = lcConductedCount(bu, ym);
+              const rag = lcRagFromCount(c);
+              const on = ragShown.has(rag);
+              const cls =
+                "lc-cell lc-cell--" +
+                rag +
+                (on ? "" : " lc-cell--filtered") +
+                (selMo.has(ym) ? " lc-cell--col-sel" : "") +
+                (selBu.has(bu) ? " lc-cell--row-sel" : "");
+              tr +=
+                '<td class="' +
+                cls +
+                '" data-lc-bu="' +
+                escapeAttr(bu) +
+                '" data-lc-ym="' +
+                escapeAttr(ym) +
+                '" title="' +
+                escapeAttr(String(c) + "/7 meetings conducted") +
+                '">' +
+                lcCellInnerHtml(c, rag, !on) +
+                "</td>";
+            }
+            tr += "</tr>";
+            return tr;
+          })
+          .join("");
+        return;
+      }
+
+      mat.setAttribute(
+        "aria-label",
+        "Meeting compliance: months by business unit"
+      );
+      const rowMonths = cols.filter((ym) => rowPassesRagFilterMonth(ym));
       theadRow.innerHTML =
-        '<th scope="col" class="lc-matrix__corner">BU <span class="lc-matrix__hint">/ Month</span></th>' +
-        cols
+        '<th scope="col" class="lc-matrix__corner">Month <span class="lc-matrix__hint">/ BU</span></th>' +
+        busV
           .map(
-            (ym) =>
-              '<th scope="col" class="lc-matrix__mo' +
-              (selMo.has(ym) ? " lc-matrix__mo--sel" : "") +
-              '" data-lc-colhead="' +
-              escapeAttr(ym) +
-              '" title="Click to toggle month selection for drill-down">' +
-              escapeHtml(spiChartMonthTick(ym)) +
+            (bu) =>
+              '<th scope="col" class="lc-matrix__bu-col' +
+              (selBu.has(bu) ? " lc-matrix__bu-col--sel" : "") +
+              '" data-lc-bu-colhead="' +
+              escapeAttr(bu) +
+              '" title="Select BU for drill-down">' +
+              escapeHtml(bu) +
               "</th>"
           )
           .join("");
-      const tb = wrap.querySelector("#lc-matrix-body");
-      tb.innerHTML = rows
-        .map((bu) => {
-          const rowSel = selBu.has(bu) ? " lc-matrix__row--sel" : "";
+      tb.innerHTML = rowMonths
+        .map((ym) => {
+          const rowSel = selMo.has(ym) ? " lc-matrix__row--sel" : "";
           let tr =
             '<tr class="lc-matrix__row' +
             rowSel +
-            '"><th scope="row" class="lc-matrix__bu" data-lc-rowhead="' +
-            escapeAttr(bu) +
-            '" title="Click to toggle BU selection for drill-down">' +
-            escapeHtml(bu) +
+            '"><th scope="row" class="lc-matrix__bu lc-matrix__mo-row" data-lc-mo-rowhead="' +
+            escapeAttr(ym) +
+            '" title="Select month for drill-down">' +
+            escapeHtml(spiChartMonthTick(ym)) +
             "</th>";
-          for (let j = 0; j < cols.length; j++) {
-            const ym = cols[j];
+          for (let i = 0; i < busV.length; i++) {
+            const bu = busV[i];
             const c = lcConductedCount(bu, ym);
             const rag = lcRagFromCount(c);
             const on = ragShown.has(rag);
@@ -8467,8 +8583,8 @@
               "lc-cell lc-cell--" +
               rag +
               (on ? "" : " lc-cell--filtered") +
-              (selMo.has(ym) ? " lc-cell--col-sel" : "") +
-              (selBu.has(bu) ? " lc-cell--row-sel" : "");
+              (selBu.has(bu) ? " lc-cell--col-sel" : "") +
+              (selMo.has(ym) ? " lc-cell--row-sel" : "");
             tr +=
               '<td class="' +
               cls +
@@ -8478,7 +8594,9 @@
               escapeAttr(ym) +
               '" title="' +
               escapeAttr(String(c) + "/7 meetings conducted") +
-              '"></td>';
+              '">' +
+              lcCellInnerHtml(c, rag, !on) +
+              "</td>";
           }
           tr += "</tr>";
           return tr;
@@ -8557,6 +8675,72 @@
       return h;
     }
 
+    function renderScenarioMonthDeptGrid(ym) {
+      const busB = visibleBus();
+      let h =
+        '<div class="lc-dd-block"><h4 class="lc-dd-block__title">' +
+        escapeHtml(spiChartMonthTick(ym)) +
+        " — departments × BU</h4>" +
+        '<div class="lc-dd-scroll"><table class="lc-dd-table"><thead><tr><th scope="col">Department</th>';
+      for (let i = 0; i < busB.length; i++) {
+        h +=
+          '<th scope="col" class="lc-dd-table__mt">' +
+          escapeHtml(busB[i]) +
+          "</th>";
+      }
+      h += "</tr></thead><tbody>";
+      for (let di = 0; di < LEADERSHIP_DEPT_LABELS.length; di++) {
+        h +=
+          "<tr><th scope=\"row\">" +
+          escapeHtml(LEADERSHIP_DEPT_LABELS[di]) +
+          "</th>";
+        for (let i = 0; i < busB.length; i++) {
+          const ok = lcDeptAttended(busB[i], ym, di);
+          h +=
+            "<td>" +
+            (ok
+              ? '<span class="lc-icon lc-icon--ok" title="Done">✔</span>'
+              : '<span class="lc-icon lc-icon--no" title="Not done">✖</span>') +
+            "</td>";
+        }
+        h += "</tr>";
+      }
+      h += "</tbody></table></div></div>";
+      return h;
+    }
+
+    function renderScenarioBuDeptAcrossMonths(bu) {
+      const cols = visibleMonths();
+      let h =
+        '<div class="lc-dd-block"><h4 class="lc-dd-block__title">BU — ' +
+        escapeHtml(bu) +
+        " (departments × month)</h4>" +
+        '<div class="lc-dd-scroll"><table class="lc-dd-table"><thead><tr><th scope="col">Department</th>';
+      for (let j = 0; j < cols.length; j++) {
+        h +=
+          '<th scope="col">' + escapeHtml(spiChartMonthTick(cols[j])) + "</th>";
+      }
+      h += "</tr></thead><tbody>";
+      for (let di = 0; di < LEADERSHIP_DEPT_LABELS.length; di++) {
+        h +=
+          "<tr><th scope=\"row\">" +
+          escapeHtml(LEADERSHIP_DEPT_LABELS[di]) +
+          "</th>";
+        for (let j = 0; j < cols.length; j++) {
+          const ok = lcDeptAttended(bu, cols[j], di);
+          h +=
+            "<td>" +
+            (ok
+              ? '<span class="lc-icon lc-icon--ok" title="Done">✔</span>'
+              : '<span class="lc-icon lc-icon--no" title="Not done">✖</span>') +
+            "</td>";
+        }
+        h += "</tr>";
+      }
+      h += "</tbody></table></div></div>";
+      return h;
+    }
+
     function paintDrill() {
       const hint = wrap.querySelector("#lc-drill-hint");
       const body = wrap.querySelector("#lc-drill-body");
@@ -8564,21 +8748,41 @@
       const moList = Array.from(selMo).filter((m) => monthShown.has(m));
       if (!buList.length && !moList.length) {
         hint.textContent =
-          "Select month column header(s) for BU × meeting-type detail, or BU row header(s) for meeting-type × month detail. Shift-click a matrix cell toggles both BU and month.";
+          matrixAxisMode === "month"
+            ? "Month view: select a month row (or cell) for departments × BU, or a BU column for departments × months. Shift-click a cell toggles BU and month."
+            : "BU view: select a month column or BU row for drill-down. Shift-click a cell toggles BU and month.";
         body.innerHTML =
           '<p class="lc-drill__empty">No drill-down selection yet.</p>';
         return;
       }
+      if (matrixAxisMode === "month") {
+        if (moList.length) {
+          hint.textContent =
+            "Departments (BSC, SRP, Contractor, Training, Logistic, Incident, Audit) × BU for each selected month.";
+          const parts = [];
+          moList
+            .sort()
+            .forEach((ym) => parts.push(renderScenarioMonthDeptGrid(ym)));
+          body.innerHTML = parts.join("");
+          return;
+        }
+        hint.textContent =
+          "Departments × months for each selected BU.";
+        const parts = [];
+        buList.forEach((b) => parts.push(renderScenarioBuDeptAcrossMonths(b)));
+        body.innerHTML = parts.join("");
+        return;
+      }
       if (moList.length) {
         hint.textContent =
-          "Month drill-down: each selected month shows all visible BUs × 7 meeting types. While any month is selected, BU-only drill-down is hidden.";
+          "Month drill-down: BUs × mandatory meeting types. BU-only drill-down is hidden while a month is selected.";
         const parts = [];
         moList.sort().forEach((ym) => parts.push(renderScenarioB(ym)));
         body.innerHTML = parts.join("");
         return;
       }
       hint.textContent =
-        "BU drill-down: each selected BU shows 7 meeting types × visible months. Scroll the panel below if tables are tall.";
+        "BU drill-down: meeting types × visible months.";
       const parts = [];
       buList.forEach((b) => parts.push(renderScenarioA(b)));
       body.innerHTML = parts.join("");
@@ -8587,6 +8791,38 @@
     function paintAll() {
       paintMatrix();
       paintDrill();
+    }
+
+    function setMatrixAxisMode(mode) {
+      if (mode !== "bu" && mode !== "month") return;
+      if (matrixAxisMode === mode) return;
+      matrixAxisMode = mode;
+      selBu.clear();
+      selMo.clear();
+      const btnBu = wrap.querySelector("#lc-mode-bu");
+      const btnMo = wrap.querySelector("#lc-mode-mo");
+      const sub = wrap.querySelector("#lc-matrix-subtitle");
+      const mat = wrap.querySelector("#lc-matrix");
+      if (btnBu && btnMo) {
+        btnBu.classList.toggle("lc-mode-btn--active", mode === "bu");
+        btnMo.classList.toggle("lc-mode-btn--active", mode === "month");
+        btnBu.setAttribute("aria-pressed", mode === "bu" ? "true" : "false");
+        btnMo.setAttribute("aria-pressed", mode === "month" ? "true" : "false");
+      }
+      if (sub) {
+        sub.textContent =
+          mode === "bu"
+            ? "BU-wise monthly compliance overview (last 6 months)"
+            : "Month-wise BU compliance overview (last 6 months)";
+      }
+      if (mat) {
+        mat.classList.toggle("lc-matrix--bu-axis", mode === "bu");
+        mat.classList.toggle("lc-matrix--month-axis", mode === "month");
+      }
+      paintAll();
+      announce(
+        mode === "bu" ? "Matrix view: BU rows." : "Matrix view: Month rows."
+      );
     }
 
     function onMatrixClick(e) {
@@ -8599,9 +8835,12 @@
           else selBu.add(b);
           if (selMo.has(ym)) selMo.delete(ym);
           else selMo.add(ym);
-        } else {
+        } else if (matrixAxisMode === "bu") {
           if (selBu.has(b)) selBu.delete(b);
           else selBu.add(b);
+        } else {
+          if (selMo.has(ym)) selMo.delete(ym);
+          else selMo.add(ym);
         }
         paintAll();
         announce(
@@ -8611,6 +8850,24 @@
             selMo.size +
             " month(s) in drill-down."
         );
+        return;
+      }
+      const moRh = e.target.closest("th[data-lc-mo-rowhead]");
+      if (moRh) {
+        const ym = moRh.getAttribute("data-lc-mo-rowhead");
+        if (selMo.has(ym)) selMo.delete(ym);
+        else selMo.add(ym);
+        paintAll();
+        announce("Drill-down: " + selMo.size + " month(s) selected.");
+        return;
+      }
+      const buCol = e.target.closest("th[data-lc-bu-colhead]");
+      if (buCol) {
+        const b = buCol.getAttribute("data-lc-bu-colhead");
+        if (selBu.has(b)) selBu.delete(b);
+        else selBu.add(b);
+        paintAll();
+        announce("Drill-down: " + selBu.size + " BU(s) selected.");
         return;
       }
       const rh = e.target.closest("th[data-lc-rowhead]");
@@ -8682,11 +8939,37 @@
     wireLcScopeGroup("#lc-mo-all", ".lc-mo-cb", "#lc-mo-details");
     updateLcFilterHints();
 
+    wrap.querySelector("#lc-mode-bu").addEventListener("click", () => {
+      setMatrixAxisMode("bu");
+    });
+    wrap.querySelector("#lc-mode-mo").addEventListener("click", () => {
+      setMatrixAxisMode("month");
+    });
+
     wrap.querySelector("#lc-matrix").addEventListener("click", onMatrixClick);
 
     wrap.querySelector("#lc-reset").addEventListener("click", () => {
       selBu.clear();
       selMo.clear();
+      matrixAxisMode = "bu";
+      const btnBu = wrap.querySelector("#lc-mode-bu");
+      const btnMo = wrap.querySelector("#lc-mode-mo");
+      const subEl = wrap.querySelector("#lc-matrix-subtitle");
+      const matEl = wrap.querySelector("#lc-matrix");
+      if (btnBu && btnMo) {
+        btnBu.classList.add("lc-mode-btn--active");
+        btnMo.classList.remove("lc-mode-btn--active");
+        btnBu.setAttribute("aria-pressed", "true");
+        btnMo.setAttribute("aria-pressed", "false");
+      }
+      if (subEl) {
+        subEl.textContent =
+          "BU-wise monthly compliance overview (last 6 months)";
+      }
+      if (matEl) {
+        matEl.classList.add("lc-matrix--bu-axis");
+        matEl.classList.remove("lc-matrix--month-axis");
+      }
       const ragAll = wrap.querySelector("#lc-rag-all");
       const buAll = wrap.querySelector("#lc-bu-all");
       const moAll = wrap.querySelector("#lc-mo-all");
