@@ -102,11 +102,13 @@
           border-top: 1px solid rgba(196, 179, 212, 0.45);
           box-sizing: border-box;
         }
-        .last-updated {
+        .last-updated,
+        .data-refreshed {
           white-space: normal;
         }
       }
-      .last-updated {
+      .last-updated,
+      .data-refreshed {
         font-size: 12px;
         white-space: nowrap;
         color: #6d6e71;
@@ -141,6 +143,7 @@
               >Adani Safety Performance Profile</strong
             >
           </p>
+          <p class="top-header__category-line" id="header-category-subtitle" hidden></p>
         </div>
         <div class="top-header__meta top-header__meta--trailing top-header__meta--docs">
           <nav id="top-header-nav" class="top-header__nav" aria-label="Primary">
@@ -159,6 +162,7 @@
               >Back</a
             >
           </nav>
+          <span class="data-refreshed">Data refreshed: Daily</span>
           <span class="last-updated"
             >Last updated <time id="header-updated">Tuesday, April 14, 2026</time></span
           >
@@ -216,6 +220,6 @@
       crossorigin=""
     ></script>
     <script defer src="embedded-data.js?v=20260416r12"></script>
-    <script defer src="app.js?v=20260416r21"></script>
+    <script defer src="app.js?v=20260416r23"></script>
   </body>
 </html>

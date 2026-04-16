@@ -316,6 +316,19 @@ body {
   color: var(--text-muted);
 }
 
+/* Category name subtitle shown under the dashboard title on category pages */
+.top-header__category-line {
+  margin: 1px 0 0;
+  font-size: 0.685rem;
+  font-weight: 600;
+  color: var(--adani-blue, #006db6);
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
 .top-header__subtitle {
   margin: 0;
   font-size: 0.7rem;
@@ -476,20 +489,18 @@ body {
   box-sizing: border-box;
 }
 
-/* Home: help + KPI reference — below Start Now (see .landing__cta top) */
+/* Home: help + KPI reference — below Explore Safety KPIs (see .landing__cta top) */
 .landing__doc-row {
   position: absolute;
   left: 3%;
   top: calc(49% + 5.75rem);
   z-index: 4;
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   max-width: min(94%, 100%);
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 .landing__doc-btn {
@@ -626,20 +637,9 @@ body {
   color: var(--text-muted);
   text-align: center;
   max-width: 100%;
-  white-space: nowrap;
-  overflow-x: auto;
-  overflow-y: hidden;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 109, 182, 0.35) transparent;
-}
-
-.app-footer__text::-webkit-scrollbar {
-  height: 3px;
-}
-.app-footer__text::-webkit-scrollbar-thumb {
-  background: rgba(0, 109, 182, 0.4);
-  border-radius: 2px;
+  white-space: normal;
+  overflow-x: visible;
+  overflow-y: visible;
 }
 
 .app-footer__text strong {
@@ -1051,16 +1051,23 @@ body {
   border-radius: 4px;
 }
 
-/* Title row: journey + breadcrumb + heading left, filters right */
+/* Title row: filters full width (journey steps removed) */
 .cat-top-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
+  align-items: stretch;
+  justify-content: flex-start;
   gap: 4px 8px;
   min-width: 0;
+  width: 100%;
   flex: 0 0 auto;
   margin: 0;
+  box-sizing: border-box;
+}
+
+.cat-top-bar--filters-only {
+  flex-direction: column;
+  align-items: stretch;
 }
 
 .cat-top-bar__lead {
@@ -1211,11 +1218,14 @@ fieldset.cat-toolbar {
   box-shadow: 0 1px 2px rgba(35, 31, 32, 0.05);
 }
 
-/* Inline: filters beside title (compact; wraps on narrow widths) */
+/* Full-width filter strip below category chrome */
 fieldset.cat-toolbar.cat-toolbar--compact {
-  flex: 3 1 420px;
+  flex: 1 1 100%;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   padding: 4px 6px 5px;
+  box-sizing: border-box;
 }
 
 fieldset.cat-toolbar.cat-toolbar--compact .toolbar-legend {
@@ -1237,22 +1247,23 @@ fieldset.cat-toolbar.cat-toolbar--compact .toolbar-legend {
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: flex-end;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
+  width: 100%;
 }
 
 fieldset.cat-toolbar--compact .cat-toolbar__inner {
-  gap: 6px;
+  gap: 4px;
 }
 
-/* Toolbar: all filters in one horizontal scroller; Download/Reset stay in .toolbar-actions */
+/* Single horizontal row: proportional flex — no wrap, no strip scrollbar */
 .cat-toolbar__filters-scroll {
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: flex-end;
-  gap: 8px;
-  flex: 1;
+  gap: 4px;
+  flex: 1 1 auto;
   min-width: 0;
   overflow: visible;
   position: relative;
@@ -1264,30 +1275,43 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: flex-end;
-  gap: 4px 8px;
-  flex: 1;
+  gap: 4px;
+  flex: 1 1 auto;
   min-width: 0;
-  overflow-x: auto;
-  overflow-y: hidden;
+  width: 100%;
+  overflow: visible;
   padding-bottom: 1px;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(0, 109, 182, 0.35) transparent;
+  box-sizing: border-box;
 }
 
 .cat-toolbar__filters-all-scroll > .field--variable {
-  flex-shrink: 0;
+  flex: 1.1 1 0;
+  min-width: 0;
   z-index: 6;
   overflow: visible;
+}
+
+.cat-toolbar__filters-all-scroll > .field.field--toolbar-scope.field--biz-site-scope {
+  flex: 1.05 1 0;
+  min-width: 0;
+  overflow: visible;
+  z-index: 5;
+}
+
+.cat-toolbar__filters-all-scroll
+  > .field.field--toolbar-scope.field--biz-site-scope:has(.kpi-scope[open]) {
+  z-index: 45;
 }
 
 .cat-toolbar__kpi-surface {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 3px;
-  flex-shrink: 0;
-  min-width: 9.5rem;
-  padding: 4px 8px 5px;
+  gap: 2px;
+  flex: 1.15 1 0;
+  min-width: 0;
+  max-width: 100%;
+  padding: 3px 6px 4px;
   box-sizing: border-box;
   background: rgba(0, 109, 182, 0.06);
   border: 1px solid rgba(0, 109, 182, 0.22);
@@ -1316,7 +1340,13 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 }
 
 .cat-toolbar__filters-all-scroll > .field {
-  flex-shrink: 0;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: none;
+}
+
+.cat-toolbar__filters-all-scroll > .field.field--calendar-compact {
+  flex: 1.35 1 0;
 }
 
 /* KPI checkboxes — toolbar trigger matches compact Vs/State/Business selects */
@@ -1326,7 +1356,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   background: transparent;
   min-width: 0;
   width: 100%;
-  max-width: 13rem;
+  max-width: 100%;
   box-shadow: none;
   overflow: visible;
 }
@@ -1459,8 +1489,9 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 .cat-toolbar .field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   align-items: stretch;
+  min-width: 0;
 }
 
 .cat-toolbar .field-label {
@@ -1474,7 +1505,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
 
 /* Variable: dropdown + checkboxes (KPI / category drill page only) */
 .field--variable {
-  flex: 0 1 auto;
+  flex: 1.1 1 0;
   min-width: 0;
 }
 
@@ -1676,10 +1707,10 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
  * Dashboard Preview (index.html): Variable — select-aligned trigger + checkpoint panel.
  */
 .cat-view .field--variable {
-  flex: 0 0 auto;
+  flex: 1.1 1 0;
   min-width: 0;
-  width: 11.5rem;
-  max-width: 13rem;
+  width: auto;
+  max-width: none;
 }
 
 .cat-view .field--var-inline:has(.var-scope[open]) {
@@ -1694,7 +1725,7 @@ fieldset.cat-toolbar--compact .cat-toolbar__inner {
   border-radius: 0;
   min-width: 0;
   width: 100%;
-  max-width: 13rem;
+  max-width: 100%;
   box-shadow: none;
 }
 
@@ -1982,7 +2013,7 @@ fieldset.kpi-summary-region {
   -ms-overflow-style: none;
 }
 
-/* Chart view ↔ detail table — shared with Insights (`m2-cat-main`) */
+/* Trend & Distribution view ↔ detail table — shared with Insights (`m2-cat-main`) */
 .cat-main-view,
 .m2-cat-main {
   flex: 1 1 0;
@@ -2067,7 +2098,7 @@ fieldset.kpi-summary-region {
   z-index: 1;
 }
 
-/* Chart view: no scroll — flex fills remaining shell height; charts shrink via min-height: 0 */
+/* Trend & Distribution view: no scroll — flex fills remaining shell height; charts shrink via min-height: 0 */
 .cat-main-view--charts .view-panel--charts {
   flex: 1 1 0;
   min-height: 0;
@@ -2475,31 +2506,93 @@ fieldset.kpi-summary-region {
   line-height: 1.2;
 }
 
-/* Calendar: single row label + inputs to save vertical space */
+/* Calendar: label + range on one line; inputs shrink with the row (no extra toolbar height) */
 .cat-toolbar .field.field--calendar-compact {
   flex-direction: row;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  gap: 4px 8px;
+  gap: 4px 6px;
 }
 
 .cat-toolbar .field.field--calendar-compact .field-label--inline {
   margin: 0;
   flex: 0 0 auto;
+  max-width: 38%;
   font-size: 0.62rem;
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cat-toolbar .field.field--calendar-compact .field-calendar-range {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: 4px;
+  align-items: center;
 }
 
 .cat-toolbar .field.field--calendar-compact .toolbar-month,
 .cat-toolbar .field.field--calendar-compact .toolbar-date {
-  min-width: 6.5rem;
+  flex: 1 1 0;
+  min-width: 0;
+  width: 100%;
   padding: 2px 4px;
   font-size: 0.62rem;
+}
+
+/* Current + Comparison: one horizontal band (pair); Site / Personnel narrowed to make room */
+.cat-toolbar .field.field--period-ranges.field--calendar-compact {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  flex: 1.55 1 0;
+  min-width: 0;
+}
+
+.cat-toolbar .field.field--period-ranges .field-period-pair {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.cat-toolbar .field.field--period-ranges .field-period-row {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 3px 4px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.cat-toolbar .field.field--period-ranges .field-period-row .field-label--inline {
+  flex: 0 0 auto;
+  max-width: 3.25rem;
+  font-size: 0.56rem;
+  letter-spacing: 0.01em;
+}
+
+.cat-toolbar__filters-all-scroll > .field.field--toolbar-scope.field--biz-site-scope.field--filter-compact {
+  flex: 0.52 1 0;
+  max-width: 6.5rem;
+}
+
+.cat-toolbar__filters-all-scroll > .field.field--filter-compact.field--personal-toolbar {
+  flex: 0.48 1 0;
+  max-width: 5.25rem;
+}
+
+.cat-toolbar__filters-all-scroll > .field.field--filter-compact.field--personal-toolbar select {
+  width: 100%;
+  min-width: 0;
 }
 
 .multi-kpi-tile--action {
@@ -2524,7 +2617,7 @@ fieldset.kpi-summary-region {
 /* One baseline: labels share height, selects + Variable trigger share control height */
 .cat-view fieldset.cat-toolbar--compact .cat-toolbar__inner {
   align-items: flex-end;
-  gap: 8px;
+  gap: 4px;
 }
 
 .cat-view fieldset.cat-toolbar--compact .field-label {
@@ -2535,6 +2628,10 @@ fieldset.kpi-summary-region {
   line-height: 1.25;
   min-height: 0.78rem;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .cat-view fieldset.cat-toolbar--compact select {
@@ -2554,8 +2651,10 @@ fieldset.kpi-summary-region {
   font: inherit;
   font-size: 0.72rem;
   padding: 3px 6px;
-  min-width: 100px;
-  max-width: 180px;
+  min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: #fff;
@@ -2567,7 +2666,9 @@ fieldset.cat-toolbar--compact select {
   font-weight: 400;
   padding: 2px 5px;
   min-width: 0;
-  max-width: 160px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 fieldset.cat-toolbar--compact .field-label {
@@ -2576,10 +2677,11 @@ fieldset.cat-toolbar--compact .field-label {
 }
 
 .cat-toolbar .toolbar-actions {
-  margin-left: 0;
-  flex-shrink: 0;
+  margin-left: auto;
+  flex: 0 0 auto;
   display: flex;
-  gap: 6px;
+  flex-wrap: nowrap;
+  gap: 4px;
   align-items: center;
 }
 
@@ -3000,7 +3102,7 @@ fieldset.cat-toolbar--compact .field-label {
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr);
 }
 
-/* Category chart view: band around chart row(s) + selected KPI title (all categories) */
+/* Category Trend & Distribution view: band around chart row(s) + selected KPI title (all categories) */
 .kpi-charts-scope {
   margin: 0;
   padding: 8px 8px 6px;
@@ -3052,6 +3154,27 @@ body:has(.cat-view) .kpi-charts-scope {
 
 .cat-charts > .chart-box {
   min-width: 0;
+}
+
+/* Filter-driven layout: fewer panels expand to full row width */
+.chart-box.chart-box--hidden {
+  display: none !important;
+}
+
+.cat-charts.cat-charts--cols-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.cat-charts.cat-charts--cols-2 {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.cat-charts.cat-charts--cols-3 {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.75fr);
+}
+
+.cat-charts--hazard.cat-charts--cols-3 {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1.15fr) minmax(0, 0.75fr);
 }
 
 /* Chart-only: one grid row shares remaining height — no min-height floor that forces clip */
@@ -3404,6 +3527,39 @@ body:has(.cat-view) .kpi-charts-scope {
 .spi-hm--cls-3 {
   background: #ef6c00;
   color: #fff;
+}
+
+/* Consequence Management: 2-chart layout (trend + vertical only; no BU radar) */
+.cat-charts--consequence {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--chart-gap, 8px);
+}
+
+/* Hazard: alternate trend/gauge canvas for % and count KPIs */
+.chart-hazard-alt {
+  display: block;
+  width: 100%;
+  min-height: 140px;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* SPI right panel: wraps both gauge and vertical canvases */
+.chart-canvas-wrap--spi-right {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 140px;
+  display: flex;
+  flex-direction: column;
+}
+.chart-canvas-wrap--spi-right canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100% !important;
+}
+.chart-spi-abs-gauge {
+  display: block;
 }
 
 /* SPI: first column — all-KPI line trend (replaces former hazard heat map) */
@@ -4856,7 +5012,8 @@ body.shell--docs-body {
   margin-left: 0;
 }
 
-.top-header__meta--docs .last-updated {
+.top-header__meta--docs .last-updated,
+.top-header__meta--docs .data-refreshed {
   flex-shrink: 0;
   font-size: 12px;
   white-space: nowrap;
@@ -5315,7 +5472,8 @@ body.shell--docs-body {
     text-overflow: ellipsis;
   }
 
-  .last-updated {
+  .last-updated,
+  .data-refreshed {
     flex-basis: auto;
     width: 100%;
     font-size: 10px;
@@ -5479,36 +5637,44 @@ body.shell--docs-body {
   }
 
   .cat-toolbar__inner {
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: 6px;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    gap: 4px;
   }
 
   .cat-toolbar__filters-scroll {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
     min-width: 0;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow: visible;
   }
 
   .cat-toolbar__filters-all-scroll {
-    flex-wrap: wrap;
-    overflow-x: visible;
+    flex-wrap: nowrap;
+    overflow: visible;
     width: 100%;
-    gap: 6px 8px;
+    gap: 4px;
   }
 
   .cat-toolbar__filters-all-scroll > .field {
-    flex: 1 1 100%;
+    flex: 1 1 0;
     min-width: 0;
   }
 
+  .cat-toolbar .field.field--period-ranges .field-period-pair {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+
   .cat-toolbar__filters-all-scroll > .field--variable {
-    flex: 1 1 100%;
+    flex: 1.1 1 0;
+    min-width: 0;
   }
 
   .cat-toolbar__kpi-surface {
-    width: 100%;
-    max-width: none;
+    flex: 1.15 1 0;
+    min-width: 0;
+    max-width: 100%;
     align-self: stretch;
     padding: 3px 6px 4px;
     gap: 2px;
@@ -5532,16 +5698,17 @@ body.shell--docs-body {
   .cat-toolbar .field.field--calendar-compact .toolbar-month,
   .cat-toolbar .field.field--calendar-compact .toolbar-date {
     min-width: 0;
-    flex: 1 1 calc(50% - 6px);
+    flex: 1 1 0;
     font-size: 0.68rem;
   }
 
   .toolbar-actions {
     display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+    flex-wrap: nowrap;
+    gap: 4px;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: flex-end;
+    flex-shrink: 0;
   }
 
   .toolbar-download-icon {
