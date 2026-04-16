@@ -106,39 +106,6 @@
   if (!DATA.monthlyByCategory) DATA.monthlyByCategory = [];
   if (!DATA.businessBreakdown) DATA.businessBreakdown = [];
 
-  /** Remove preview-only Location Vulnerability (10) — catalogue is nine domains only. */
-  function stripLocationVulnerabilityCategory() {
-    if (!DATA) return;
-    const drop = 10;
-    if (Array.isArray(DATA.categories)) {
-      DATA.categories = DATA.categories.filter(
-        (c) => Number(c.categoryKey) !== drop
-      );
-    }
-    if (Array.isArray(DATA.kpiDetailByCategory)) {
-      DATA.kpiDetailByCategory = DATA.kpiDetailByCategory.filter(
-        (x) => Number(x.categoryKey) !== drop
-      );
-    }
-    if (Array.isArray(DATA.factRows)) {
-      DATA.factRows = DATA.factRows.filter(
-        (r) => Number(r.categoryKey) !== drop
-      );
-    }
-    if (Array.isArray(DATA.monthlyByCategory)) {
-      DATA.monthlyByCategory = DATA.monthlyByCategory.filter(
-        (x) => Number(x.categoryKey) !== drop
-      );
-    }
-    if (Array.isArray(DATA.businessBreakdown)) {
-      DATA.businessBreakdown = DATA.businessBreakdown.filter(
-        (x) => Number(x.categoryKey) !== drop
-      );
-    }
-  }
-
-  stripLocationVulnerabilityCategory();
-
   /**
    * Category Selection page: display order, names, and card descriptions (workbook "Categories" sheet).
    * sortOrder controls grid order; categoryKey stays stable for routes and data joins.
@@ -207,6 +174,13 @@
       categoryName: "Digital & Technology Intervention",
       uxNote:
         "Measures adoption and utilization of safety systems and digital tools",
+    },
+    {
+      categoryKey: 10,
+      sortOrder: 10,
+      categoryName: "Vulnerable Location",
+      uxNote:
+        "Highlights geographic and site-level exposure patterns to prioritize interventions",
     },
   ];
 
@@ -933,11 +907,94 @@
     }
   }
 
+  /**
+   * Vulnerable Location (10): catalogue row + KPI list cloned from Hazard map measures (no extra facts).
+   */
+  function previewSeedVulnerableLocationCategory() {
+    if (!DATA || !Array.isArray(DATA.factRows)) return;
+    const LOC = 10;
+    const HAZ = 2;
+    const LV_ORDER = [13, 38, 39, 40, 45, 46, 53];
+    DATA.factRows = DATA.factRows.filter(
+      (r) =>
+        !(
+          Number(r.categoryKey) === LOC &&
+          [601, 602, 603].includes(Number(r.kpiKey))
+        )
+    );
+    DATA.kpiDetailByCategory = DATA.kpiDetailByCategory.filter(
+      (x) => Number(x.categoryKey) !== LOC
+    );
+    const haz = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === HAZ
+    );
+    const locKpis = [];
+    if (haz && Array.isArray(haz.kpis)) {
+      const map = new Map(haz.kpis.map((k) => [Number(k.kpiKey), k]));
+      for (let i = 0; i < LV_ORDER.length; i++) {
+        const k = map.get(LV_ORDER[i]);
+        if (k) {
+          locKpis.push({
+            kpiKey: k.kpiKey,
+            kpiName: k.kpiName,
+            unitType: k.unitType || "Count",
+            latestValue: k.latestValue,
+          });
+        }
+      }
+    }
+    if (!locKpis.length) {
+      locKpis.push(
+        {
+          kpiKey: 13,
+          kpiName: "Near Miss Count",
+          unitType: "Count",
+          latestValue: 0,
+        },
+        {
+          kpiKey: 38,
+          kpiName: "Hazard Spotting Rate",
+          unitType: "Count",
+          latestValue: 0,
+        }
+      );
+    }
+    DATA.kpiDetailByCategory.push({
+      categoryKey: LOC,
+      kpis: locKpis,
+    });
+    DATA.monthlyByCategory = (DATA.monthlyByCategory || []).filter(
+      (x) => Number(x.categoryKey) !== LOC
+    );
+    DATA.businessBreakdown = (DATA.businessBreakdown || []).filter(
+      (x) => Number(x.categoryKey) !== LOC
+    );
+    const meta = CATEGORY_SELECTION_CATALOG_META.find(
+      (m) => Number(m.categoryKey) === LOC
+    );
+    let catRow = DATA.categories.find((c) => Number(c.categoryKey) === LOC);
+    if (!catRow && meta) {
+      catRow = {
+        categoryKey: LOC,
+        categoryName: meta.categoryName,
+        sortOrder: meta.sortOrder,
+        uxNote: meta.uxNote,
+        kpiCount: locKpis.length,
+        latestMonthIndex: 1,
+      };
+      DATA.categories.push(catRow);
+    } else if (catRow) {
+      catRow.kpiCount = locKpis.length;
+      catRow.latestMonthIndex = 1;
+    }
+  }
+
   previewApplyDataMetaTitles();
   previewAddIncidentFirePropertyKpis();
   previewCategoryDataBootstrap();
   previewAddHazardSiPlannedActualKpi();
   previewStripRiskControlAssuranceDuplicateKpis();
+  previewSeedVulnerableLocationCategory();
   ensureCategoryCatalogueBaseline();
   normalizeCategorySelectionCatalog();
 
@@ -963,10 +1020,13 @@
   const CMP_ACCOUNTABILITY_CHART_PRIMARY_KPI_KEYS = new Set(["24", "25"]);
   const TRAINING_CATEGORY_KEY = 6;
   const SYSTEMS_ADOPTION_CATEGORY_KEY = 9;
-  const LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY = 8;
-  const CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS = new Set([
-    LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY,
-  ]);
+  const LEADERSHIP_CATEGORY_KEY = 8;
+  const VULNERABLE_LOCATION_CATEGORY_KEY = 10;
+  /** Hazard KPIs aggregated on the Vulnerable Location map (see KPI reference). */
+  const VULNERABLE_LOCATION_KPI_ORDER = [13, 38, 39, 40, 45, 46, 53];
+  const VULNERABLE_LOCATION_KPI_KEYS = new Set(VULNERABLE_LOCATION_KPI_ORDER);
+  /** Categories that appear on the list but cannot be opened (none in current preview). */
+  const CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS = new Set();
   /**
    * Leading vs lagging — used on the Categories list (#categories) chips only.
    */
@@ -1017,13 +1077,19 @@
       kind: "strategic",
       label: "Strategic",
       blurb:
-        "Tracks leadership engagement, safety reviews, and governance effectiveness (not in this preview build).",
+        "Tracks leadership engagement, safety reviews, and governance effectiveness.",
     },
     9: {
       kind: "leading",
       label: "Leading",
       blurb:
         "Measures adoption and utilization of safety systems and digital tools.",
+    },
+    10: {
+      kind: "leading",
+      label: "Leading",
+      blurb:
+        "Highlights geographic and site-level exposure patterns to prioritize interventions.",
     },
   };
 
@@ -1431,6 +1497,9 @@
   const LS_CAT_MAIN_VIEW = insightShell
     ? "insights_cat_main_view"
     : "adani_cat_main_view";
+  const LS_CAT_MAIN_VIEW_VL = insightShell
+    ? "insights_vl_main_view"
+    : "adani_vl_main_view";
 
   const TREND_LINE_COLORS = [
     ADANI_BLUE,
@@ -2129,6 +2198,16 @@
       }
     });
     destroySpiLeafletMap();
+    if (window.__adaniVlMap) {
+      try {
+        window.__adaniVlMap.remove();
+      } catch {
+        /* ignore */
+      }
+      window.__adaniVlMap = null;
+    }
+    const vlMapHost = document.getElementById("vl-leaflet-map");
+    if (vlMapHost) vlMapHost.innerHTML = "";
     const spiHmHost = document.getElementById("spi-hazard-heatmap-host");
     if (spiHmHost) spiHmHost.innerHTML = "";
     ["chart-hazard-alt", "chart-spi-abs-gauge"].forEach(function(id) {
@@ -2797,6 +2876,10 @@
   function wireCatMainViewIndex() {
     const main = document.getElementById("cat-main-view");
     if (!main) return;
+    if (document.getElementById("view-tab-vl-map")) {
+      wireCatMainViewVulnerable();
+      return;
+    }
     const tabCharts = document.getElementById("view-tab-charts");
     const tabTable = document.getElementById("view-tab-table");
     const tabCompare = document.getElementById("view-tab-compare");
@@ -2901,6 +2984,218 @@
     }
     main.addEventListener("pointerup", onViewTabActivate);
     main.addEventListener("click", onViewTabActivate);
+  }
+
+  /** Map layer rows: all India states; state toolbar filter does not clip map totals. */
+  function vulnerableLocationMapRows(f) {
+    const fAll = Object.assign({}, f, { state: "all" });
+    const base = getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY);
+    return applyNonMonthFiltersAllKpis(base, fAll).filter((r) =>
+      VULNERABLE_LOCATION_KPI_KEYS.has(Number(r.kpiKey))
+    );
+  }
+
+  function renderVulnerableLocationMap(f) {
+    const host = document.getElementById("vl-leaflet-map");
+    if (!host) return;
+    if (window.__adaniVlMap) {
+      try {
+        window.__adaniVlMap.remove();
+      } catch {
+        /* ignore */
+      }
+      window.__adaniVlMap = null;
+    }
+    host.innerHTML = "";
+    if (typeof L === "undefined") {
+      host.innerHTML =
+        '<p class="vl-map-fallback" role="status">Map preview needs Leaflet (check network) and a local HTTP server.</p>';
+      return;
+    }
+    const inner = document.createElement("div");
+    inner.className = "vl-leaflet-map-inner";
+    inner.id = "vl-leaflet-map-inner";
+    host.appendChild(inner);
+
+    const winM = new Set(effectiveBizWindowMonths(f));
+    const snap = vulnerableLocationMapRows(f).filter((r) => winM.has(r.yearMonth));
+    const byState = {};
+    for (let i = 0; i < snap.length; i++) {
+      const r = snap[i];
+      const st = String(r.state || "").trim();
+      if (!st) continue;
+      if (!byState[st]) byState[st] = { sum: 0, kpiCount: 0, seen: {} };
+      const kk = Number(r.kpiKey);
+      if (!Number.isNaN(kk)) {
+        if (!byState[st].seen[kk]) {
+          byState[st].seen[kk] = 1;
+          byState[st].kpiCount += 1;
+        }
+      }
+      const v = Number(r.value);
+      if (Number.isFinite(v)) byState[st].sum += v;
+    }
+    let maxKpi = 1;
+    let maxSum = 1;
+    INDIA_STATES_UT.forEach((nm) => {
+      const a = byState[nm];
+      if (!a) return;
+      if (a.kpiCount > maxKpi) maxKpi = a.kpiCount;
+      if (a.sum > maxSum) maxSum = a.sum;
+    });
+
+    const map = L.map(inner, {
+      zoomControl: true,
+      attributionControl: true,
+    }).setView([22.5, 78], 5);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+    const sel = f.state && f.state !== "all" ? String(f.state).trim() : "";
+
+    function heatColor(t) {
+      const u = Math.max(0, Math.min(1, t));
+      const r = Math.round(230 + (0 - 230) * u);
+      const g = Math.round(240 + (177 - 240) * u);
+      const b = Math.round(250 + (107 - 250) * u);
+      return "rgb(" + r + "," + g + "," + b + ")";
+    }
+
+    INDIA_STATES_UT.forEach((nm) => {
+      const ll = STATE_CENTROID_BY_STATE[nm];
+      if (!ll) return;
+      const agg = byState[nm] || { sum: 0, kpiCount: 0, seen: {} };
+      const tK = agg.kpiCount / maxKpi;
+      const tS = agg.sum / maxSum;
+      const t = 0.55 * tK + 0.45 * tS;
+      const fill = heatColor(t);
+      const radius = 6 + agg.kpiCount * 2.2 + Math.min(14, Math.sqrt(agg.sum + 1));
+      const mk = L.circleMarker(ll, {
+        radius: radius,
+        stroke: true,
+        color: sel && sel === nm ? ADANI_PURPLE : "rgba(35,31,32,0.35)",
+        weight: sel && sel === nm ? 3 : 1,
+        fillColor: fill,
+        fillOpacity: sel && sel !== nm && sel ? 0.28 : 0.88,
+      }).addTo(map);
+      mk.bindPopup(
+        "<strong>" +
+          escapeHtml(nm) +
+          "</strong><br/>" +
+          "KPIs with data: " +
+          agg.kpiCount +
+          " / " +
+          VULNERABLE_LOCATION_KPI_ORDER.length +
+          "<br/>" +
+          "Σ value (window): " +
+          formatValue(agg.sum, "Count")
+      );
+    });
+    map.fitBounds(
+      L.latLngBounds(
+        L.latLng(INDIA_MAP_BOUNDS_SW[0], INDIA_MAP_BOUNDS_SW[1]),
+        L.latLng(INDIA_MAP_BOUNDS_NE[0], INDIA_MAP_BOUNDS_NE[1])
+      ),
+      { padding: [10, 14] }
+    );
+    window.__adaniVlMap = map;
+  }
+
+  function refreshVulnerableLocationView(catKey) {
+    if (Number(catKey) !== VULNERABLE_LOCATION_CATEGORY_KEY) return;
+    const f = readFilters(catKey);
+    if (!f) return;
+    const main = document.getElementById("cat-main-view");
+    const mode = main ? main.dataset.view || "map" : "map";
+    if (mode === "map") {
+      renderVulnerableLocationMap(f);
+    } else if (mode === "table") {
+      renderTableBody(catKey);
+    } else {
+      buildBuComparisonChart(catKey, f);
+    }
+    const cat = getCategory(catKey);
+    const ctx = document.getElementById("cat-context");
+    if (ctx && cat) {
+      ctx.textContent = cat.uxNote || "";
+    }
+  }
+
+  function wireCatMainViewVulnerable() {
+    const main = document.getElementById("cat-main-view");
+    if (!main) return;
+    const tMap = document.getElementById("view-tab-vl-map");
+    const tTable = document.getElementById("view-tab-vl-table");
+    const tCmp = document.getElementById("view-tab-vl-compare");
+    const pMap = document.getElementById("view-panel-vl-map");
+    const pTable = document.getElementById("view-panel-vl-table");
+    const pCmp = document.getElementById("view-panel-vl-compare");
+    if (!tMap || !pMap) return;
+
+    function apply(mode) {
+      const isMap = mode === "map";
+      const isTable = mode === "table";
+      const isCmp = mode === "compare";
+      main.dataset.view = mode;
+      main.classList.remove(
+        "cat-main-view--charts",
+        "cat-main-view--table",
+        "cat-main-view--compare",
+        "cat-main-view--vl-map",
+        "cat-main-view--vl-table",
+        "cat-main-view--vl-compare"
+      );
+      if (isMap) main.classList.add("cat-main-view--vl-map");
+      else if (isTable) main.classList.add("cat-main-view--vl-table");
+      else main.classList.add("cat-main-view--vl-compare");
+      [tMap, tTable, tCmp].forEach((btn) => {
+        if (!btn) return;
+        const m = btn.getAttribute("data-view");
+        const on = m === mode;
+        btn.setAttribute("aria-selected", on ? "true" : "false");
+        btn.classList.toggle("view-tabs__btn--active", on);
+        btn.tabIndex = on ? 0 : -1;
+      });
+      if (pMap) pMap.hidden = !isMap;
+      if (pTable) pTable.hidden = !isTable;
+      if (pCmp) pCmp.hidden = !isCmp;
+      try {
+        localStorage.setItem(LS_CAT_MAIN_VIEW_VL, mode);
+      } catch {
+        /* ignore */
+      }
+      if (currentCategoryKey != null) {
+        refreshVulnerableLocationView(currentCategoryKey);
+      }
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => resizeAllChartsIndex());
+      });
+    }
+
+    let initial = "map";
+    try {
+      const s = localStorage.getItem(LS_CAT_MAIN_VIEW_VL);
+      if (s === "map" || s === "table" || s === "compare") initial = s;
+    } catch {
+      /* ignore */
+    }
+    apply(initial);
+
+    let lastMs = 0;
+    function onTab(ev) {
+      const btn = ev.target.closest("button.view-tabs__btn[data-view]");
+      if (!btn || !main.contains(btn)) return;
+      const mode = btn.getAttribute("data-view");
+      if (mode !== "map" && mode !== "table" && mode !== "compare") return;
+      const t = Date.now();
+      if (t - lastMs < 350) return;
+      lastMs = t;
+      apply(mode);
+    }
+    main.addEventListener("pointerup", onTab);
+    main.addEventListener("click", onTab);
   }
 
   /** Distinct hues for radar spokes (one color per business unit). */
@@ -3302,6 +3597,10 @@
   function updateTableZoneLabel(f) {
     const el = document.getElementById("tbl-zone-label");
     if (!el || !f) return;
+    if (Number(currentCategoryKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      el.textContent = "State vs hazard KPIs (current period window)";
+      return;
+    }
     const singleSite =
       Array.isArray(f.site) && f.site.length === 1;
     const singleBu =
@@ -3745,6 +4044,14 @@
 
   function getRowsForCategory(catKey) {
     const ck = Number(catKey);
+    if (ck === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      if (!Array.isArray(DATA.factRows)) return [];
+      return DATA.factRows
+        .filter((r) => VULNERABLE_LOCATION_KPI_KEYS.has(Number(r.kpiKey)))
+        .map((r) =>
+          Object.assign({}, r, { categoryKey: VULNERABLE_LOCATION_CATEGORY_KEY })
+        );
+    }
     return DATA.factRows.filter((r) => Number(r.categoryKey) === ck);
   }
 
@@ -3757,7 +4064,15 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b));
   }
 
-  function getFilterConfig(_catKey) {
+  function getFilterConfig(catKey) {
+    const ck = Number(catKey);
+    if (ck === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      return {
+        showKpi: false,
+        showState: true,
+        showBusiness: false,
+      };
+    }
     return {
       showKpi: true,
       showState: false,
@@ -3914,7 +4229,7 @@
       );
       return ordered.concat(rest);
     }
-    if (cat === LEADERSHIP_NOT_IN_PREVIEW_CATEGORY_KEY) {
+    if (cat === LEADERSHIP_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
       const ordered = LEADERSHIP_KPI_ORDER.map((id) => map.get(id)).filter(
         Boolean
@@ -3923,6 +4238,12 @@
         (k) => !LEADERSHIP_KPI_ORDER.includes(Number(k.kpiKey))
       );
       return ordered.concat(rest);
+    }
+    if (cat === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
+      return VULNERABLE_LOCATION_KPI_ORDER.map((id) => map.get(id)).filter(
+        Boolean
+      );
     }
     const tri = list.find((k) => isTriKpiMeta(k));
     if (!tri) return list;
@@ -7067,9 +7388,70 @@
     );
   }
 
+  function renderVulnerableLocationTableBody(catKey, f) {
+    updateTableZoneLabel(f);
+    const kpisMeta = sortKpisForDisplay(catKey, getKpis(catKey));
+    let states = mergedIndiaStateList(DATA.states);
+    if (f.state && f.state !== "all") {
+      states = states.filter((s) => s === f.state);
+    }
+    const pool = applyNonMonthFiltersAllKpis(
+      getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY),
+      f
+    ).filter((r) => VULNERABLE_LOCATION_KPI_KEYS.has(Number(r.kpiKey)));
+    const win = new Set(effectiveBizWindowMonths(f));
+    const snap = pool.filter((r) => win.has(r.yearMonth));
+    const thead = document.querySelector("#tbl-detail thead tr");
+    const tbody = document.getElementById("tbl-body");
+    const sm = document.getElementById("tbl-summary");
+    if (sm) sm.textContent = "";
+    if (!thead || !tbody) return;
+    thead.innerHTML =
+      '<th scope="col" class="bu-matrix__th-bu">State / UT</th>' +
+      kpisMeta
+        .map(
+          (k) =>
+            '<th scope="col" class="col-num">' +
+            escapeHtml(shortKpiHeaderLabel(k.kpiName)) +
+            "</th>"
+        )
+        .join("");
+    let html = "";
+    for (let si = 0; si < states.length; si++) {
+      const st = states[si];
+      html += '<tr><th scope="row">' + escapeHtml(st) + "</th>";
+      for (let ki = 0; ki < kpisMeta.length; ki++) {
+        const k = kpisMeta[ki];
+        const slice = snap.filter(
+          (r) =>
+            String(r.state || "").trim() === st &&
+            String(r.kpiKey) === String(k.kpiKey)
+        );
+        const vals = slice
+          .map((r) => Number(r.value))
+          .filter((x) => Number.isFinite(x));
+        let cell = "—";
+        if (vals.length) {
+          const ut = k.unitType || "";
+          const agg = isAdditiveUnit(ut)
+            ? vals.reduce((a, b) => a + b, 0)
+            : avg(vals);
+          cell = formatValue(agg, ut);
+        }
+        html += '<td class="col-num">' + escapeHtml(cell) + "</td>";
+      }
+      html += "</tr>";
+    }
+    tbody.innerHTML = html;
+  }
+
   function renderTableBody(catKey) {
     const f = readFilters(catKey);
     if (!f) return;
+    if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      renderVulnerableLocationTableBody(catKey, f);
+      return;
+    }
     const kpisMeta = getKpis(catKey);
     const selectedSet = new Set(
       (f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi]).map(String)
@@ -7620,6 +8002,17 @@
     const f = readFilters(catKey);
     if (!f) return;
     const cat = getCategory(catKey);
+    if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      announce(
+        (cat ? cat.categoryName : "Vulnerable Location") +
+          ". State filter: " +
+          (f.state && f.state !== "all" ? f.state : "All states") +
+          ". Mapped KPIs: " +
+          VULNERABLE_LOCATION_KPI_ORDER.length +
+          "."
+      );
+      return;
+    }
     const label = cat ? cat.categoryName + ". " : "";
     const buCount =
       f.business === "all"
@@ -7649,6 +8042,12 @@
     const kpisMeta = getKpis(catKey);
     const f = readFilters(catKey);
     if (!f) return;
+
+    if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      refreshVulnerableLocationView(catKey);
+      announceFilterSummary(catKey);
+      return;
+    }
 
     const multiWrap = document.getElementById("multi-kpi-wrap");
     if (multiWrap) {
@@ -7713,6 +8112,137 @@
     }
   }
 
+  function mountVulnerableLocationCategoryPage(
+    catKey,
+    cat,
+    _cfg,
+    stateOpts,
+    periodRangesFieldHtml
+  ) {
+    void _cfg;
+    const stateFieldHtml =
+      '<div class="field field--filter-compact field--state-vl"><label class="field-label" for="f-state">State</label>' +
+      '<select id="f-state">' +
+      stateOpts +
+      "</select></div>";
+    const filtersScroll = periodRangesFieldHtml + stateFieldHtml;
+    const comparePanelHtml =
+      '<div id="view-panel-vl-compare" class="view-panel view-panel--vl-compare" role="tabpanel" aria-labelledby="view-tab-vl-compare" hidden><div class="chart-box chart-box--bu-compare">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label" id="chart-bu-compare-title">BU comparison — current vs base</span> <span id="chart-bu-compare-hint" class="chart-box__hint">Grouped bars · same KPI · all BUs</span>',
+        "chart-bu-compare",
+        "comparison-by-bu",
+        CHART_HELP.compareBu
+      ) +
+      '<div class="chart-canvas-wrap chart-canvas-wrap--bu-compare"><canvas id="chart-bu-compare" role="img" aria-label="Grouped bar chart: base vs current period by business unit"></canvas></div></div></div>';
+    const wrap = document.createElement("div");
+    wrap.className = insightShell
+      ? "cat-view cat-view--modern cat-view--vulnerable-location"
+      : "cat-view cat-view--vulnerable-location";
+    wrap.innerHTML =
+      '<div class="cat-top-bar cat-top-bar--filters-only">' +
+      '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact cat-toolbar--vl" aria-label="Map and geography filters">' +
+      '<legend class="visually-hidden">Map and geography filters</legend>' +
+      '<div class="cat-toolbar__inner" role="group">' +
+      '<div class="cat-toolbar__filters-scroll">' +
+      '<div class="cat-toolbar__filters-all-scroll">' +
+      filtersScroll +
+      "</div></div>" +
+      '<div class="toolbar-actions">' +
+      '<details class="download-toolbar" id="export-menu">' +
+      '<summary class="toolbar-download-icon" title="Download page or filter report" aria-label="Download page or filter report">' +
+      '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true" focusable="false">' +
+      '<path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>' +
+      "</svg></summary>" +
+      '<div class="download-toolbar__panel download-toolbar__panel--compact" role="menu" aria-label="Page export">' +
+      '<button type="button" class="download-toolbar__btn" id="dl-page-pdf" role="menuitem">Page (PDF)</button>' +
+      '<button type="button" class="download-toolbar__btn" id="dl-page-jpeg" role="menuitem">Page (JPEG)</button>' +
+      '<button type="button" class="download-toolbar__btn" id="dl-report-pdf" role="menuitem">Filters report (PDF)</button>' +
+      "</div></details>" +
+      '<button type="button" class="btn btn--reset-compact" id="f-reset">Reset</button>' +
+      "</div></div></fieldset></div>" +
+      '<div class="cat-main-view cat-main-view--vl" id="cat-main-view" data-view="map">' +
+      '<div class="view-tabs" role="tablist" aria-label="Map, table, or comparison">' +
+      '<button type="button" role="tab" id="view-tab-vl-map" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-map" data-view="map">Map view</button>' +
+      '<button type="button" role="tab" id="view-tab-vl-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-table" tabindex="-1" data-view="table">Table view</button>' +
+      '<button type="button" role="tab" id="view-tab-vl-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-compare" tabindex="-1" data-view="compare">Comparison view</button>' +
+      "</div>" +
+      '<div id="view-panel-vl-map" class="view-panel view-panel--vl-map" role="tabpanel" aria-labelledby="view-tab-vl-map">' +
+      '<div class="vl-map-wrap">' +
+      '<div id="vl-leaflet-map" class="vl-map-host" role="application" aria-label="India map: hazard KPI signals by state and UT"></div>' +
+      '<p class="vl-map-legend" id="vl-map-legend">Markers cover every state/UT. Size scales with Σ of mapped KPI values in the current period; colour blends KPI coverage (how many of the seven measures have rows) with that total. The map always shows all states; use the State control to narrow Table and Comparison.</p>' +
+      "</div></div>" +
+      '<div id="view-panel-vl-table" class="view-panel view-panel--vl-table" role="tabpanel" aria-labelledby="view-tab-vl-table" hidden>' +
+      '<div class="table-zone">' +
+      '<div class="table-zone__head">' +
+      '<div class="table-zone__title">' +
+      '<span class="table-zone__label" id="tbl-zone-label">State performance</span>' +
+      '<span id="tbl-summary" class="table-zone__summary" aria-live="polite"></span>' +
+      "</div>" +
+      '<div class="table-zone__exports" role="group" aria-label="Export table">' +
+      '<button type="button" class="chart-export-btn" data-table-export="csv" title="Download table (CSV)" aria-label="Download table as CSV">' +
+      EXPORT_TABLE_CSV_SVG +
+      "</button>" +
+      '<button type="button" class="chart-export-btn" data-table-export="jpeg" title="Download table (JPEG)" aria-label="Download table as JPEG">' +
+      EXPORT_DL_ICON_SVG +
+      "</button></div>" +
+      '<div class="table-pager" hidden>' +
+      '<button type="button" id="tbl-prev" aria-label="Previous page">Prev</button>' +
+      '<span id="tbl-pageinfo"></span>' +
+      '<button type="button" id="tbl-next" aria-label="Next page">Next</button>' +
+      "</div></div>" +
+      '<div class="table-scroll table-scroll--bu-matrix" tabindex="0">' +
+      '<table class="data-table bu-matrix" id="tbl-detail">' +
+      "<thead><tr>" +
+      '<th scope="col" class="bu-matrix__th-bu">State / UT</th>' +
+      "</tr></thead>" +
+      '<tbody id="tbl-body"></tbody></table>' +
+      "</div></div></div>" +
+      comparePanelHtml +
+      "</div>" +
+      '<p class="cat-context" id="cat-context">' +
+      escapeHtml(cat.uxNote || "") +
+      "</p>";
+
+    root.innerHTML = "";
+    root.appendChild(wrap);
+
+    const stEl = document.getElementById("f-state");
+    if (stEl) stEl.value = "all";
+    initPeriodRangeInputs();
+
+    function onFilterChange() {
+      tableState.page = 0;
+      refreshCategoryView(catKey);
+    }
+    ["f-state", "f-cur-from", "f-cur-to", "f-cmp-from", "f-cmp-to"].forEach(
+      (id) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("change", onFilterChange);
+      }
+    );
+    wireToolbarScopeScrollPanels(wrap);
+
+    document.getElementById("f-reset").addEventListener("click", () => {
+      if (stEl) stEl.value = "all";
+      ["f-cur-from", "f-cur-to", "f-cmp-from", "f-cmp-to"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
+      initPeriodRangeInputs();
+      tableState.page = 0;
+      refreshCategoryView(catKey);
+    });
+
+    wireTableHeaders(catKey);
+    wireCatMainViewVulnerable();
+    wireExportDownloads(catKey);
+    refreshCategoryView(catKey);
+    const h = document.getElementById("cat-heading");
+    if (h) h.focus();
+    updateHeaderNavState();
+  }
+
   function renderCategory(catKey) {
     currentCategoryKey = catKey;
     tableState = { sortKey: "yearMonth", asc: false, page: 0 };
@@ -7729,9 +8259,7 @@
     if (CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(catKey)) {
       history.replaceState(null, "", "#categories");
       renderCategories();
-      announce(
-        "Leadership and Safety Governance is not included in this preview."
-      );
+      announce("This category is not included in this preview.");
       return;
     }
 
@@ -7780,6 +8308,18 @@
       '<label class="visually-hidden" for="f-cmp-to">Comparison period to</label>' +
       '<input type="month" id="f-cmp-to" class="toolbar-date toolbar-month" />' +
       "</div></div></div></div>";
+
+    if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      mountVulnerableLocationCategoryPage(
+        catKey,
+        cat,
+        cfg,
+        stateOpts,
+        periodRangesFieldHtml
+      );
+      return;
+    }
+
     const personalFieldHtml =
       '<div class="field field--filter-compact field--personal-toolbar"><label class="field-label" for="f-personal">Personnel</label>' +
       '<select id="f-personal">' +

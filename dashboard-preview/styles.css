@@ -450,7 +450,7 @@ body {
   font-family: var(--font);
 }
 
-/* Home: full-bleed hero below header (assets/home-2-2.png — Home 2 (2)) */
+/* Home: full-bleed hero below header (assets/home-2-5.png — Home 2 (5)) */
 .viewport__main:has(.landing.landing--bg-only) {
   padding: 0;
   background: transparent;
@@ -480,7 +480,7 @@ body {
   border-radius: 0;
   gap: 0;
   background-color: #dde6ed;
-  background-image: url("assets/home-2-2.png");
+  background-image: url("assets/home-2-5.png");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;
@@ -2158,6 +2158,56 @@ fieldset.kpi-summary-region {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+}
+
+/* Vulnerable Location (category 10): no KPI summary row; map + table + comparison tabs */
+.cat-view--vulnerable-location .kpi-summary-region {
+  display: none !important;
+}
+.cat-main-view--vl {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.view-panel--vl-map:not([hidden]),
+.view-panel--vl-table:not([hidden]),
+.view-panel--vl-compare:not([hidden]) {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.vl-map-wrap {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.vl-map-host {
+  flex: 1 1 0;
+  min-height: 360px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+.vl-leaflet-map-inner {
+  width: 100%;
+  height: 100%;
+  min-height: 360px;
+}
+.vl-map-legend {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: #6d6e71;
+}
+.vl-map-fallback {
+  padding: 14px;
+  font-size: 0.85rem;
 }
 
 .cat-main-view--table .table-zone {
