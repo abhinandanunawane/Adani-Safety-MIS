@@ -1021,6 +1021,16 @@
   const TRAINING_CATEGORY_KEY = 6;
   const SYSTEMS_ADOPTION_CATEGORY_KEY = 9;
   const LEADERSHIP_CATEGORY_KEY = 8;
+  /** Main dashboard (`index.html`) only — mandatory meeting types for compliance matrix. */
+  const LEADERSHIP_MEETING_TYPE_LABELS = [
+    "Executive safety board",
+    "BU safety council",
+    "Cross-functional review",
+    "Contractor safety forum",
+    "Incident learning review",
+    "Training & competency forum",
+    "Audit action review",
+  ];
   const VULNERABLE_LOCATION_CATEGORY_KEY = 10;
   /** Hazard KPIs aggregated on the Vulnerable Location map (see KPI reference). */
   const VULNERABLE_LOCATION_KPI_ORDER = [13, 38, 39, 40, 45, 46, 53];
@@ -1086,20 +1096,31 @@
         "Measures adoption and utilization of safety systems and digital tools.",
     },
     10: {
-      kind: "leading",
-      label: "Leading",
+      kind: "lagging",
+      label: "Lagging",
       blurb:
         "Highlights geographic and site-level exposure patterns to prioritize interventions.",
     },
   };
 
+  /** Subtitle under main title on category drill (#cat=…): category name + (Lagging)/(Leading)/(Strategic). */
+  function categoryNatureBracketSuffix(catKey) {
+    const n = CATEGORY_NATURE_BY_KEY[Number(catKey)];
+    if (!n) return "";
+    if (n.kind === "lagging") return " (Lagging)";
+    if (n.kind === "leading") return " (Leading)";
+    if (n.kind === "strategic") return " (Strategic)";
+    return "";
+  }
+
   function categoryListChipLeadingLagging(catKey) {
     const n = CATEGORY_NATURE_BY_KEY[catKey];
-    const lagging = n && n.kind === "lagging";
-    return {
-      label: lagging ? "Lagging" : "Leading",
-      chipKind: lagging ? "lagging" : "leading",
-    };
+    if (!n) return { label: "—", chipKind: "leading" };
+    if (n.kind === "lagging")
+      return { label: "Lagging", chipKind: "lagging" };
+    if (n.kind === "strategic")
+      return { label: "Strategic", chipKind: "leading" };
+    return { label: "Leading", chipKind: "leading" };
   }
   /** Adani approved palette — #00B16B #006DB6 #8E278F #F04C23 #E6E7E8 (charts: KPI dashboard only). */
   const ADANI_GREEN = "#00B16B";
@@ -8002,6 +8023,13 @@
     const f = readFilters(catKey);
     if (!f) return;
     const cat = getCategory(catKey);
+    if (!insightShell && Number(catKey) === LEADERSHIP_CATEGORY_KEY) {
+      announce(
+        (cat ? cat.categoryName : "Leadership") +
+          ". Meeting compliance matrix · slicers and drill-down."
+      );
+      return;
+    }
     if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
       announce(
         (cat ? cat.categoryName : "Vulnerable Location") +
@@ -8042,6 +8070,14 @@
     const kpisMeta = getKpis(catKey);
     const f = readFilters(catKey);
     if (!f) return;
+
+    if (!insightShell && Number(catKey) === LEADERSHIP_CATEGORY_KEY) {
+      if (typeof window.__adaniLeadershipMeetingsRerender === "function") {
+        window.__adaniLeadershipMeetingsRerender();
+      }
+      announceFilterSummary(catKey);
+      return;
+    }
 
     if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
       refreshVulnerableLocationView(catKey);
@@ -8110,6 +8146,576 @@
       el.textContent = "";
       el.hidden = true;
     }
+  }
+
+  /**
+   * Main preview (`index.html` only): Leadership & Safety Governance —
+   * meeting compliance matrix wireframe (no KPI strip / chart tabs).
+   */
+  function mountLeadershipMeetingCompliancePage(catKey, cat) {
+    const refM = getRefMonth();
+    const months = [];
+    for (let d = -5; d <= 0; d++) {
+      const ym = monthAdd(refM, d);
+      if (ym) months.push(ym);
+    }
+    const bus = PREVIEW_BUSINESS_NAMES.slice();
+
+    function lcConductedCount(bu, ym) {
+      const h = hash32(String(bu) + "|" + String(ym));
+      return h % 8;
+    }
+
+    function lcMeetingFlags(bu, ym) {
+      const c = lcConductedCount(bu, ym);
+      const order = [0, 1, 2, 3, 4, 5, 6].sort(
+        (a, b) =>
+          hash32(String(bu) + "|" + String(ym) + "|o|" + a) -
+          hash32(String(bu) + "|" + String(ym) + "|o|" + b)
+      );
+      const f = new Array(7).fill(false);
+      for (let k = 0; k < c; k++) f[order[k]] = true;
+      return f;
+    }
+
+    function lcRagFromCount(c) {
+      if (c >= 7) return "green";
+      if (c >= 5) return "yellow";
+      return "red";
+    }
+
+    const ragKeys = ["green", "yellow", "red"];
+    const ragShown = new Set(ragKeys);
+    const buShown = new Set(bus);
+    const monthShown = new Set(months);
+    const selBu = new Set();
+    const selMo = new Set();
+
+    const wrap = document.createElement("div");
+    wrap.className = "cat-view cat-view--leadership-meetings";
+    wrap.innerHTML =
+      '<div class="lc-page">' +
+      '<div class="cat-top-bar cat-top-bar--filters-only">' +
+      '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact" aria-label="Meeting compliance filters">' +
+      '<legend class="visually-hidden">Meeting compliance filters</legend>' +
+      '<div class="cat-toolbar__inner" role="group">' +
+      '<div class="cat-toolbar__filters-scroll">' +
+      '<div class="cat-toolbar__filters-all-scroll">' +
+      '<div class="field field--variable field--var-inline">' +
+      '<span class="field-label" id="lc-rag-lbl">RAG</span>' +
+      '<details class="var-scope var-scope--toolbar" id="lc-rag-details">' +
+      '<summary class="var-scope__summary" aria-labelledby="lc-rag-lbl" title="RAG">' +
+      '<span class="var-scope__summary-text">' +
+      '<span class="var-scope__hint" id="lc-rag-hint">All RAG bands</span></span>' +
+      '<span class="var-scope__chev" aria-hidden="true"></span></summary>' +
+      '<div class="var-scope__panel" role="group" aria-labelledby="lc-rag-lbl">' +
+      '<div class="var-scope__menu">' +
+      '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
+      '<input type="checkbox" id="lc-rag-all" checked />' +
+      '<span class="field-variable-check__text">All RAG bands</span></label>' +
+      '<div class="var-scope__divider" aria-hidden="true"></div>' +
+      '<div class="var-scope__options" id="lc-slicer-rag-options"></div>' +
+      "</div></div></details></div>" +
+      '<div class="field field--variable field--var-inline">' +
+      '<span class="field-label" id="lc-bu-lbl">BU</span>' +
+      '<details class="var-scope var-scope--toolbar" id="lc-bu-details">' +
+      '<summary class="var-scope__summary" aria-labelledby="lc-bu-lbl" title="Business unit">' +
+      '<span class="var-scope__summary-text">' +
+      '<span class="var-scope__hint" id="lc-bu-hint">All BUs</span></span>' +
+      '<span class="var-scope__chev" aria-hidden="true"></span></summary>' +
+      '<div class="var-scope__panel" role="group" aria-labelledby="lc-bu-lbl">' +
+      '<div class="var-scope__menu">' +
+      '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
+      '<input type="checkbox" id="lc-bu-all" checked />' +
+      '<span class="field-variable-check__text">All BUs</span></label>' +
+      '<div class="var-scope__divider" aria-hidden="true"></div>' +
+      '<div class="var-scope__options lc-meeting-scope--bu" id="lc-slicer-bu-options"></div>' +
+      "</div></div></details></div>" +
+      '<div class="field field--variable field--var-inline">' +
+      '<span class="field-label" id="lc-mo-lbl">Month</span>' +
+      '<details class="var-scope var-scope--toolbar" id="lc-mo-details">' +
+      '<summary class="var-scope__summary" aria-labelledby="lc-mo-lbl" title="Month">' +
+      '<span class="var-scope__summary-text">' +
+      '<span class="var-scope__hint" id="lc-mo-hint">All months</span></span>' +
+      '<span class="var-scope__chev" aria-hidden="true"></span></summary>' +
+      '<div class="var-scope__panel" role="group" aria-labelledby="lc-mo-lbl">' +
+      '<div class="var-scope__menu">' +
+      '<label class="field-variable-check field-variable-check--row field-variable-check--all">' +
+      '<input type="checkbox" id="lc-mo-all" checked />' +
+      '<span class="field-variable-check__text">All months</span></label>' +
+      '<div class="var-scope__divider" aria-hidden="true"></div>' +
+      '<div class="var-scope__options" id="lc-slicer-mo-options"></div>' +
+      "</div></div></details></div>" +
+      "</div></div>" +
+      '<div class="toolbar-actions">' +
+      '<button type="button" class="btn btn--reset-compact" id="lc-reset">Reset</button>' +
+      "</div></div></fieldset></div>" +
+      '<header class="lc-header">' +
+      '<h2 class="lc-title">Meeting Compliance Tracking</h2>' +
+      '<p class="lc-subtitle">BU-wise monthly compliance overview (last 6 months)</p>' +
+      '<details class="lc-objective-details">' +
+      '<summary class="lc-objective-summary">Page objective</summary>' +
+      '<p class="lc-objective"><strong>Objective.</strong> Visualize monthly meeting compliance across 24 business units (BUs), for 7 mandatory meeting types per month, with RAG for quick assessment and drill-down for detail.</p>' +
+      "</details></header>" +
+      '<div class="lc-primary">' +
+      '<div class="lc-legend" aria-label="RAG legend">' +
+      '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--g"></span> Green = Full compliance (7/7)</span>' +
+      '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--y"></span> Yellow = Partial (5–6)</span>' +
+      '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--r"></span> Red = Low (≤4)</span>' +
+      "</div>" +
+      '<div class="lc-matrix-scroll" tabindex="0">' +
+      '<table class="lc-matrix" id="lc-matrix" aria-label="BU by month RAG matrix">' +
+      "<thead><tr>" +
+      '<th scope="col" class="lc-matrix__corner">BU <span class="lc-matrix__hint">/ Month</span></th>' +
+      "</tr></thead>" +
+      '<tbody id="lc-matrix-body"></tbody></table></div></div>' +
+      '<section class="lc-drill" aria-labelledby="lc-drill-h">' +
+      '<h3 class="lc-drill__title" id="lc-drill-h">Drill-down detail</h3>' +
+      '<p class="lc-drill__hint" id="lc-drill-hint"></p>' +
+      '<div class="lc-drill__body" id="lc-drill-body"></div>' +
+      "</section>" +
+      '<p class="cat-context lc-footnote" id="cat-context">' +
+      escapeHtml(cat.uxNote || "") +
+      "</p></div>";
+
+    function buildSlicerNodes() {
+      const ragEl = wrap.querySelector("#lc-slicer-rag-options");
+      const buEl = wrap.querySelector("#lc-slicer-bu-options");
+      const moEl = wrap.querySelector("#lc-slicer-mo-options");
+      ragEl.innerHTML = ragKeys
+        .map((k) => {
+          const lab =
+            k === "green" ? "Green" : k === "yellow" ? "Yellow" : "Red";
+          return (
+            '<label class="field-variable-check field-variable-check--row">' +
+            '<input type="checkbox" class="lc-rag-cb" value="' +
+            escapeAttr(k) +
+            '" />' +
+            '<span class="field-variable-check__text">' +
+            escapeHtml(lab) +
+            "</span></label>"
+          );
+        })
+        .join("");
+      buEl.innerHTML = bus
+        .map(
+          (b) =>
+            '<label class="field-variable-check field-variable-check--row">' +
+            '<input type="checkbox" class="lc-bu-cb" value="' +
+            escapeAttr(b) +
+            '" />' +
+            '<span class="field-variable-check__text">' +
+            escapeHtml(b) +
+            "</span></label>"
+        )
+        .join("");
+      moEl.innerHTML = months
+        .map((ym) => {
+          return (
+            '<label class="field-variable-check field-variable-check--row">' +
+            '<input type="checkbox" class="lc-mo-cb" value="' +
+            escapeAttr(ym) +
+            '" />' +
+            '<span class="field-variable-check__text">' +
+            escapeHtml(spiChartMonthTick(ym)) +
+            "</span></label>"
+          );
+        })
+        .join("");
+    }
+
+    function updateLcRagHint() {
+      const hint = wrap.querySelector("#lc-rag-hint");
+      const all = wrap.querySelector("#lc-rag-all");
+      const cbs = wrap.querySelectorAll(".lc-rag-cb");
+      if (!hint || !all) return;
+      if (all.checked) {
+        hint.textContent = "All RAG bands";
+        return;
+      }
+      const n = [...cbs].filter((cb) => cb.checked).length;
+      hint.textContent = n ? n + " selected" : "All RAG bands";
+    }
+
+    function updateLcBuHint() {
+      const hint = wrap.querySelector("#lc-bu-hint");
+      const all = wrap.querySelector("#lc-bu-all");
+      const cbs = wrap.querySelectorAll(".lc-bu-cb");
+      if (!hint || !all) return;
+      if (all.checked) {
+        hint.textContent = "All BUs";
+        return;
+      }
+      const n = [...cbs].filter((cb) => cb.checked).length;
+      hint.textContent = n ? n + " selected" : "All BUs";
+    }
+
+    function updateLcMoHint() {
+      const hint = wrap.querySelector("#lc-mo-hint");
+      const all = wrap.querySelector("#lc-mo-all");
+      const cbs = wrap.querySelectorAll(".lc-mo-cb");
+      if (!hint || !all) return;
+      if (all.checked) {
+        hint.textContent = "All months";
+        return;
+      }
+      const n = [...cbs].filter((cb) => cb.checked).length;
+      hint.textContent = n ? n + " selected" : "All months";
+    }
+
+    function updateLcFilterHints() {
+      updateLcRagHint();
+      updateLcBuHint();
+      updateLcMoHint();
+    }
+
+    function readRagShownFromDom() {
+      const all = wrap.querySelector("#lc-rag-all");
+      ragShown.clear();
+      if (all && all.checked) {
+        ragKeys.forEach((k) => ragShown.add(k));
+        return;
+      }
+      wrap.querySelectorAll(".lc-rag-cb").forEach((inp) => {
+        if (inp.checked) ragShown.add(inp.value);
+      });
+      if (!ragShown.size) ragKeys.forEach((k) => ragShown.add(k));
+    }
+    function readBuShownFromDom() {
+      const all = wrap.querySelector("#lc-bu-all");
+      buShown.clear();
+      if (all && all.checked) {
+        bus.forEach((b) => buShown.add(b));
+        return;
+      }
+      wrap.querySelectorAll(".lc-bu-cb").forEach((inp) => {
+        if (inp.checked) buShown.add(inp.value);
+      });
+      if (!buShown.size) bus.forEach((b) => buShown.add(b));
+    }
+    function readMonthShownFromDom() {
+      const all = wrap.querySelector("#lc-mo-all");
+      monthShown.clear();
+      if (all && all.checked) {
+        months.forEach((m) => monthShown.add(m));
+        return;
+      }
+      wrap.querySelectorAll(".lc-mo-cb").forEach((inp) => {
+        if (inp.checked) monthShown.add(inp.value);
+      });
+      if (!monthShown.size) months.forEach((m) => monthShown.add(m));
+    }
+
+    function visibleMonths() {
+      return months.filter((m) => monthShown.has(m));
+    }
+
+    function visibleBus() {
+      return bus.filter((b) => buShown.has(b));
+    }
+
+    function rowPassesRagFilter(bu) {
+      const cols = visibleMonths();
+      if (!cols.length) return false;
+      for (let j = 0; j < cols.length; j++) {
+        const ym = cols[j];
+        const rag = lcRagFromCount(lcConductedCount(bu, ym));
+        if (ragShown.has(rag)) return true;
+      }
+      return false;
+    }
+
+    function paintMatrix() {
+      readRagShownFromDom();
+      readBuShownFromDom();
+      readMonthShownFromDom();
+      const cols = visibleMonths();
+      const rows = visibleBus().filter((b) => rowPassesRagFilter(b));
+      const theadRow = wrap.querySelector("#lc-matrix thead tr");
+      theadRow.innerHTML =
+        '<th scope="col" class="lc-matrix__corner">BU <span class="lc-matrix__hint">/ Month</span></th>' +
+        cols
+          .map(
+            (ym) =>
+              '<th scope="col" class="lc-matrix__mo' +
+              (selMo.has(ym) ? " lc-matrix__mo--sel" : "") +
+              '" data-lc-colhead="' +
+              escapeAttr(ym) +
+              '" title="Click to toggle month selection for drill-down">' +
+              escapeHtml(spiChartMonthTick(ym)) +
+              "</th>"
+          )
+          .join("");
+      const tb = wrap.querySelector("#lc-matrix-body");
+      tb.innerHTML = rows
+        .map((bu) => {
+          const rowSel = selBu.has(bu) ? " lc-matrix__row--sel" : "";
+          let tr =
+            '<tr class="lc-matrix__row' +
+            rowSel +
+            '"><th scope="row" class="lc-matrix__bu" data-lc-rowhead="' +
+            escapeAttr(bu) +
+            '" title="Click to toggle BU selection for drill-down">' +
+            escapeHtml(bu) +
+            "</th>";
+          for (let j = 0; j < cols.length; j++) {
+            const ym = cols[j];
+            const c = lcConductedCount(bu, ym);
+            const rag = lcRagFromCount(c);
+            const on = ragShown.has(rag);
+            const cls =
+              "lc-cell lc-cell--" +
+              rag +
+              (on ? "" : " lc-cell--filtered") +
+              (selMo.has(ym) ? " lc-cell--col-sel" : "") +
+              (selBu.has(bu) ? " lc-cell--row-sel" : "");
+            tr +=
+              '<td class="' +
+              cls +
+              '" data-lc-bu="' +
+              escapeAttr(bu) +
+              '" data-lc-ym="' +
+              escapeAttr(ym) +
+              '" title="' +
+              escapeAttr(String(c) + "/7 meetings conducted") +
+              '"></td>';
+          }
+          tr += "</tr>";
+          return tr;
+        })
+        .join("");
+    }
+
+    function renderScenarioA(bu) {
+      const cols = visibleMonths();
+      let h =
+        '<div class="lc-dd-block"><h4 class="lc-dd-block__title">BU detail — ' +
+        escapeHtml(bu) +
+        "</h4>" +
+        '<div class="lc-dd-scroll"><table class="lc-dd-table">' +
+        "<thead><tr><th scope=\"col\">Meeting type</th>";
+      for (let j = 0; j < cols.length; j++) {
+        h +=
+          '<th scope="col">' + escapeHtml(spiChartMonthTick(cols[j])) + "</th>";
+      }
+      h += "</tr></thead><tbody>";
+      const flagsByYm = {};
+      for (let j = 0; j < cols.length; j++) {
+        flagsByYm[cols[j]] = lcMeetingFlags(bu, cols[j]);
+      }
+      for (let mi = 0; mi < LEADERSHIP_MEETING_TYPE_LABELS.length; mi++) {
+        h +=
+          "<tr><th scope=\"row\">" +
+          escapeHtml(LEADERSHIP_MEETING_TYPE_LABELS[mi]) +
+          "</th>";
+        for (let j = 0; j < cols.length; j++) {
+          const ym = cols[j];
+          const ok = flagsByYm[ym][mi];
+          h +=
+            "<td>" +
+            (ok
+              ? '<span class="lc-icon lc-icon--ok" title="Conducted">✔</span>'
+              : '<span class="lc-icon lc-icon--no" title="Not conducted">✖</span>') +
+            "</td>";
+        }
+        h += "</tr>";
+      }
+      h += "</tbody></table></div></div>";
+      return h;
+    }
+
+    function renderScenarioB(ym) {
+      const busB = visibleBus();
+      let h =
+        '<div class="lc-dd-block"><h4 class="lc-dd-block__title">Month — ' +
+        escapeHtml(spiChartMonthTick(ym)) +
+        "</h4>" +
+        '<div class="lc-dd-scroll"><table class="lc-dd-table">' +
+        "<thead><tr><th scope=\"col\">BU</th>";
+      for (let mi = 0; mi < LEADERSHIP_MEETING_TYPE_LABELS.length; mi++) {
+        h +=
+          '<th scope="col" class="lc-dd-table__mt">' +
+          escapeHtml(LEADERSHIP_MEETING_TYPE_LABELS[mi]) +
+          "</th>";
+      }
+      h += "</tr></thead><tbody>";
+      for (let i = 0; i < busB.length; i++) {
+        const bu = busB[i];
+        const fl = lcMeetingFlags(bu, ym);
+        h += "<tr><th scope=\"row\">" + escapeHtml(bu) + "</th>";
+        for (let mi = 0; mi < 7; mi++) {
+          h +=
+            "<td>" +
+            (fl[mi]
+              ? '<span class="lc-icon lc-icon--ok" title="Conducted">✔</span>'
+              : '<span class="lc-icon lc-icon--no" title="Not conducted">✖</span>') +
+            "</td>";
+        }
+        h += "</tr>";
+      }
+      h += "</tbody></table></div></div>";
+      return h;
+    }
+
+    function paintDrill() {
+      const hint = wrap.querySelector("#lc-drill-hint");
+      const body = wrap.querySelector("#lc-drill-body");
+      const buList = Array.from(selBu).filter((b) => buShown.has(b));
+      const moList = Array.from(selMo).filter((m) => monthShown.has(m));
+      if (!buList.length && !moList.length) {
+        hint.textContent =
+          "Select month column header(s) for BU × meeting-type detail, or BU row header(s) for meeting-type × month detail. Shift-click a matrix cell toggles both BU and month.";
+        body.innerHTML =
+          '<p class="lc-drill__empty">No drill-down selection yet.</p>';
+        return;
+      }
+      if (moList.length) {
+        hint.textContent =
+          "Month drill-down: each selected month shows all visible BUs × 7 meeting types. While any month is selected, BU-only drill-down is hidden.";
+        const parts = [];
+        moList.sort().forEach((ym) => parts.push(renderScenarioB(ym)));
+        body.innerHTML = parts.join("");
+        return;
+      }
+      hint.textContent =
+        "BU drill-down: each selected BU shows 7 meeting types × visible months. Scroll the panel below if tables are tall.";
+      const parts = [];
+      buList.forEach((b) => parts.push(renderScenarioA(b)));
+      body.innerHTML = parts.join("");
+    }
+
+    function paintAll() {
+      paintMatrix();
+      paintDrill();
+    }
+
+    function onMatrixClick(e) {
+      const cell = e.target.closest("td[data-lc-bu]");
+      if (cell) {
+        const b = cell.getAttribute("data-lc-bu");
+        const ym = cell.getAttribute("data-lc-ym");
+        if (e.shiftKey) {
+          if (selBu.has(b)) selBu.delete(b);
+          else selBu.add(b);
+          if (selMo.has(ym)) selMo.delete(ym);
+          else selMo.add(ym);
+        } else {
+          if (selBu.has(b)) selBu.delete(b);
+          else selBu.add(b);
+        }
+        paintAll();
+        announce(
+          "Matrix: " +
+            selBu.size +
+            " BU(s) and " +
+            selMo.size +
+            " month(s) in drill-down."
+        );
+        return;
+      }
+      const rh = e.target.closest("th[data-lc-rowhead]");
+      if (rh) {
+        const b = rh.getAttribute("data-lc-rowhead");
+        if (selBu.has(b)) selBu.delete(b);
+        else selBu.add(b);
+        paintAll();
+        announce("Drill-down: " + selBu.size + " BU(s) selected.");
+        return;
+      }
+      const ch = e.target.closest("th[data-lc-colhead]");
+      if (ch) {
+        const ym = ch.getAttribute("data-lc-colhead");
+        if (selMo.has(ym)) selMo.delete(ym);
+        else selMo.add(ym);
+        paintAll();
+        announce("Drill-down: " + selMo.size + " month(s) selected.");
+      }
+    }
+
+    function onLcFilterChange() {
+      updateLcFilterHints();
+      Array.from(selBu).forEach((b) => {
+        if (!buShown.has(b)) selBu.delete(b);
+      });
+      Array.from(selMo).forEach((m) => {
+        if (!monthShown.has(m)) selMo.delete(m);
+      });
+      paintAll();
+      announce("Matrix filters updated.");
+    }
+
+    function wireLcScopeGroup(allId, cbSel, detailsId) {
+      const allEl = wrap.querySelector(allId);
+      if (!allEl) return;
+      function cbs() {
+        return wrap.querySelectorAll(cbSel);
+      }
+      function subChange() {
+        const any = [...cbs()].some((cb) => cb.checked);
+        if (any) allEl.checked = false;
+        else allEl.checked = true;
+        updateLcFilterHints();
+        onLcFilterChange();
+      }
+      function allChange() {
+        if (allEl.checked) {
+          cbs().forEach((cb) => {
+            cb.checked = false;
+          });
+          const det = wrap.querySelector(detailsId);
+          if (det) det.open = false;
+        }
+        updateLcFilterHints();
+        onLcFilterChange();
+      }
+      allEl.addEventListener("change", allChange);
+      cbs().forEach((cb) => cb.addEventListener("change", subChange));
+    }
+
+    root.innerHTML = "";
+    root.appendChild(wrap);
+    buildSlicerNodes();
+    wireToolbarScopeScrollPanels(wrap);
+
+    wireLcScopeGroup("#lc-rag-all", ".lc-rag-cb", "#lc-rag-details");
+    wireLcScopeGroup("#lc-bu-all", ".lc-bu-cb", "#lc-bu-details");
+    wireLcScopeGroup("#lc-mo-all", ".lc-mo-cb", "#lc-mo-details");
+    updateLcFilterHints();
+
+    wrap.querySelector("#lc-matrix").addEventListener("click", onMatrixClick);
+
+    wrap.querySelector("#lc-reset").addEventListener("click", () => {
+      selBu.clear();
+      selMo.clear();
+      const ragAll = wrap.querySelector("#lc-rag-all");
+      const buAll = wrap.querySelector("#lc-bu-all");
+      const moAll = wrap.querySelector("#lc-mo-all");
+      if (ragAll) ragAll.checked = true;
+      if (buAll) buAll.checked = true;
+      if (moAll) moAll.checked = true;
+      wrap.querySelectorAll(".lc-rag-cb").forEach((cb) => {
+        cb.checked = false;
+      });
+      wrap.querySelectorAll(".lc-bu-cb").forEach((cb) => {
+        cb.checked = false;
+      });
+      wrap.querySelectorAll(".lc-mo-cb").forEach((cb) => {
+        cb.checked = false;
+      });
+      wrap.querySelectorAll("details.var-scope--toolbar").forEach((d) => {
+        d.open = false;
+      });
+      updateLcFilterHints();
+      paintAll();
+      announce("Meeting compliance filters reset.");
+    });
+
+    window.__adaniLeadershipMeetingsRerender = paintAll;
+    paintAll();
+    announceFilterSummary(catKey);
+    const h = document.getElementById("cat-heading");
+    if (h) h.focus();
+    updateHeaderNavState();
   }
 
   function mountVulnerableLocationCategoryPage(
@@ -8247,6 +8853,7 @@
     currentCategoryKey = catKey;
     tableState = { sortKey: "yearMonth", asc: false, page: 0 };
     destroyCharts();
+    window.__adaniLeadershipMeetingsRerender = null;
     setShellLandingMode(false);
 
     const cat = getCategory(catKey);
@@ -8254,7 +8861,9 @@
       renderCategories();
       return;
     }
-    setCategoryHeaderSubtitle(cat.categoryName || "");
+    setCategoryHeaderSubtitle(
+      (cat.categoryName || "") + categoryNatureBracketSuffix(catKey)
+    );
 
     if (CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(catKey)) {
       history.replaceState(null, "", "#categories");
@@ -8317,6 +8926,11 @@
         stateOpts,
         periodRangesFieldHtml
       );
+      return;
+    }
+
+    if (!insightShell && Number(catKey) === LEADERSHIP_CATEGORY_KEY) {
+      mountLeadershipMeetingCompliancePage(catKey, cat);
       return;
     }
 
