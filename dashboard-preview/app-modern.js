@@ -1,5 +1,5 @@
 /**
- * Adani Safety Performance Profile — Insights layout: same data as classic; copy foregrounds user research, IA, usability testing,
+ * Adani Safety Performance Dashboard — Insights layout: same data as classic; copy foregrounds user research, IA, usability testing,
  * accessibility, consistency, user-centered approach, consistency & hierarchy, iterative process, UCD, HCI,
  * customer experience (CX) design, usability, desirability, usefulness. Maps to Power BI bookmarks + pages.
  */
@@ -64,7 +64,7 @@
     if (root) {
       root.innerHTML =
         '<div class="boot-error" style="padding:12px;font-size:13px;color:#0f172a">' +
-        '<h1 class="boot-error__title" style="margin:0 0 10px;font-size:1.05rem;font-weight:700;color:#8e278f">Adani Safety Performance Profile</h1>' +
+        '<h1 class="boot-error__title" style="margin:0 0 10px;font-size:1.05rem;font-weight:700;color:#8e278f">Adani Safety Performance Dashboard</h1>' +
         "<p style=\"margin:0 0 10px;line-height:1.45\"><strong>Data not loaded.</strong> The site header above should still be visible.</p>" +
         "Ensure <code>embedded-data.js</code> is in the same folder as <code>insights.html</code> " +
         "and open the page via a local server (e.g. <code>npx serve</code>) if scripts are blocked. " +

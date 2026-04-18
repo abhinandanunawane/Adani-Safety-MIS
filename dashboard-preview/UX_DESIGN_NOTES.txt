@@ -1,11 +1,11 @@
-Adani Safety Performance Profile — Dashboard preview: UX, IA, and Power BI alignment
+Adani Safety Performance Dashboard — Dashboard preview: UX, IA, and Power BI alignment
 ====================================================================
 This static preview is a user-centered prototype for stakeholder review, usability testing, and iterative refinement before or alongside Power BI report development.
 
 1. Information architecture (IA)
 --------------------------------
 - Global: Header (persistent product identity + primary nav) → Main canvas → Footer (disclaimer).
-- Task flow: Landing (orientation) → Categories (topic choice) → Category / KPI view (filters → KPI summary → charts → detail table).
+- Task flow: Landing (orientation) → Dashboard Categories (topic choice) → Category / KPI view (filters → KPI summary → charts → detail table).
 - Wayfinding: Journey steps (1–3), breadcrumb on drill-down, primary nav with aria-current reflecting route.
 - Hierarchy: Filters and Vs mode above summaries; summaries above charts; charts above granular table (general-to-specific).
 
@@ -13,7 +13,7 @@ This static preview is a user-centered prototype for stakeholder review, usabili
 --------------------------------
 - Report pages: Landing ≈ cover / intro page; Categories ≈ hub or bookmark; Category view ≈ one report page per domain (or one page with slicer “Category”).
 - Slicers / filters: KPI, Vs, State, Business, Unit align with Power BI slicers and the semantic model (dimension tables, fact relationships).
-- Bookmarks: Optional for “step” navigation (Home / Categories / Explore) if a single-page app pattern is used in Power BI.
+- Bookmarks: Optional for “step” navigation (Home / Dashboard Categories / Explore) if a single-page app pattern is used in Power BI.
 - Visuals: Line / bar-style breakdown / donut map to native Power BI visuals; KPI cards map to card visuals or custom tooltip KPI templates.
 - Theme: Brand tokens in CSS (:root) align with a Power BI theme JSON (hex for primary, background, text, semantic colours).
 - Limitations: This preview uses fixed 1280×720; Power BI layouts are responsive—test bookmarks and mobile layout separately.

@@ -9,7 +9,7 @@ $kpiRefHtml = @"
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>KPI details &amp; measures &mdash; Adani Safety Performance Profile</title>
+    <title>KPI details &amp; measures &mdash; Adani Safety Performance Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
@@ -98,7 +98,7 @@ $kpiRefHtml = @"
         </div>
         <div class="top-header__titles">
           <p class="top-header__title-line">
-            <strong class="top-header__brand">Adani Safety Performance Profile</strong>
+            <strong class="top-header__brand">Adani Safety Performance Dashboard</strong>
             <span class="header-sep" aria-hidden="true"> &middot; </span>
             <span class="top-header__desc">KPI details &amp; measures</span>
           </p>
@@ -106,7 +106,7 @@ $kpiRefHtml = @"
         <div class="top-header__meta top-header__meta--trailing top-header__meta--docs">
           <nav class="top-header__nav top-header__nav--static" aria-label="Go to dashboard">
             <a class="top-nav-link top-nav-link--primary" href="index.html#landing">Home</a>
-            <a class="top-nav-link top-nav-link--primary" href="index.html#categories">Categories</a>
+            <a class="top-nav-link top-nav-link--primary" href="index.html#categories">Dashboard Categories</a>
           </nav>
           <nav class="top-header__docs" aria-label="Help and KPI reference">
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html">How to use</a>
@@ -191,7 +191,7 @@ $guideHtml = @"
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>How to use this dashboard &mdash; Adani Safety Performance Profile</title>
+    <title>How to use this dashboard &mdash; Adani Safety Performance Dashboard</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
@@ -280,7 +280,7 @@ $guideHtml = @"
         </div>
         <div class="top-header__titles">
           <p class="top-header__title-line">
-            <strong class="top-header__brand">Adani Safety Performance Profile</strong>
+            <strong class="top-header__brand">Adani Safety Performance Dashboard</strong>
             <span class="header-sep" aria-hidden="true"> &middot; </span>
             <span class="top-header__desc">How to use this dashboard</span>
           </p>
@@ -288,7 +288,7 @@ $guideHtml = @"
         <div class="top-header__meta top-header__meta--trailing top-header__meta--docs">
           <nav class="top-header__nav top-header__nav--static" aria-label="Go to dashboard">
             <a class="top-nav-link top-nav-link--primary" href="index.html#landing">Home</a>
-            <a class="top-nav-link top-nav-link--primary" href="index.html#categories">Categories</a>
+            <a class="top-nav-link top-nav-link--primary" href="index.html#categories">Dashboard Categories</a>
           </nav>
           <nav class="top-header__docs" aria-label="Help and KPI reference">
             <a class="top-nav-link top-nav-link--doc top-nav-link--secondary" href="guide.html" aria-current="page">How to use</a>

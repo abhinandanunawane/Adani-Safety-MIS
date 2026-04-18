@@ -79,11 +79,11 @@ body:has(.shell.shell--modern) {
   background: var(--m2-grad-page-landing);
 }
 
-/* insights.html home — same hero as dashboard (assets/home-2-2.png — Home 2 (2)) */
+/* insights.html home — same hero as dashboard (assets/home-2-6.png — Home 2 (6)) */
 .shell--modern[data-layout="insights"]
   .viewport__main--modern:has(.landing--modern) {
   background-color: #dde6ed;
-  background-image: url("assets/home-2-2.png");
+  background-image: url("assets/home-2-6.png");
   background-size: cover;
   background-position: center center;
   background-repeat: no-repeat;

@@ -1,4 +1,4 @@
-/** Adani Safety Performance Profile — HTML preview (fixed canvas; open via local server). */
+/** Adani Safety Performance Dashboard — HTML preview (fixed canvas; open via local server). */
 (function () {
   "use strict";
 
@@ -78,7 +78,7 @@
       root.innerHTML =
         '<div class="boot-error" role="alert" style="padding:12px 14px;font-size:13px;color:#0f172a;max-width:52rem">' +
         '<h1 class="boot-error__title" style="margin:0 0 10px;font-size:1.05rem;font-weight:700;color:#8e278f">' +
-        "Adani Safety Performance Profile</h1>" +
+        "Adani Safety Performance Dashboard</h1>" +
         "<p style=\"margin:0 0 10px;line-height:1.45\"><strong>Data not loaded.</strong> " +
         "The site header above should still be visible; this panel explains what went wrong.</p>" +
         "<ul style=\"margin:0;padding-left:1.25rem;line-height:1.5\">" +
@@ -257,6 +257,29 @@
     typeof document !== "undefined" &&
     document.querySelector('.shell--modern[data-layout="insights"]') != null;
 
+  /**
+   * Main `index.html` category grid sequence (stable categoryKey). Insights layout unchanged.
+   */
+  const CLASSIC_INDEX_CATEGORY_GRID_ORDER = [
+    10, 1, 3, 2, 7, 4, 6, 5, 8, 9,
+  ];
+
+  function classicIndexCategoryGridRank(categoryKey) {
+    const k = Number(categoryKey);
+    const i = CLASSIC_INDEX_CATEGORY_GRID_ORDER.indexOf(k);
+    return i === -1 ? CLASSIC_INDEX_CATEGORY_GRID_ORDER.length + k : i;
+  }
+
+  /** Labels for main preview only; `categoryKey` and data joins stay unchanged. */
+  function classicIndexCategoryDisplayName(categoryKey, dataName) {
+    if (insightShell) return dataName || "";
+    const k = Number(categoryKey);
+    if (k === 1) return "Incident Data";
+    if (k === 3) return "Safety Incidents Rate";
+    if (k === 10) return "Vulnerable & Resilient Sites";
+    return dataName || "";
+  }
+
   if (typeof Chart !== "undefined") {
     Chart.defaults.font.family = FONT_UI;
     Chart.defaults.font.size = 10;
@@ -421,7 +444,7 @@
   /** Align packaged JSON meta with header product name (avoid editing embedded-data.js). */
   function previewApplyDataMetaTitles() {
     if (!DATA || !DATA.meta) return;
-    DATA.meta.dashboardTitle = "Adani Safety Performance Profile";
+    DATA.meta.dashboardTitle = "Adani Safety Performance Dashboard";
     DATA.meta.subtitle =
       "Safety performance indicators — Interactive Preview";
   }
@@ -2172,6 +2195,13 @@
   function categoryMatchesSearchQuery(cat, qLower) {
     if (!qLower) return true;
     if ((cat.categoryName || "").toLowerCase().includes(qLower)) return true;
+    if (!insightShell) {
+      const shown = classicIndexCategoryDisplayName(
+        cat.categoryKey,
+        cat.categoryName
+      );
+      if ((shown || "").toLowerCase().includes(qLower)) return true;
+    }
     if ((cat.uxNote || "").toLowerCase().includes(qLower)) return true;
     return getKpis(cat.categoryKey).some((k) =>
       (k.kpiName || "").toLowerCase().includes(qLower)
@@ -7711,10 +7741,15 @@
   function filterReportTextLines(catKey, f) {
     const cat = getCategory(catKey);
     const lines = [];
-    lines.push("Adani Safety Performance Profile — applied filters (export)");
+    lines.push("Adani Safety Performance Dashboard — applied filters (export)");
     lines.push("Generated: " + new Date().toISOString());
     lines.push("");
-    lines.push("Category: " + (cat ? cat.categoryName : String(catKey)));
+    lines.push(
+      "Category: " +
+        (cat
+          ? classicIndexCategoryDisplayName(catKey, cat.categoryName)
+          : String(catKey))
+    );
     lines.push(
       "Business unit: " +
         (f.business === "all"
@@ -8035,14 +8070,20 @@
     const cat = getCategory(catKey);
     if (!insightShell && Number(catKey) === LEADERSHIP_CATEGORY_KEY) {
       announce(
-        (cat ? cat.categoryName : "Leadership") +
-          ". Meeting compliance matrix · slicers and drill-down."
+        (cat
+          ? classicIndexCategoryDisplayName(catKey, cat.categoryName)
+          : "Leadership") + ". Meeting compliance matrix · slicers and drill-down."
       );
       return;
     }
     if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
       announce(
-        (cat ? cat.categoryName : "Vulnerable Location") +
+        (cat
+          ? classicIndexCategoryDisplayName(catKey, cat.categoryName)
+          : classicIndexCategoryDisplayName(
+              VULNERABLE_LOCATION_CATEGORY_KEY,
+              "Vulnerable Location"
+            )) +
           ". State filter: " +
           (f.state && f.state !== "all" ? f.state : "All states") +
           ". Mapped KPIs: " +
@@ -8051,7 +8092,9 @@
       );
       return;
     }
-    const label = cat ? cat.categoryName + ". " : "";
+    const label = cat
+      ? classicIndexCategoryDisplayName(catKey, cat.categoryName) + ". "
+      : "";
     const buCount =
       f.business === "all"
         ? PREVIEW_BUSINESS_NAMES.length
@@ -9145,7 +9188,8 @@
       return;
     }
     setCategoryHeaderSubtitle(
-      (cat.categoryName || "") + categoryNatureBracketSuffix(catKey)
+      classicIndexCategoryDisplayName(catKey, cat.categoryName || "") +
+        categoryNatureBracketSuffix(catKey)
     );
 
     if (CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(catKey)) {
@@ -9626,7 +9670,7 @@
       "landing landing--bg-only" +
       (insightShell ? " landing--modern" : "");
     box.setAttribute("role", "region");
-    box.setAttribute("aria-label", "Adani Safety Performance Profile home");
+    box.setAttribute("aria-label", "Adani Safety Performance Dashboard home");
     box.innerHTML =
       '<div class="landing__cta">' +
       '<button type="button" class="landing__start" id="btn-landing-start">' +
@@ -9637,7 +9681,7 @@
       "</button></div>" +
       '<div class="landing__doc-row" role="navigation" aria-label="Help and KPI reference">' +
       '<a class="landing__doc-btn" href="guide.html">How to use this dashboard</a>' +
-      '<a class="landing__doc-btn landing__doc-btn--secondary" href="kpi-reference.html">View KPI definitions</a>' +
+      '<a class="landing__doc-btn landing__doc-btn--secondary" href="kpi-reference.html">KPI Catalogue</a>' +
       "</div>";
 
     root.innerHTML = "";
@@ -9657,8 +9701,8 @@
     }
     announce(
       insightShell
-        ? "Insights home. Choose Explore Safety KPIs to browse categories."
-        : "Adani Safety Performance Profile home."
+        ? "Insights home. Choose Explore Safety KPIs to browse dashboard categories."
+        : "Adani Safety Performance Dashboard home."
     );
     updateHeaderNavState();
   }
@@ -9677,7 +9721,7 @@
     box.innerHTML =
       '<div class="m2-cat-dir-head">' +
       '<div class="m2-cat-dir-intro">' +
-      '<h2 id="home-h" class="categories-page__title">Categories</h2>' +
+      '<h2 id="home-h" class="categories-page__title">Dashboard Categories</h2>' +
       '<p class="m2-cat-dir-lede">Choose a category to analyze related safety KPIs and performance. All categories below open the same charts, table, comparison, and exports as the main dashboard preview—presented in the Insights layout.</p>' +
       '<div class="home-tools m2-cat-dir-search" role="search">' +
       '<label class="home-search-label" for="cat-q">Search by category or KPI</label>' +
@@ -9843,7 +9887,7 @@
     box.className = "home-body home-body--launchpad";
     box.innerHTML =
       '<div class="home-intro home-intro--launchpad">' +
-      '<h2 id="home-h" class="categories-page__title">Categories</h2>' +
+      '<h2 id="home-h" class="categories-page__title">Dashboard Categories</h2>' +
       '<p class="home-lede">Choose a category to analyze related safety KPIs and performance</p>' +
       '<div class="home-tools" role="search">' +
       '<label class="home-search-label" for="cat-q">Search by category or KPI</label>' +
@@ -9879,7 +9923,11 @@
       const q = (query || "").trim().toLowerCase();
       const cats = DATA.categories
         .filter((c) => categoryMatchesSearchQuery(c, q))
-        .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        .sort(
+          (a, b) =>
+            classicIndexCategoryGridRank(a.categoryKey) -
+            classicIndexCategoryGridRank(b.categoryKey)
+        );
       if (!cats.length) {
         grid.removeAttribute("role");
         grid.removeAttribute("aria-labelledby");
@@ -9899,6 +9947,10 @@
         const active = !CATEGORY_DISABLED_NOT_IN_PREVIEW_KEYS.has(
           cat.categoryKey
         );
+        const displayName = classicIndexCategoryDisplayName(
+          cat.categoryKey,
+          cat.categoryName
+        );
         const ll = categoryListChipLeadingLagging(cat.categoryKey);
         const el = active
           ? document.createElement("button")
@@ -9911,12 +9963,12 @@
         el.setAttribute(
           "aria-label",
           active
-            ? cat.categoryName +
+            ? displayName +
                 ", " +
                 cat.kpiCount +
                 " KPIs, " +
                 ll.label
-            : cat.categoryName +
+            : displayName +
                 ", " +
                 cat.kpiCount +
                 " KPIs, " +
@@ -9944,7 +9996,7 @@
           "</span></div>" +
           '<div class="category-card__lp-body">' +
           '<span class="category-card__name">' +
-          escapeHtml(cat.categoryName) +
+          escapeHtml(displayName) +
           "</span>" +
           '<span class="category-card__meta">' +
           desc +

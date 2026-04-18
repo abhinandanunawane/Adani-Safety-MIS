@@ -1,4 +1,4 @@
-# Adani Safety Performance Profile
+# Adani Safety Performance Dashboard
 
 Static **dashboard preview** (`dashboard-preview/`) plus **Power BI assets** (`PowerBI_Assets/`).
 
