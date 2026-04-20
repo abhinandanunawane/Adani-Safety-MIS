@@ -51,7 +51,7 @@
   --viz-footer-fs-min: 0.58rem;
   --viz-footer-fs-max: 0.64rem;
   /* BU matrix: bar width scales to max |Vs %| in table (see app.js matrixBarWidthNormalized) */
-  --matrix-databar-h: 18px;
+  --matrix-databar-h: 12px;
   /* Multi-KPI metric tiles: Vs arrow + tile border (green up / red down) */
   --multi-kpi-trend-up: var(--brand-green);
   --multi-kpi-trend-down: #c41e3a;
@@ -6020,6 +6020,11 @@ body.shell--docs-body {
 }
 
 .cat-view--leadership-meetings .lc-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
   flex: 0 0 auto;
   border-bottom: 1px solid rgba(109, 110, 113, 0.15);
   padding-bottom: 4px;
@@ -6270,11 +6275,12 @@ body.shell--docs-body {
 
 .cat-view--leadership-meetings .lc-cell-stack {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  justify-content: center;
-  gap: 2px;
+  justify-content: flex-start;
+  gap: 8px;
   line-height: 1;
+  width: 100%;
 }
 
 .cat-view--leadership-meetings .lc-cell-stack--muted .lc-dot {
@@ -6303,6 +6309,45 @@ body.shell--docs-body {
 
 .cat-view--leadership-meetings .lc-dot--red {
   background: #dc2626;
+}
+
+/* Progress bar replacement for RAG dot in meeting-compliance matrix */
+.cat-view--leadership-meetings .lc-dot { display: none; }
+
+/* Full-width progress bar that fills the cell (simple) */
+.cat-view--leadership-meetings .lc-progress {
+  width: calc(100% - 8px);
+  height: var(--matrix-databar-h);
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  display: block;
+  margin: 4px auto;
+}
+.cat-view--leadership-meetings .lc-progress__fill {
+  height: 100%;
+  width: 0%;
+  transition: width 260ms var(--ease);
+  display: block;
+  border-radius: 6px;
+}
+.cat-view--leadership-meetings .lc-progress__fill--green {
+  background: #16a34a;
+}
+.cat-view--leadership-meetings .lc-progress__fill--yellow {
+  background: #ca8a04;
+}
+.cat-view--leadership-meetings .lc-progress__fill--red {
+  background: #dc2626;
+}
+.cat-view--leadership-meetings .lc-progress__label {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  margin-left: 8px;
+  color: #1e293b;
+  vertical-align: middle;
 }
 
 .cat-view--leadership-meetings .lc-cell-countline {
@@ -6449,5 +6494,99 @@ body.shell--docs-body {
   overflow: visible;
   -webkit-line-clamp: unset;
   -webkit-box-orient: unset;
+}
+
+/* Vulnerable & Resilient Locations — added UI helpers */
+.cat-view--vulnerable-location .cat-main-kpis {
+  padding: 10px 16px;
+  display: block;
+  background: transparent;
+  margin-bottom: 8px;
+}
+.cat-view--vulnerable-location .vl-kpi-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.cat-view--vulnerable-location .vl-kpi {
+  flex: 1 1 0;
+  background: #fff;
+  border: 1px solid rgba(109,110,113,0.08);
+  padding: 10px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(16,24,40,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cat-view--vulnerable-location .vl-kpi__label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+.cat-view--vulnerable-location .vl-kpi__value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text, #231f20);
+}
+
+.cat-view--vulnerable-location .chart-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 8px 0 16px;
+}
+.cat-view--vulnerable-location .chart-box--vl-trend,
+.cat-view--vulnerable-location .chart-box--vl-dist {
+  min-height: 220px;
+}
+.cat-view--vulnerable-location .chart-placeholder {
+  height: 220px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color: #94a3b8;
+  background: linear-gradient(180deg,#fff,#fbfdff);
+  border: 1px dashed rgba(16,24,40,0.04);
+}
+
+.cat-view--vulnerable-location .vl-map-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cat-view--vulnerable-location .vl-map-host {
+  width: 100%;
+  height: 420px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #eef2f6;
+}
+.cat-view--vulnerable-location .vl-map-controls {
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+  padding: 6px 0;
+}
+.cat-view--vulnerable-location .vl-map-controls__lbl {
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  font-size:0.85rem;
+  color:var(--text);
+}
+/* Top lists are hidden from page (display only on map) */
+
+@media (max-width:900px) {
+  .cat-view--vulnerable-location .chart-row {
+    grid-template-columns: 1fr;
+  }
+  .cat-view--vulnerable-location .vl-kpi-row {
+    flex-direction: column;
+  }
+  .cat-view--vulnerable-location .vl-map-host {
+    height: 360px;
+  }
 }
 

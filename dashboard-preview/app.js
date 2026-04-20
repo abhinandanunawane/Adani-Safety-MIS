@@ -117,7 +117,7 @@
       sortOrder: 1,
       categoryName: "Incident Management",
       uxNote:
-        "Tracks occurrence, type, trends, and closure of all safety incidents across operations",
+        "Tracks occurrence, type, trends, and closure of all safety incidents across all verticals",
     },
     {
       categoryKey: 3,
@@ -152,14 +152,13 @@
       sortOrder: 6,
       categoryName: "Risk Control Programs",
       uxNote:
-        "Monitors effectiveness and closure of structured risk mitigation initiatives (e.g., SRFA)",
+        "Monitors effectiveness and closure of structured risk mitigation initiatives",
     },
     {
       categoryKey: 8,
       sortOrder: 7,
       categoryName: "Leadership & Safety Governance",
-      uxNote:
-        "Tracks leadership engagement, safety reviews, and governance effectiveness",
+      uxNote: "",
     },
     {
       categoryKey: 6,
@@ -173,14 +172,14 @@
       sortOrder: 9,
       categoryName: "Digital & Technology Intervention",
       uxNote:
-        "Measures adoption and utilization of safety systems and digital tools",
+        "Measures adoption and utilization of safety systems, digital tools & technological solutions",
     },
     {
       categoryKey: 10,
       sortOrder: 10,
       categoryName: "Vulnerable Location",
       uxNote:
-        "Highlights geographic and site-level exposure patterns to prioritize interventions",
+        "Highlights geographic and site-level exposure patterns to as Resilient & Vulnerable Site prioritize interventions",
     },
   ];
 
@@ -276,7 +275,7 @@
     const k = Number(categoryKey);
     if (k === 1) return "Incident Data";
     if (k === 3) return "Safety Incidents Rate";
-    if (k === 10) return "Vulnerable & Resilient Sites";
+    if (k === 10) return "Vulnerable & Resilient Locations";
     return dataName || "";
   }
 
@@ -1078,7 +1077,7 @@
       kind: "lagging",
       label: "Lagging",
       blurb:
-        "Tracks occurrence, type, trends, and closure of all safety incidents across operations.",
+        "Tracks occurrence, type, trends, and closure of all safety incidents across all verticals.",
     },
     2: {
       kind: "leading",
@@ -1114,25 +1113,24 @@
       kind: "leading",
       label: "Leading / preventive",
       blurb:
-        "Monitors effectiveness and closure of structured risk mitigation initiatives (e.g., SRFA).",
+        "Monitors effectiveness and closure of structured risk mitigation initiatives.",
     },
     8: {
       kind: "strategic",
       label: "Strategic",
-      blurb:
-        "Tracks leadership engagement, safety reviews, and governance effectiveness.",
+      blurb: "",
     },
     9: {
       kind: "leading",
       label: "Leading",
       blurb:
-        "Measures adoption and utilization of safety systems and digital tools.",
+        "Measures adoption and utilization of safety systems, digital tools & technological solutions.",
     },
     10: {
       kind: "lagging",
       label: "Lagging",
       blurb:
-        "Highlights geographic and site-level exposure patterns to prioritize interventions.",
+        "Highlights geographic and site-level exposure patterns to as Resilient & Vulnerable Site prioritize interventions.",
     },
   };
 
@@ -3124,6 +3122,18 @@
       return "rgb(" + r + "," + g + "," + b + ")";
     }
 
+    // compute top5 resilient and bottom5 vulnerable by aggregate sum
+    const sums = [];
+    INDIA_STATES_UT.forEach((nm) => {
+      const a = byState[nm] || { sum: 0, kpiCount: 0, seen: {} };
+      sums.push({ state: nm, sum: a.sum || 0 });
+    });
+    sums.sort((a, b) => b.sum - a.sum);
+    const top5 = sums.slice(0, 5).map((x) => x.state);
+    const bottom5 = sums.slice(-5).map((x) => x.state);
+
+    // Top lists are intentionally not rendered in-page; they are available to the map only.
+
     INDIA_STATES_UT.forEach((nm) => {
       const ll = STATE_CENTROID_BY_STATE[nm];
       if (!ll) return;
@@ -3133,13 +3143,44 @@
       const t = 0.55 * tK + 0.45 * tS;
       const fill = heatColor(t);
       const radius = 6 + agg.kpiCount * 2.2 + Math.min(14, Math.sqrt(agg.sum + 1));
+      // determine resilient/vulnerable membership
+      const isTop = top5.indexOf(nm) !== -1;
+      const isBottom = bottom5.indexOf(nm) !== -1;
+      // read user toggles (default true)
+      const showRes = (() => {
+        const el = document.getElementById("vl-filter-resilient");
+        return el ? !!el.checked : true;
+      })();
+      const showVul = (() => {
+        const el = document.getElementById("vl-filter-vulnerable");
+        return el ? !!el.checked : true;
+      })();
+      // decide visibility and color
+      let strokeCol = "rgba(35,31,32,0.35)";
+      let fillCol = fill;
+      if (isTop) {
+        strokeCol = "#16a34a";
+        fillCol = "#a7f3d0";
+      } else if (isBottom) {
+        strokeCol = "#dc2626";
+        fillCol = "#fca5a5";
+      } else {
+        strokeCol = "rgba(35,31,32,0.25)";
+        fillCol = "rgba(200,200,200,0.18)";
+      }
+      // decide whether to show (always show, but muted if not selected)
+      const showSelectedOnly = !(showRes && showVul);
+      const isSelected =
+        (isTop && showRes) || (isBottom && showVul) || (!isTop && !isBottom && (showRes && showVul));
+      const opacity = isSelected ? 0.9 : 0.28;
+      const weight = isSelected ? 2 : 1;
       const mk = L.circleMarker(ll, {
         radius: radius,
         stroke: true,
-        color: sel && sel === nm ? ADANI_PURPLE : "rgba(35,31,32,0.35)",
-        weight: sel && sel === nm ? 3 : 1,
-        fillColor: fill,
-        fillOpacity: sel && sel !== nm && sel ? 0.28 : 0.88,
+        color: sel && sel === nm ? ADANI_PURPLE : strokeCol,
+        weight: sel && sel === nm ? 3 : weight,
+        fillColor: fillCol,
+        fillOpacity: opacity,
       }).addTo(map);
       mk.bindPopup(
         "<strong>" +
@@ -3164,14 +3205,101 @@
     window.__adaniVlMap = map;
   }
 
+  function renderVulnerableLocationTrend(f) {
+    // simple placeholders or Chart.js rendering if available
+    const el1 = document.getElementById("chart-vl-trend");
+    const el2 = document.getElementById("chart-vl-dist");
+    if (!el1 || !el2) return;
+    // clear any existing charts
+    try {
+      const c1 = Chart.getChart(el1);
+      if (c1) c1.destroy();
+    } catch {}
+    try {
+      const c2 = Chart.getChart(el2);
+      if (c2) c2.destroy();
+    } catch {}
+    // If Chart is available, draw simple demo charts based on available rows
+    const rows = getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY).filter((r) =>
+      VULNERABLE_LOCATION_KPI_KEYS.has(Number(r.kpiKey))
+    );
+    const labels = ["A","B","C","D","E","F"];
+    const data1 = labels.map((_,i) => Math.round(Math.random()*100));
+    const data2 = labels.map((_,i) => Math.round(Math.random()*50));
+    if (typeof Chart !== "undefined") {
+      new Chart(el1, {
+        type: "line",
+        data: { labels: labels, datasets: [{ label: "Demo trend", data: data1, borderColor: ADANI_BLUE, backgroundColor: ADANI_BLUE + "33" }] },
+        options: { responsive: true, maintainAspectRatio: false },
+      });
+      new Chart(el2, {
+        type: "bar",
+        data: { labels: labels, datasets: [{ label: "Demo distribution", data: data2, backgroundColor: ADANI_GREEN }] },
+        options: { responsive: true, maintainAspectRatio: false },
+      });
+    } else {
+      const p1 = el1.parentElement;
+      const p2 = el2.parentElement;
+      if (p1) p1.innerHTML = "<div class='chart-placeholder'>Trend chart (requires Chart.js)</div>";
+      if (p2) p2.innerHTML = "<div class='chart-placeholder'>Distribution chart (requires Chart.js)</div>";
+    }
+    // populate KPI tiles with totals (simple aggregation)
+    const rowsAll = applyNonMonthFiltersAllKpis(getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY), readFilters(VULNERABLE_LOCATION_CATEGORY_KEY));
+    const emp = rowsAll.filter((r)=> r.role === "Employee").reduce((s,r)=> s + Number(r.value || 0),0);
+    const con = rowsAll.filter((r)=> r.role === "Contractor").reduce((s,r)=> s + Number(r.value || 0),0);
+    const total = emp + con;
+    const safe = rowsAll.reduce((s,r)=> s + (Number(r.safeHours||0)),0) || 0;
+    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v); };
+    setText("vl-kpi-emp", emp);
+    setText("vl-kpi-con", con);
+    setText("vl-kpi-total", total);
+    setText("vl-kpi-safe", safe);
+  }
+
   function refreshVulnerableLocationView(catKey) {
     if (Number(catKey) !== VULNERABLE_LOCATION_CATEGORY_KEY) return;
     const f = readFilters(catKey);
     if (!f) return;
     const main = document.getElementById("cat-main-view");
     const mode = main ? main.dataset.view || "map" : "map";
+    // render multi KPI cards for this category (match Incident UI)
+    const kpisMeta = getKpis(catKey);
+    const multiWrap = document.getElementById("multi-kpi-wrap");
+    if (multiWrap) {
+      const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
+      if (!aggList.length) {
+        multiWrap.innerHTML =
+          '<div class="empty-msg" style="padding:8px">No KPI data for this selection. Adjust periods or geography filters.</div>';
+      } else {
+        renderMultiKpiCards(
+          multiWrap,
+          aggList,
+          f,
+          f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi],
+          [
+            String(catKey),
+            f.currentFrom || "",
+            f.currentTo || "",
+            f.comparisonFrom || "",
+            f.comparisonTo || "",
+            f.refMonth || "",
+            f.state || "",
+            (Array.isArray(f.business)
+              ? JSON.stringify(f.business.slice().sort())
+              : String(f.business || "")),
+            String(f.kpi || ""),
+            JSON.stringify(f.kpiKeys || []),
+            JSON.stringify(f.variable || {}),
+          ].join("|"),
+          catKey
+        );
+      }
+    }
+
     if (mode === "map") {
       renderVulnerableLocationMap(f);
+    } else if (mode === "trend") {
+      renderVulnerableLocationTrend(f);
     } else if (mode === "table") {
       renderTableBody(catKey);
     } else {
@@ -3187,15 +3315,18 @@
   function wireCatMainViewVulnerable() {
     const main = document.getElementById("cat-main-view");
     if (!main) return;
+    const tTrend = document.getElementById("view-tab-vl-trend");
     const tMap = document.getElementById("view-tab-vl-map");
     const tTable = document.getElementById("view-tab-vl-table");
     const tCmp = document.getElementById("view-tab-vl-compare");
+    const pTrend = document.getElementById("view-panel-vl-trend");
     const pMap = document.getElementById("view-panel-vl-map");
     const pTable = document.getElementById("view-panel-vl-table");
     const pCmp = document.getElementById("view-panel-vl-compare");
-    if (!tMap || !pMap) return;
+    if (!tTrend || !pTrend || !tMap || !pMap) return;
 
     function apply(mode) {
+      const isTrend = mode === "trend";
       const isMap = mode === "map";
       const isTable = mode === "table";
       const isCmp = mode === "compare";
@@ -3210,8 +3341,9 @@
       );
       if (isMap) main.classList.add("cat-main-view--vl-map");
       else if (isTable) main.classList.add("cat-main-view--vl-table");
-      else main.classList.add("cat-main-view--vl-compare");
-      [tMap, tTable, tCmp].forEach((btn) => {
+      else if (isCmp) main.classList.add("cat-main-view--vl-compare");
+      else if (isTrend) main.classList.add("cat-main-view--charts");
+      [tTrend, tMap, tTable, tCmp].forEach((btn) => {
         if (!btn) return;
         const m = btn.getAttribute("data-view");
         const on = m === mode;
@@ -3219,6 +3351,7 @@
         btn.classList.toggle("view-tabs__btn--active", on);
         btn.tabIndex = on ? 0 : -1;
       });
+      if (pTrend) pTrend.hidden = !isTrend;
       if (pMap) pMap.hidden = !isMap;
       if (pTable) pTable.hidden = !isTable;
       if (pCmp) pCmp.hidden = !isCmp;
@@ -3235,10 +3368,10 @@
       });
     }
 
-    let initial = "map";
+    let initial = "trend";
     try {
       const s = localStorage.getItem(LS_CAT_MAIN_VIEW_VL);
-      if (s === "map" || s === "table" || s === "compare") initial = s;
+      if (s === "map" || s === "table" || s === "compare" || s === "trend") initial = s;
     } catch {
       /* ignore */
     }
@@ -3249,7 +3382,7 @@
       const btn = ev.target.closest("button.view-tabs__btn[data-view]");
       if (!btn || !main.contains(btn)) return;
       const mode = btn.getAttribute("data-view");
-      if (mode !== "map" && mode !== "table" && mode !== "compare") return;
+      if (mode !== "map" && mode !== "table" && mode !== "compare" && mode !== "trend") return;
       const t = Date.now();
       if (t - lastMs < 350) return;
       lastMs = t;
@@ -8319,17 +8452,14 @@
       '<button type="button" class="lc-mode-btn lc-mode-btn--active" id="lc-mode-bu" aria-pressed="true">BU</button>' +
       '<button type="button" class="lc-mode-btn" id="lc-mode-mo" aria-pressed="false">Month</button>' +
       "</div></div>" +
-      '<p class="lc-subtitle" id="lc-matrix-subtitle">BU-wise monthly compliance overview (last 6 months)</p>' +
-      '<details class="lc-objective-details">' +
-      '<summary class="lc-objective-summary">Page objective</summary>' +
-      '<p class="lc-objective"><strong>Objective.</strong> Visualize monthly meeting compliance across 24 business units (BUs), for 7 mandatory meeting types per month, with RAG for quick assessment and drill-down for detail.</p>' +
-      "</details></header>" +
+      '<p class="lc-subtitle" id="lc-matrix-subtitle"></p>' +
+      "</header>" +
       '<div class="lc-primary">' +
       '<div class="lc-legend" aria-label="RAG legend">' +
       '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--g"></span> Green = Full compliance (7/7)</span>' +
-      '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--y"></span> Yellow = Partial (5–6)</span>' +
+      '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--y"></span> Amber = Partial (5–6)</span>' +
       '<span class="lc-legend__item"><span class="lc-legend__sw lc-legend__sw--r"></span> Red = Low (≤4)</span>' +
-      '<span class="lc-legend__item lc-legend__item--note">Cells: colored dot (RAG) + meetings held / 7</span>' +
+      '' +
       "</div>" +
       '<div class="lc-matrix-scroll" tabindex="0">' +
       '<table class="lc-matrix lc-matrix--bu-axis" id="lc-matrix" aria-label="Meeting compliance matrix">' +
@@ -8353,7 +8483,7 @@
       ragEl.innerHTML = ragKeys
         .map((k) => {
           const lab =
-            k === "green" ? "Green" : k === "yellow" ? "Yellow" : "Red";
+            k === "green" ? "Green" : k === "yellow" ? "Amber" : "Red";
           return (
             '<label class="field-variable-check field-variable-check--row">' +
             '<input type="checkbox" class="lc-rag-cb" value="' +
@@ -8514,14 +8644,31 @@
 
       function lcCellInnerHtml(c, rag, filtered) {
         const fade = filtered ? " lc-cell-stack--muted" : "";
+        const pct = Math.round((Number(c) / 7) * 100);
+        const showPctLabel = matrixAxisMode !== "month";
         return (
           '<span class="lc-cell-stack' +
           fade +
-          '"><span class="lc-dot lc-dot--' +
-          rag +
-          '" aria-hidden="true"></span><span class="lc-cell-countline"><span class="lc-cell-count">' +
+          '">' +
+          // progress bar
+          '<span class="lc-progress" role="progressbar" aria-valuemin="0" aria-valuemax="7" aria-valuenow="' +
           String(c) +
-          '</span><span class="lc-cell-suffix">/7</span></span></span>'
+          '">' +
+          '<span class="lc-progress__fill lc-progress__fill--' +
+          rag +
+          '" style="width:' +
+          String(pct) +
+          '%"></span>' +
+          "</span>" +
+          // count line
+          '<span class="lc-cell-countline"><span class="lc-cell-count">' +
+          String(c) +
+          '</span><span class="lc-cell-suffix">/7</span></span>' +
+          // percent label (omit in Month view)
+          (showPctLabel
+            ? '<span class="lc-progress__label">' + String(pct) + "%</span>"
+            : "") +
+          "</span>"
         );
       }
 
@@ -8853,10 +9000,7 @@
         btnMo.setAttribute("aria-pressed", mode === "month" ? "true" : "false");
       }
       if (sub) {
-        sub.textContent =
-          mode === "bu"
-            ? "BU-wise monthly compliance overview (last 6 months)"
-            : "Month-wise BU compliance overview (last 6 months)";
+        sub.textContent = "";
       }
       if (mat) {
         mat.classList.toggle("lc-matrix--bu-axis", mode === "bu");
@@ -9006,8 +9150,7 @@
         btnMo.setAttribute("aria-pressed", "false");
       }
       if (subEl) {
-        subEl.textContent =
-          "BU-wise monthly compliance overview (last 6 months)";
+        subEl.textContent = "";
       }
       if (matEl) {
         matEl.classList.add("lc-matrix--bu-axis");
@@ -9093,16 +9236,51 @@
       "</div></details>" +
       '<button type="button" class="btn btn--reset-compact" id="f-reset">Reset</button>' +
       "</div></div></fieldset></div>" +
-      '<div class="cat-main-view cat-main-view--vl" id="cat-main-view" data-view="map">' +
-      '<div class="view-tabs" role="tablist" aria-label="Map, table, or comparison">' +
-      '<button type="button" role="tab" id="view-tab-vl-map" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-map" data-view="map">Map view</button>' +
+      // KPI surface (four KPI tiles)
+      '<div class="cat-main-kpis" id="cat-main-kpis">' +
+      '<div class="kpi-row vl-kpi-row">' +
+      '<div class="vl-kpi"><div class="vl-kpi__label">Total man hours (employees)</div><div class="vl-kpi__value" id="vl-kpi-emp"></div></div>' +
+      '<div class="vl-kpi"><div class="vl-kpi__label">Total man hours (contractors)</div><div class="vl-kpi__value" id="vl-kpi-con"></div></div>' +
+      '<div class="vl-kpi"><div class="vl-kpi__label">Total man hours (emp + con)</div><div class="vl-kpi__value" id="vl-kpi-total"></div></div>' +
+      '<div class="vl-kpi"><div class="vl-kpi__label">Total safe man hours</div><div class="vl-kpi__value" id="vl-kpi-safe"></div></div>' +
+      "</div></div>" +
+      '<div class="cat-main-view cat-main-view--vl" id="cat-main-view" data-view="trend">' +
+      '<div class="view-tabs" role="tablist" aria-label="Trend, table, comparison or map">' +
+      '<button type="button" role="tab" id="view-tab-vl-trend" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-trend" data-view="trend">Trend &amp; Distribution</button>' +
       '<button type="button" role="tab" id="view-tab-vl-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-table" tabindex="-1" data-view="table">Table view</button>' +
       '<button type="button" role="tab" id="view-tab-vl-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-compare" tabindex="-1" data-view="compare">Comparison view</button>' +
+      '<button type="button" role="tab" id="view-tab-vl-map" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-map" tabindex="-1" data-view="map">Map view</button>' +
       "</div>" +
-      '<div id="view-panel-vl-map" class="view-panel view-panel--vl-map" role="tabpanel" aria-labelledby="view-tab-vl-map">' +
+      // Trend & Distribution panel (two charts)
+      '<div id="view-panel-vl-trend" class="view-panel view-panel--vl-trend" role="tabpanel" aria-labelledby="view-tab-vl-trend">' +
+      '<div class="chart-row">' +
+      '<div class="chart-box chart-box--vl-trend">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label" id="chart-vl-trend-title">Trend — selected KPI</span>',
+        "chart-vl-trend",
+        "vl-trend",
+        CHART_HELP.trend
+      ) +
+      '<div class="chart-canvas-wrap"><canvas id="chart-vl-trend" role="img" aria-label="Trend chart"></canvas></div></div>' +
+      '<div class="chart-box chart-box--vl-dist">' +
+      chartBlockTitleHtml(
+        '<span class="chart-analytics-title__label" id="chart-vl-dist-title">Distribution — selected KPI</span>',
+        "chart-vl-dist",
+        "vl-dist",
+        CHART_HELP.dist
+      ) +
+      '<div class="chart-canvas-wrap"><canvas id="chart-vl-dist" role="img" aria-label="Distribution chart"></canvas></div></div>' +
+      "</div></div>" +
+      '<div id="view-panel-vl-map" class="view-panel view-panel--vl-map" role="tabpanel" aria-labelledby="view-tab-vl-map" hidden>' +
       '<div class="vl-map-wrap">' +
-      '<div id="vl-leaflet-map" class="vl-map-host" role="application" aria-label="India map: hazard KPI signals by state and UT"></div>' +
-      '<p class="vl-map-legend" id="vl-map-legend">Markers cover every state/UT. Size scales with Σ of mapped KPI values in the current period; colour blends KPI coverage (how many of the seven measures have rows) with that total. The map always shows all states; use the State control to narrow Table and Comparison.</p>' +
+      // map controls: resilient/vulnerable toggles and top5 lists
+      '<div class="vl-map-controls">' +
+      '<label class="vl-map-controls__lbl"><input type="checkbox" id="vl-filter-resilient" checked /> Resilient sites</label>' +
+      '<label class="vl-map-controls__lbl"><input type="checkbox" id="vl-filter-vulnerable" checked /> Vulnerable sites</label>' +
+      "</div>" +
+      '' +
+      '<div id="vl-leaflet-map" class="vl-map-host" role="application" aria-label="India map: vulnerable & resilient locations"></div>' +
+      '<p class="vl-map-legend" id="vl-map-legend">Markers show top resilient and vulnerable locations. Use the toggles to highlight categories; the rest are shown in muted colour.</p>' +
       "</div></div>" +
       '<div id="view-panel-vl-table" class="view-panel view-panel--vl-table" role="tabpanel" aria-labelledby="view-tab-vl-table" hidden>' +
       '<div class="table-zone">' +
@@ -9129,7 +9307,7 @@
       '<th scope="col" class="bu-matrix__th-bu">State / UT</th>' +
       "</tr></thead>" +
       '<tbody id="tbl-body"></tbody></table>' +
-      "</div></div></div>" +
+      "</div></div>" +
       comparePanelHtml +
       "</div>" +
       '<p class="cat-context" id="cat-context">' +
@@ -9173,6 +9351,11 @@
     const h = document.getElementById("cat-heading");
     if (h) h.focus();
     updateHeaderNavState();
+    // wire map filter toggles (resilient / vulnerable)
+    const rChk = document.getElementById("vl-filter-resilient");
+    const vChk = document.getElementById("vl-filter-vulnerable");
+    if (rChk) rChk.addEventListener("change", () => refreshVulnerableLocationView(catKey));
+    if (vChk) vChk.addEventListener("change", () => refreshVulnerableLocationView(catKey));
   }
 
   function renderCategory(catKey) {
