@@ -490,7 +490,7 @@
     const extraMeta = [
       {
         kpiKey: INCIDENT_FIRE_KPI_KEY,
-        kpiName: "Fire Incident Count",
+        kpiName: "Fire incidents Count",
         unitType: "Count",
         latestValue: 0,
       },
@@ -561,6 +561,51 @@
       }
     }
     DATA.factRows.push(...newRows);
+  }
+
+  /** Incident Data (category 1): approved KPI titles + sync `kpiDetailByCategory` and fact rows. */
+  function previewApplyIncidentKpiDisplayNames() {
+    if (!DATA) return;
+    const INC_CAT = 1;
+    const LABEL = {
+      1: "Process safety Incidents",
+      2: "Process Safety Near Misses",
+      3: "Leak/spill count",
+      4: "Total Recordable Injuries",
+      5: "Repeat incident cases (cat 0 to 5) count",
+      7: "Dangerous occurrence count",
+      8: "Fatality Count",
+      9: "LTI Count",
+      10: "MTC Count",
+      11: "RWC Count",
+      12: "FAC Count",
+      14: "Delta of LTI count",
+      15: "Delta of Repeat incident count",
+      19: "Delta of Fatal incident",
+      22: "Total Man day lost",
+      28: "Total Vehicle incidents count",
+      44: "Investigations Closure %",
+      56: "Fire incidents Count",
+      57: "Property Damage Count",
+    };
+    const blocks = Array.isArray(DATA.kpiDetailByCategory)
+      ? DATA.kpiDetailByCategory
+      : [];
+    const detail = blocks.find((x) => Number(x.categoryKey) === INC_CAT);
+    if (detail && Array.isArray(detail.kpis)) {
+      detail.kpis.forEach((k) => {
+        const kk = Number(k.kpiKey);
+        if (LABEL[kk]) k.kpiName = LABEL[kk];
+      });
+    }
+    if (Array.isArray(DATA.factRows)) {
+      for (let i = 0; i < DATA.factRows.length; i++) {
+        const r = DATA.factRows[i];
+        if (Number(r.categoryKey) !== INC_CAT) continue;
+        const kk = Number(r.kpiKey);
+        if (LABEL[kk]) r.kpiName = LABEL[kk];
+      }
+    }
   }
 
   /**
@@ -1024,6 +1069,7 @@
 
   previewApplyDataMetaTitles();
   previewAddIncidentFirePropertyKpis();
+  previewApplyIncidentKpiDisplayNames();
   previewCategoryDataBootstrap();
   previewAddHazardSiPlannedActualKpi();
   previewStripRiskControlAssuranceDuplicateKpis();
@@ -4539,8 +4585,8 @@
   }
 
   /**
-   * Incident Management: stakeholder order (Fatality → … → Investigation Closure %).
-   * Keys: 56/57 = Fire incidents / Property Damage incidents (preview-seeded).
+   * Incident Data: sequence Fatality → FAC → … → Fire → Man day → PSI/PSNM →
+   * Investigations % → Deltas → Property damage → TRIR (preview-seeded 56/57).
    */
   const INCIDENT_KPI_ORDER = [
     8,
@@ -4548,20 +4594,21 @@
     10,
     11,
     12,
-    19,
-    14,
-    22,
     4,
     3,
-    7,
     28,
+    5,
+    7,
     INCIDENT_FIRE_KPI_KEY,
-    INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
+    22,
     1,
     2,
-    5,
-    15,
     44,
+    14,
+    15,
+    19,
+    INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
+    21,
   ];
   /**
    * Hazard & Observation (leading): stakeholder sequence
