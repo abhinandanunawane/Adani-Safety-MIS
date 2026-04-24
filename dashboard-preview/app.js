@@ -106,6 +106,17 @@
   if (!DATA.monthlyByCategory) DATA.monthlyByCategory = [];
   if (!DATA.businessBreakdown) DATA.businessBreakdown = [];
 
+  (function patchTrainingKpiDisplayNames() {
+    function fixName(o) {
+      if (!o || o.kpiName !== "Training Count") return;
+      o.kpiName = "Training Program Count";
+    }
+    (DATA.kpiDetailByCategory || []).forEach((block) => {
+      (block.kpis || []).forEach(fixName);
+    });
+    (DATA.factRows || []).forEach(fixName);
+  })();
+
   /**
    * Category Selection page: display order, names, and card descriptions (workbook "Categories" sheet).
    * sortOrder controls grid order; categoryKey stays stable for routes and data joins.
@@ -1030,6 +1041,8 @@
 
   let currentCategoryKey = null;
   let catSearchAnnounceTimer = null;
+  /** Retries `buildBuComparisonChart` when Chart.js is still loading (defer). */
+  let vlBuCompareChartAttempts = 0;
 
   const INCIDENT_MANAGEMENT_CATEGORY_KEY = 1;
   const SPI_CATEGORY_KEY = 3;
@@ -1117,7 +1130,7 @@
     },
     8: {
       kind: "strategic",
-      label: "Strategic",
+      label: "Strategic Overview",
       blurb: "",
     },
     9: {
@@ -1127,20 +1140,21 @@
         "Measures adoption and utilization of safety systems, digital tools & technological solutions.",
     },
     10: {
-      kind: "lagging",
-      label: "Lagging",
+      kind: "strategic",
+      label: "Strategic Overview",
       blurb:
         "Highlights geographic and site-level exposure patterns to as Resilient & Vulnerable Site prioritize interventions.",
     },
   };
 
-  /** Subtitle under main title on category drill (#cat=…): category name + (Lagging)/(Leading)/(Strategic). */
+  /** Subtitle under main title on category drill (#cat=…): category name + (Lagging)/(Leading)/(Strategic Overview). */
   function categoryNatureBracketSuffix(catKey) {
     const n = CATEGORY_NATURE_BY_KEY[Number(catKey)];
     if (!n) return "";
     if (n.kind === "lagging") return " (Lagging)";
     if (n.kind === "leading") return " (Leading)";
-    if (n.kind === "strategic") return " (Strategic)";
+    if (n.kind === "strategic")
+      return " (" + (n.label || "Strategic Overview") + ")";
     return "";
   }
 
@@ -1150,7 +1164,7 @@
     if (n.kind === "lagging")
       return { label: "Lagging", chipKind: "lagging" };
     if (n.kind === "strategic")
-      return { label: "Strategic", chipKind: "leading" };
+      return { label: n.label || "Strategic Overview", chipKind: "leading" };
     return { label: "Leading", chipKind: "leading" };
   }
   /** Adani approved palette — #00B16B #006DB6 #8E278F #F04C23 #E6E7E8 (charts: KPI dashboard only). */
@@ -1438,7 +1452,7 @@
 
   const CHART_HELP = {
     trend:
-      "Insight: Month-on-month trend for the active KPI.\nUses: Selected KPI(s), Current Period, Comparison Period, Business unit, State, Site, Personnel type, Verticals.\nExport: JPEG via camera icon.",
+      "Insight: Month-on-month trend for the active KPI.\nUses: Selected KPI(s), Current Period, Comparison Period, Business, State, Site, Personnel Type, Verticals.\nExport: JPEG via camera icon.",
     spiTrend:
       "Insight: How each Safety Performance Index KPI moves over the last months.\nUses: All SPI KPIs in parallel, same global filters and calendar end month as the page.\nExport: JPEG.",
     hazardHeat:
@@ -1457,6 +1471,8 @@
       "Insight: Line across verticals for the active KPI (latest month slice).\nUses: KPI selection, Vertical scope, Business / State filters.\nExport: JPEG.",
     compareBu:
       "Insight: Grouped bars — Comparison Period vs Current Period for the active KPI, every BU.\nUses: Current and Comparison period ranges, KPI selection, filters.\nExport: JPEG.",
+    compareBuVl:
+      "Insight: Grouped bars by business unit — same KPI aggregated for the current period, split between sites in resilient states (top 5) and vulnerable states (bottom 5) using the same map ranking.\nUses: Current period window, KPI selection, business / site / vertical filters.\nExport: JPEG.",
   };
 
   /** Chart "i" tooltip: keep Insight block only (drops Uses / Export lines). */
@@ -1511,7 +1527,7 @@
       }
     }
     if (f.personalType && f.personalType !== "all") {
-      parts.push("Personnel: " + String(f.personalType));
+      parts.push("Personnel type: " + String(f.personalType));
     }
     if (f.variable && f.variable.length) {
       parts.push(
@@ -1681,11 +1697,11 @@
       .join("");
     return (
       '<div class="field field--toolbar-scope field--biz-site-scope">' +
-      '<span class="field-label" id="f-biz-field-lbl">Business unit</span>' +
+      '<span class="field-label" id="f-biz-field-lbl">Business</span>' +
       '<details class="kpi-scope kpi-scope--toolbar" id="f-biz-details">' +
-      '<summary class="kpi-scope__summary" aria-labelledby="f-biz-field-lbl" title="Business unit">' +
+      '<summary class="kpi-scope__summary" aria-labelledby="f-biz-field-lbl" title="Business">' +
       '<span class="kpi-scope__summary-text">' +
-      '<span class="kpi-scope__title">Business unit</span>' +
+      '<span class="kpi-scope__title">Business</span>' +
       '<span class="kpi-scope__count" id="f-biz-hint"></span>' +
       "</span></summary>" +
       '<div class="kpi-panel" id="f-biz-panel" role="group" aria-labelledby="f-biz-field-lbl">' +
@@ -1793,9 +1809,9 @@
   function variableFilterFieldHtml() {
     return (
       '<div class="field field--variable field--var-inline">' +
-      '<span class="field-label" id="f-var-lbl">Vertical</span>' +
+      '<span class="field-label" id="f-var-lbl">Verticals</span>' +
       '<details class="var-scope var-scope--toolbar" id="f-var-details">' +
-      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl" title="Vertical">' +
+      '<summary class="var-scope__summary" aria-labelledby="f-var-lbl" title="Verticals">' +
       '<span class="var-scope__summary-text">' +
       '<span class="var-scope__hint" id="f-var-hint">All verticals</span>' +
       "</span>" +
@@ -3029,16 +3045,23 @@
 
     apply(initial);
 
-    /** Delegated tab switch — pointerup + click (debounced: same tap fires both on many devices) */
+    /** Delegated tab switch — pointerup + click (dedupe only duplicate events for same tab) */
     let viewTabLastMs = 0;
+    let viewTabLastMode = "";
     function onViewTabActivate(ev) {
       const btn = ev.target.closest("button.view-tabs__btn[data-view]");
       if (!btn || !main.contains(btn)) return;
       const mode = btn.getAttribute("data-view");
       if (mode !== "charts" && mode !== "table" && mode !== "compare") return;
       const t = Date.now();
-      if (t - viewTabLastMs < 350) return;
+      if (
+        mode === viewTabLastMode &&
+        t - viewTabLastMs < 350
+      ) {
+        return;
+      }
       viewTabLastMs = t;
+      viewTabLastMode = mode;
       apply(mode);
     }
     main.addEventListener("pointerup", onViewTabActivate);
@@ -3054,30 +3077,8 @@
     );
   }
 
-  function renderVulnerableLocationMap(f) {
-    const host = document.getElementById("vl-leaflet-map");
-    if (!host) return;
-    if (window.__adaniVlMap) {
-      try {
-        window.__adaniVlMap.remove();
-      } catch {
-        /* ignore */
-      }
-      window.__adaniVlMap = null;
-    }
-    host.innerHTML = "";
-    if (typeof L === "undefined") {
-      host.innerHTML =
-        '<p class="vl-map-fallback" role="status">Map preview needs Leaflet (check network) and a local HTTP server.</p>';
-      return;
-    }
-    const inner = document.createElement("div");
-    inner.className = "vl-leaflet-map-inner";
-    inner.id = "vl-leaflet-map-inner";
-    host.appendChild(inner);
-
-    const winM = new Set(effectiveBizWindowMonths(f));
-    const snap = vulnerableLocationMapRows(f).filter((r) => winM.has(r.yearMonth));
+  /** State/UT rollups + top/bottom five (resilient / vulnerable) for map and charts. */
+  function vulnerableLocationStateRankingFromSnap(snap) {
     const byState = {};
     for (let i = 0; i < snap.length; i++) {
       const r = snap[i];
@@ -3102,6 +3103,91 @@
       if (a.kpiCount > maxKpi) maxKpi = a.kpiCount;
       if (a.sum > maxSum) maxSum = a.sum;
     });
+    const sums = [];
+    INDIA_STATES_UT.forEach((nm) => {
+      const a = byState[nm] || { sum: 0, kpiCount: 0, seen: {} };
+      sums.push({ state: nm, sum: a.sum || 0 });
+    });
+    sums.sort((a, b) => b.sum - a.sum);
+    const top5 = sums.slice(0, 5).map((x) => x.state);
+    const bottom5 = sums.slice(-5).map((x) => x.state);
+    return { byState, top5, bottom5, maxKpi, maxSum };
+  }
+
+  function vulnerableLocationStateRankingFromFilters(f) {
+    const winM = new Set(effectiveBizWindowMonths(f));
+    const snap = vulnerableLocationMapRows(f).filter((r) => winM.has(r.yearMonth));
+    return vulnerableLocationStateRankingFromSnap(snap);
+  }
+
+  /** Preview-only man-hour tiles (deterministic from filters). */
+  function vulnerableLocationDummyManHours(f) {
+    const seed =
+      String(f.currentFrom || "") +
+      "|" +
+      String(f.currentTo || "") +
+      "|" +
+      String(f.comparisonFrom || "") +
+      "|" +
+      String(f.comparisonTo || "") +
+      "|" +
+      (Array.isArray(f.business)
+        ? f.business.join("+")
+        : String(f.business || "")) +
+      "|" +
+      (Array.isArray(f.site) ? f.site.join("+") : String(f.site || "")) +
+      "|" +
+      JSON.stringify(f.variable || {});
+    const emp = 1280400 + (Math.abs(hash32(seed + "|emp")) % 498000);
+    const con = 915200 + (Math.abs(hash32(seed + "|con")) % 362000);
+    const total = emp + con;
+    const safeFrac = 0.912 + (Math.abs(hash32(seed + "|safe")) % 65) / 1000;
+    const safe = Math.round(total * safeFrac);
+    return { emp: emp, con: con, total: total, safe: safe };
+  }
+
+  function populateVulnerableLocationManHourTiles(f) {
+    const d = vulnerableLocationDummyManHours(f);
+    const fmt = (n) =>
+      Number(n).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    const setText = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = v;
+    };
+    setText("vl-kpi-emp", fmt(d.emp));
+    setText("vl-kpi-con", fmt(d.con));
+    setText("vl-kpi-total", fmt(d.total));
+    setText("vl-kpi-safe", fmt(d.safe));
+  }
+
+  function renderVulnerableLocationMap(f) {
+    const host = document.getElementById("vl-leaflet-map");
+    if (!host) return;
+    if (window.__adaniVlMap) {
+      try {
+        window.__adaniVlMap.remove();
+      } catch {
+        /* ignore */
+      }
+      window.__adaniVlMap = null;
+    }
+    host.innerHTML = "";
+    if (typeof L === "undefined") {
+      host.innerHTML =
+        '<p class="vl-map-fallback" role="status">Map preview needs Leaflet (check network) and a local HTTP server.</p>';
+      return;
+    }
+    const inner = document.createElement("div");
+    inner.className = "vl-leaflet-map-inner";
+    inner.id = "vl-leaflet-map-inner";
+    host.appendChild(inner);
+
+    const rank = vulnerableLocationStateRankingFromFilters(f);
+    const byState = rank.byState;
+    const maxKpi = rank.maxKpi;
+    const maxSum = rank.maxSum;
+    const top5 = rank.top5;
+    const bottom5 = rank.bottom5;
 
     const map = L.map(inner, {
       zoomControl: true,
@@ -3121,18 +3207,6 @@
       const b = Math.round(250 + (107 - 250) * u);
       return "rgb(" + r + "," + g + "," + b + ")";
     }
-
-    // compute top5 resilient and bottom5 vulnerable by aggregate sum
-    const sums = [];
-    INDIA_STATES_UT.forEach((nm) => {
-      const a = byState[nm] || { sum: 0, kpiCount: 0, seen: {} };
-      sums.push({ state: nm, sum: a.sum || 0 });
-    });
-    sums.sort((a, b) => b.sum - a.sum);
-    const top5 = sums.slice(0, 5).map((x) => x.state);
-    const bottom5 = sums.slice(-5).map((x) => x.state);
-
-    // Top lists are intentionally not rendered in-page; they are available to the map only.
 
     INDIA_STATES_UT.forEach((nm) => {
       const ll = STATE_CENTROID_BY_STATE[nm];
@@ -3206,11 +3280,11 @@
   }
 
   function renderVulnerableLocationTrend(f) {
-    // simple placeholders or Chart.js rendering if available
     const el1 = document.getElementById("chart-vl-trend");
     const el2 = document.getElementById("chart-vl-dist");
+    const tTitle = document.getElementById("chart-vl-trend-title");
+    const dTitle = document.getElementById("chart-vl-dist-title");
     if (!el1 || !el2) return;
-    // clear any existing charts
     try {
       const c1 = Chart.getChart(el1);
       if (c1) c1.destroy();
@@ -3219,23 +3293,145 @@
       const c2 = Chart.getChart(el2);
       if (c2) c2.destroy();
     } catch {}
-    // If Chart is available, draw simple demo charts based on available rows
-    const rows = getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY).filter((r) =>
-      VULNERABLE_LOCATION_KPI_KEYS.has(Number(r.kpiKey))
+
+    const pk =
+      f.kpiKeys && f.kpiKeys.length
+        ? String(f.kpiKeys[0])
+        : String(f.kpi);
+    const kMeta = getKpis(VULNERABLE_LOCATION_CATEGORY_KEY).find(
+      (x) => String(x.kpiKey) === pk
     );
-    const labels = ["A","B","C","D","E","F"];
-    const data1 = labels.map((_,i) => Math.round(Math.random()*100));
-    const data2 = labels.map((_,i) => Math.round(Math.random()*50));
+    const kLabel = kMeta ? kpiDropdownLabel(kMeta) : "KPI " + pk;
+    if (tTitle) {
+      tTitle.textContent =
+        "Trend — " + kLabel + " (resilient vs vulnerable locations)";
+    }
+    if (dTitle) {
+      dTitle.textContent =
+        "Distribution — " + kLabel + " (latest month in current period)";
+    }
+
+    const rank = vulnerableLocationStateRankingFromFilters(f);
+    const topSet = new Set(rank.top5);
+    const botSet = new Set(rank.bottom5);
+    const basePool = applyNonMonthFiltersAllKpis(
+      getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY),
+      f
+    );
+    const months = currentPeriodMonthList(f);
+
+    function monthAgg(stateSet, ym) {
+      if (!kMeta || !ym) return null;
+      const kk = kMeta.kpiKey;
+      const ut = kMeta.unitType || "";
+      const rows = basePool.filter(
+        (r) =>
+          String(r.kpiKey) === String(kk) &&
+          String(r.yearMonth) === String(ym) &&
+          stateSet.has(String(r.state || "").trim())
+      );
+      if (!rows.length) return null;
+      if (isAdditiveUnit(ut)) {
+        return rows.reduce((s, r) => s + Number(r.value || 0), 0);
+      }
+      return avg(rows.map((r) => r.value));
+    }
+
+    const labels = months.length
+      ? months.map((ym) => formatMonthYear(ym))
+      : ["—"];
+    const resData = months.length
+      ? months.map((ym) => monthAgg(topSet, ym) ?? 0)
+      : [0];
+    const vulData = months.length
+      ? months.map((ym) => monthAgg(botSet, ym) ?? 0)
+      : [0];
+    const lastM = months.length ? months[months.length - 1] : null;
+    const distLabels = ["Resilient (top 5 states)", "Vulnerable (bottom 5 states)"];
+    const distData = lastM
+      ? [
+          monthAgg(topSet, lastM) ?? 0,
+          monthAgg(botSet, lastM) ?? 0,
+        ]
+      : [0, 0];
+
+    const vlLegendBottom = {
+      display: true,
+      position: "bottom",
+      align: "center",
+      labels: {
+        boxWidth: 10,
+        padding: 6,
+        font: { size: 9, family: FONT_UI },
+        color: CHART_INK,
+      },
+    };
+    const vlChartPlugins = {
+      legend: vlLegendBottom,
+      subtitle: {
+        display: true,
+        text:
+          "Legend: resilient = top 5 states/UTs by combined KPI values in the map window; vulnerable = bottom 5 (same rule as map markers).",
+        color: CHART_INK,
+        font: { size: 8.5, family: FONT_UI },
+        padding: { bottom: 2 },
+      },
+    };
+
     if (typeof Chart !== "undefined") {
       new Chart(el1, {
         type: "line",
-        data: { labels: labels, datasets: [{ label: "Demo trend", data: data1, borderColor: ADANI_BLUE, backgroundColor: ADANI_BLUE + "33" }] },
-        options: { responsive: true, maintainAspectRatio: false },
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: "Resilient locations (top 5 states)",
+              data: resData,
+              borderColor: "#34d399",
+              backgroundColor: "rgba(52, 211, 153, 0.12)",
+              tension: 0.2,
+              fill: true,
+              borderWidth: 2,
+              pointRadius: 3,
+            },
+            {
+              label: "Vulnerable locations (bottom 5 states)",
+              data: vulData,
+              borderColor: "#fb7185",
+              backgroundColor: "rgba(251, 113, 133, 0.12)",
+              tension: 0.2,
+              fill: true,
+              borderWidth: 2,
+              pointRadius: 3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          plugins: vlChartPlugins,
+        },
       });
       new Chart(el2, {
         type: "bar",
-        data: { labels: labels, datasets: [{ label: "Demo distribution", data: data2, backgroundColor: ADANI_GREEN }] },
-        options: { responsive: true, maintainAspectRatio: false },
+        data: {
+          labels: distLabels,
+          datasets: [
+            {
+              label: kLabel + " · latest month",
+              data: distData,
+              backgroundColor: ["rgba(52, 211, 153, 0.55)", "rgba(251, 113, 133, 0.55)"],
+              borderColor: ["#34d399", "#fb7185"],
+              borderWidth: 1,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: vlChartPlugins,
+        },
       });
     } else {
       const p1 = el1.parentElement;
@@ -3243,25 +3439,15 @@
       if (p1) p1.innerHTML = "<div class='chart-placeholder'>Trend chart (requires Chart.js)</div>";
       if (p2) p2.innerHTML = "<div class='chart-placeholder'>Distribution chart (requires Chart.js)</div>";
     }
-    // populate KPI tiles with totals (simple aggregation)
-    const rowsAll = applyNonMonthFiltersAllKpis(getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY), readFilters(VULNERABLE_LOCATION_CATEGORY_KEY));
-    const emp = rowsAll.filter((r)=> r.role === "Employee").reduce((s,r)=> s + Number(r.value || 0),0);
-    const con = rowsAll.filter((r)=> r.role === "Contractor").reduce((s,r)=> s + Number(r.value || 0),0);
-    const total = emp + con;
-    const safe = rowsAll.reduce((s,r)=> s + (Number(r.safeHours||0)),0) || 0;
-    const setText = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = String(v); };
-    setText("vl-kpi-emp", emp);
-    setText("vl-kpi-con", con);
-    setText("vl-kpi-total", total);
-    setText("vl-kpi-safe", safe);
   }
 
   function refreshVulnerableLocationView(catKey) {
     if (Number(catKey) !== VULNERABLE_LOCATION_CATEGORY_KEY) return;
     const f = readFilters(catKey);
     if (!f) return;
+    populateVulnerableLocationManHourTiles(f);
     const main = document.getElementById("cat-main-view");
-    const mode = main ? main.dataset.view || "map" : "map";
+    const mode = main ? main.dataset.view || "trend" : "trend";
     // render multi KPI cards for this category (match Incident UI)
     const kpisMeta = getKpis(catKey);
     const multiWrap = document.getElementById("multi-kpi-wrap");
@@ -3323,7 +3509,9 @@
     const pMap = document.getElementById("view-panel-vl-map");
     const pTable = document.getElementById("view-panel-vl-table");
     const pCmp = document.getElementById("view-panel-vl-compare");
-    if (!tTrend || !pTrend || !tMap || !pMap) return;
+    if (!tTrend || !pTrend || !tMap || !pMap || !tTable || !pTable || !tCmp || !pCmp) {
+      return;
+    }
 
     function apply(mode) {
       const isTrend = mode === "trend";
@@ -3368,6 +3556,24 @@
       });
     }
 
+    /** Same pattern as `wireCatMainViewIndex`: delegate on #cat-main-view so tabs always work
+     * even if initial `apply()` throws during chart/table render. Dedupe pointerup+click per tab. */
+    let vlTabLastMs = 0;
+    let vlTabLastMode = "";
+    function onVlViewTabActivate(ev) {
+      const btn = ev.target.closest("button.view-tabs__btn[data-view]");
+      if (!btn || !main.contains(btn)) return;
+      const mode = btn.getAttribute("data-view");
+      if (mode !== "map" && mode !== "table" && mode !== "compare" && mode !== "trend") return;
+      const t = Date.now();
+      if (mode === vlTabLastMode && t - vlTabLastMs < 350) return;
+      vlTabLastMs = t;
+      vlTabLastMode = mode;
+      apply(mode);
+    }
+    main.addEventListener("pointerup", onVlViewTabActivate);
+    main.addEventListener("click", onVlViewTabActivate);
+
     let initial = "trend";
     try {
       const s = localStorage.getItem(LS_CAT_MAIN_VIEW_VL);
@@ -3375,21 +3581,11 @@
     } catch {
       /* ignore */
     }
-    apply(initial);
-
-    let lastMs = 0;
-    function onTab(ev) {
-      const btn = ev.target.closest("button.view-tabs__btn[data-view]");
-      if (!btn || !main.contains(btn)) return;
-      const mode = btn.getAttribute("data-view");
-      if (mode !== "map" && mode !== "table" && mode !== "compare" && mode !== "trend") return;
-      const t = Date.now();
-      if (t - lastMs < 350) return;
-      lastMs = t;
-      apply(mode);
+    try {
+      apply(initial);
+    } catch {
+      /* Initial chart/table render can throw; tab handlers are already wired. */
     }
-    main.addEventListener("pointerup", onTab);
-    main.addEventListener("click", onTab);
   }
 
   /** Distinct hues for radar spokes (one color per business unit). */
@@ -3792,7 +3988,8 @@
     const el = document.getElementById("tbl-zone-label");
     if (!el || !f) return;
     if (Number(currentCategoryKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
-      el.textContent = "State vs hazard KPIs (current period window)";
+      el.textContent =
+        "Business, site & KPIs (current period window)";
       return;
     }
     const singleSite =
@@ -4236,6 +4433,23 @@
   }
 
 
+  /**
+   * Preview-only: scale VL fact values by state index so top/bottom five states
+   * (by combined KPI sum) separate clearly — trend, comparison, and map show green vs red.
+   */
+  function vlFactRowPreviewContrast(r) {
+    const st = String(r.state || "").trim();
+    const idx = INDIA_STATES_UT.indexOf(st);
+    if (idx === -1) return r;
+    const v = Number(r.value);
+    if (!Number.isFinite(v)) return r;
+    const n = INDIA_STATES_UT.length;
+    const t = n > 1 ? idx / (n - 1) : 0;
+    const mult = 2.35 - t * 1.75;
+    const nv = Math.max(0.0001, v * mult);
+    return Object.assign({}, r, { value: nv });
+  }
+
   function getRowsForCategory(catKey) {
     const ck = Number(catKey);
     if (ck === VULNERABLE_LOCATION_CATEGORY_KEY) {
@@ -4243,7 +4457,9 @@
       return DATA.factRows
         .filter((r) => VULNERABLE_LOCATION_KPI_KEYS.has(Number(r.kpiKey)))
         .map((r) =>
-          Object.assign({}, r, { categoryKey: VULNERABLE_LOCATION_CATEGORY_KEY })
+          vlFactRowPreviewContrast(
+            Object.assign({}, r, { categoryKey: VULNERABLE_LOCATION_CATEGORY_KEY })
+          )
         );
     }
     return DATA.factRows.filter((r) => Number(r.categoryKey) === ck);
@@ -4888,6 +5104,51 @@
     };
   }
 
+  /**
+   * One BU × KPI — aggregate **current period** months only, rows whose state is in `stateSet`.
+   * Used for Strategic Overview comparison: resilient vs vulnerable states per BU.
+   */
+  function buKpiCurrentPeriodForStateSet(basePool, buName, kpiMeta, f, stateSet) {
+    const kk = kpiMeta.kpiKey;
+    const ut = kpiMeta.unitType;
+    const bu = factBusinessNameForPreview(buName);
+    const curM = currentPeriodMonthList(f);
+    const stSet =
+      stateSet instanceof Set
+        ? stateSet
+        : new Set(
+            Array.from(stateSet || []).map((s) => String(s || "").trim()).filter(Boolean)
+          );
+
+    function aggregateOverMonths(months) {
+      const add = isAdditiveUnit(ut);
+      function aggMonth(ym) {
+        if (!ym) return null;
+        const rows = basePool.filter(
+          (r) =>
+            String(r.kpiKey) === String(kk) &&
+            String(r.yearMonth) === String(ym) &&
+            String(r.businessName || "").trim() === bu &&
+            stSet.has(String(r.state || "").trim())
+        );
+        if (!rows.length) return null;
+        if (add) {
+          return rows.reduce((a, r) => a + Number(r.value), 0);
+        }
+        return avg(rows.map((r) => r.value));
+      }
+      const vals = months
+        .map(aggMonth)
+        .filter((v) => v != null && !Number.isNaN(v));
+      if (!vals.length) return null;
+      if (add) return vals.reduce((a, b) => a + b, 0);
+      return avg(vals);
+    }
+
+    const v = aggregateOverMonths(curM);
+    return v != null && !Number.isNaN(Number(v)) ? Number(v) : null;
+  }
+
   /** Vs % for one Site × KPI (dummy site label) within filtered business slice. */
   function siteKpiVsPct(basePool, siteLabel, kpiMeta, f) {
     const kk = kpiMeta.kpiKey;
@@ -5299,15 +5560,225 @@
     container.appendChild(rowMain);
   }
 
+  /** Strategic Overview: grouped bars per BU — resilient (top 5 states) vs vulnerable (bottom 5) for current period. */
+  function buildVulnerableLocationResilientVsVulnerableBuComparison(
+    catKey,
+    f,
+    el,
+    hint,
+    titleEl,
+    mode
+  ) {
+    if (mode.singleSite) {
+      if (hint) {
+        hint.textContent =
+          "Single site selected · resilient vs vulnerable comparison by business unit is hidden · " +
+          comparisonVsPeriodCaption(f);
+      }
+      if (titleEl) {
+        titleEl.textContent = "Resilient vs vulnerable sites — by business unit";
+      }
+      return;
+    }
+    const pk =
+      f.kpiKeys && f.kpiKeys.length
+        ? String(f.kpiKeys[0])
+        : String(f.kpi);
+    let kMeta = getKpis(catKey).find((x) => String(x.kpiKey) === pk);
+    if (!kMeta) {
+      const ordered = sortKpisForDisplay(catKey, getKpis(catKey));
+      kMeta = ordered[0];
+    }
+    if (!kMeta) return;
+
+    const rank = vulnerableLocationStateRankingFromFilters(f);
+    const resSet = new Set(
+      (rank.top5 || []).map((s) => String(s || "").trim()).filter(Boolean)
+    );
+    const vulSet = new Set(
+      (rank.bottom5 || []).map((s) => String(s || "").trim()).filter(Boolean)
+    );
+    const basePool = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
+    const bus = PREVIEW_BUSINESS_NAMES.slice();
+    const resData = [];
+    const vulData = [];
+    bus.forEach((bu) => {
+      const rv = buKpiCurrentPeriodForStateSet(basePool, bu, kMeta, f, resSet);
+      const vv = buKpiCurrentPeriodForStateSet(basePool, bu, kMeta, f, vulSet);
+      resData.push(rv != null ? rv : 0);
+      vulData.push(vv != null ? vv : 0);
+    });
+    const labelList = bus.map(locCompareBizLabel);
+    const locListForTooltip = bus.slice();
+    const unit = kMeta.unitType || "";
+    const yTitle = unit === "PercentOrRate" ? "Value (%)" : "Value";
+    const curRange = formatMonthRangeShort(currentPeriodMonthList(f));
+    const subLines =
+      "Current period " +
+      curRange +
+      " · each pair of bars is one BU — green = KPI total in resilient states (top 5), coral = in vulnerable states (bottom 5), same ranking as the map.";
+
+    new Chart(el, {
+      type: "bar",
+      data: {
+        labels: labelList,
+        datasets: [
+          {
+            label: "Resilient sites (top 5 states/UTs)",
+            data: resData,
+            backgroundColor: "rgba(52, 211, 153, 0.62)",
+            borderColor: "#34d399",
+            borderWidth: 1,
+          },
+          {
+            label: "Vulnerable sites (bottom 5 states/UTs)",
+            data: vulData,
+            backgroundColor: "rgba(251, 113, 133, 0.62)",
+            borderColor: "#fb7185",
+            borderWidth: 1,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "index", intersect: false },
+        layout: {
+          padding: { top: 4, right: 6, bottom: 28, left: 6 },
+        },
+        plugins: {
+          subtitle: {
+            display: true,
+            text: subLines,
+            color: CHART_INK,
+            font: { size: 8.5, family: FONT_UI },
+            padding: { bottom: 4 },
+          },
+          legend: {
+            display: true,
+            position: "bottom",
+            align: "center",
+            labels: {
+              boxWidth: 10,
+              padding: 4,
+              font: {
+                size: 9,
+                family: FONT_UI,
+              },
+              color: CHART_INK,
+            },
+          },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const i = items[0].dataIndex;
+                return locListForTooltip[i] != null
+                  ? String(locListForTooltip[i])
+                  : "";
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            stacked: false,
+            grid: { display: false },
+            ticks: {
+              autoSkip: false,
+              maxTicksLimit: 48,
+              font: {
+                size: 10,
+                weight: "500",
+                family: FONT_UI,
+              },
+              maxRotation: 60,
+              minRotation: 45,
+              color: CHART_INK,
+              padding: 4,
+            },
+            title: {
+              display: true,
+              text: "Business unit",
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+              padding: { top: 2, bottom: 0 },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            grace: "5%",
+            ticks: { font: { size: 9 }, color: CHART_INK },
+            grid: { color: "rgba(109, 110, 113, 0.09)" },
+            title: {
+              display: true,
+              text: yTitle,
+              font: { size: 10, family: FONT_UI },
+              color: CHART_INK,
+              padding: { top: 0, bottom: 4 },
+            },
+          },
+        },
+      },
+    });
+    if (hint) {
+      hint.textContent =
+        "(Current period · resilient vs vulnerable states per BU · map ranking) · " +
+        curRange;
+    }
+    if (titleEl) {
+      titleEl.textContent =
+        shortKpiHeaderLabel(kMeta.kpiName) +
+        " — resilient vs vulnerable sites by business unit";
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const ch = Chart.getChart(el);
+        if (ch) {
+          try {
+            ch.resize();
+          } catch {
+            /* ignore */
+          }
+        }
+      });
+    });
+  }
+
   /** Grouped bars — comparison (base) vs current KPI value per BU or per site (single-BU slice). */
   function buildBuComparisonChart(catKey, f) {
     const el = document.getElementById("chart-bu-compare");
-    if (!el || typeof Chart === "undefined") return;
+    if (!el) return;
+    if (typeof Chart === "undefined") {
+      if (
+        Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY &&
+        vlBuCompareChartAttempts < 80
+      ) {
+        vlBuCompareChartAttempts++;
+        window.setTimeout(function () {
+          if (Number(currentCategoryKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+            buildBuComparisonChart(catKey, f);
+          }
+        }, 50);
+      }
+      return;
+    }
+    vlBuCompareChartAttempts = 0;
     const prev = Chart.getChart(el);
     if (prev) prev.destroy();
-    const mode = chartUiMode(catKey, f);
     const hint = document.getElementById("chart-bu-compare-hint");
     const titleEl = document.getElementById("chart-bu-compare-title");
+    const mode = chartUiMode(catKey, f);
+    if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      buildVulnerableLocationResilientVsVulnerableBuComparison(
+        catKey,
+        f,
+        el,
+        hint,
+        titleEl,
+        mode
+      );
+      return;
+    }
     if (mode.singleSite) {
       if (hint) {
         hint.textContent =
@@ -5321,7 +5792,11 @@
       f.kpiKeys && f.kpiKeys.length
         ? String(f.kpiKeys[0])
         : String(f.kpi);
-    const kMeta = getKpis(catKey).find((x) => String(x.kpiKey) === pk);
+    let kMeta = getKpis(catKey).find((x) => String(x.kpiKey) === pk);
+    if (!kMeta) {
+      const ordered = sortKpisForDisplay(catKey, getKpis(catKey));
+      kMeta = ordered[0];
+    }
     if (!kMeta) return;
     const basePool = applyNonMonthFiltersAllKpis(getRowsForCategory(catKey), f);
     const isAssurance = catKey === ASSURANCE_CATEGORY_KEY;
@@ -5379,16 +5854,16 @@
           {
             label: "Comparison (base) · " + cmpRange,
             data: baseData,
-            backgroundColor: "rgba(142, 39, 143, 0.45)",
-            borderColor: ADANI_PURPLE,
+            backgroundColor: "rgba(196, 181, 253, 0.75)",
+            borderColor: "rgba(139, 92, 246, 0.85)",
             borderWidth: 1,
           },
           {
             label: "Current period",
             data: curData,
-            backgroundColor: "rgba(0, 109, 182, 0.5)",
+            backgroundColor: "rgba(125, 211, 252, 0.82)",
             borderWidth: 1,
-            borderColor: ADANI_BLUE,
+            borderColor: "rgba(14, 165, 233, 0.9)",
           },
         ],
       },
@@ -5619,27 +6094,27 @@
     }
     const colCount = colLabels.length;
     const isHazardSpotting = f && String(f.kpi) === "38";
-    const rowTitles = isHazardSpotting
-      ? ["Unsafe Acts", "Unsafe Condition"]
-      : ["Hazard Spotting Rate", "Hazard Closure %"];
+    const isUnsafeActsPerHour = f && String(f.kpi) === "53";
+    /** Absolute counts + only green/red vs previous period (Week or Month). */
+    const useHazardAbsDeltaColors = isHazardSpotting || isUnsafeActsPerHour;
+    const rowTitles = isUnsafeActsPerHour
+      ? ["Unsafe Acts per Hour"]
+      : isHazardSpotting
+        ? ["Unsafe Acts", "Unsafe Condition"]
+        : ["Hazard Spotting Rate", "Hazard Closure %"];
     const matrix = [];
     for (let ri = 0; ri < rowTitles.length; ri++) {
       const row = [];
       for (let ci = 0; ci < colCount; ci++) {
         const seed = ref + "|" + bizTag + "|" + mode + "|" + ri + "|" + ci;
         let raw, display;
-        if (isHazardSpotting) {
+        if (isHazardSpotting || isUnsafeActsPerHour) {
           if (mode === "week") {
             raw = 40 + (hash32(seed + "|v") % 61);
           } else {
             raw = 200 + (hash32(seed + "|v") % 201);
           }
-          if (ci === colCount - 1) {
-            const p = -15 + (hash32(seed + "|p") % 31);
-            display = (p >= 0 ? "+ " : "− ") + Math.abs(p) + "%";
-          } else {
-            display = String(raw);
-          }
+          display = String(raw);
         } else {
           raw = -5 + (hash32(seed + "|v") % 200) / 10;
           if (ci === colCount - 1) {
@@ -5672,9 +6147,26 @@
       };
     }
     const normSpot = normForRow(0, false);
-    const normClose = normForRow(1, true);
+    const normClose =
+      matrix.length > 1 ? normForRow(1, true) : normSpot;
+
+    function prevRawForDelta(ri, ci, raw) {
+      const cur = Number(raw);
+      if (ci > 0) return Number(matrix[ri][ci - 1].raw);
+      const h = hash32(
+        ref + "|" + bizTag + "|" + mode + "|r" + ri + "|prv0"
+      );
+      return Math.max(0, cur - 18 + (h % 36));
+    }
 
     function classForCell(ri, ci, raw) {
+      if (useHazardAbsDeltaColors) {
+        const cur = Number(raw);
+        const prev = prevRawForDelta(ri, ci, raw);
+        return cur >= prev
+          ? "spi-hm-cell spi-hm--ua-ph-up"
+          : "spi-hm-cell spi-hm--ua-ph-down";
+      }
       if (ci === colCount - 1) return "spi-hm-cell spi-hm-cell--pct";
       const t = ri === 0 ? normSpot(raw) : normClose(raw);
       if (ri === 0) {
@@ -5712,6 +6204,84 @@
       }
       html += "</tr>";
     }
+    if (!isUnsafeActsPerHour) {
+      if (isHazardSpotting) {
+        function totalRawAt(ci) {
+          return (
+            Number(matrix[0][ci].raw) + Number(matrix[1][ci].raw)
+          );
+        }
+        function prevTotalRawForDelta(ci) {
+          if (ci > 0) return totalRawAt(ci - 1);
+          const h = hash32(
+            ref + "|" + bizTag + "|" + mode + "|tot|prv0"
+          );
+          const cur = totalRawAt(0);
+          return Math.max(0, cur - 24 + (h % 48));
+        }
+        html +=
+          '<tr><th scope="row" class="spi-hm-rowhead">' +
+          "Total (Acts + Condition)" +
+          "</th>";
+        for (let c = 0; c < colCount; c++) {
+          const tr = totalRawAt(c);
+          const disp = String(Math.round(tr));
+          const prev = prevTotalRawForDelta(c);
+          const cls =
+            tr >= prev
+              ? "spi-hm-cell spi-hm--ua-ph-up"
+              : "spi-hm-cell spi-hm--ua-ph-down";
+          html +=
+            '<td class="' + cls + '">' + escapeHtml(disp) + "</td>";
+        }
+        html += "</tr>";
+      } else {
+        const totalNums = [];
+        for (let tc = 0; tc < colCount - 1; tc++) {
+          totalNums.push(matrix[0][tc].raw + matrix[1][tc].raw);
+        }
+        const tMn = totalNums.length ? Math.min.apply(null, totalNums) : 0;
+        const tMx = totalNums.length ? Math.max.apply(null, totalNums) : 1;
+        function normTotal(raw) {
+          if (tMx <= tMn) return 0.5;
+          return (raw - tMn) / (tMx - tMn);
+        }
+        function classForTotalCell(ci, totalRaw) {
+          if (ci === colCount - 1) {
+            return "spi-hm-cell spi-hm-cell--pct spi-hm-cell--pct-total";
+          }
+          const t = normTotal(totalRaw);
+          if (t < 0.34) return "spi-hm-cell spi-hm--total-1";
+          if (t < 0.67) return "spi-hm-cell spi-hm--total-2";
+          return "spi-hm-cell spi-hm--total-3";
+        }
+        html +=
+          '<tr><th scope="row" class="spi-hm-rowhead">' +
+          "Total" +
+          "</th>";
+        for (let c = 0; c < colCount; c++) {
+          if (c === colCount - 1) {
+            html +=
+              '<td class="' +
+              classForTotalCell(c, 0) +
+              '">—</td>';
+          } else {
+            const tr = matrix[0][c].raw + matrix[1][c].raw;
+            const disp =
+              Math.abs(tr) < 1
+                ? String(tr.toFixed(4))
+                : String(tr.toFixed(2));
+            html +=
+              '<td class="' +
+              classForTotalCell(c, tr) +
+              '">' +
+              escapeHtml(disp) +
+              "</td>";
+          }
+        }
+        html += "</tr>";
+      }
+    }
     html += "</tbody></table>";
     host.innerHTML = html;
 
@@ -5720,12 +6290,15 @@
       const mom = -5 + (hash32(ref + bizTag + "|spiHmMom") % 21);
       const momStr =
         (mom >= 0 ? "▲" : "▼") + Math.abs(mom) + "% MoM";
-      foot.innerHTML = isHazardSpotting
-        ? "Total observations reached <strong>" +
-          n +
-          "</strong> (" +
-          momStr +
-          ") · <strong>Unsafe Acts &amp; Unsafe Condition</strong> counts for the selected filters (preview sample)."
+      const periodWord = mode === "week" ? "week" : "month";
+      foot.innerHTML = useHazardAbsDeltaColors
+        ? "<strong>Absolute counts only</strong> (no percentages; preview sample). " +
+          (isHazardSpotting
+            ? "Rows: <strong>Unsafe Acts</strong>, <strong>Unsafe Condition</strong>, <strong>Total (Acts + Condition)</strong>. "
+            : "<strong>Unsafe Acts per Hour</strong>. ") +
+          "<strong>Pastel green</strong> = same or higher than the previous " +
+          periodWord +
+          " (first column vs a seeded baseline for color). <strong>Pastel red</strong> = lower. Chart uses only these two colours."
         : "Total hazard-linked observations reached <strong>" +
           n +
           "</strong> (" +
@@ -7585,10 +8158,6 @@
   function renderVulnerableLocationTableBody(catKey, f) {
     updateTableZoneLabel(f);
     const kpisMeta = sortKpisForDisplay(catKey, getKpis(catKey));
-    let states = mergedIndiaStateList(DATA.states);
-    if (f.state && f.state !== "all") {
-      states = states.filter((s) => s === f.state);
-    }
     const pool = applyNonMonthFiltersAllKpis(
       getRowsForCategory(VULNERABLE_LOCATION_CATEGORY_KEY),
       f
@@ -7600,8 +8169,28 @@
     const sm = document.getElementById("tbl-summary");
     if (sm) sm.textContent = "";
     if (!thead || !tbody) return;
+
+    const rowKeys = [];
+    const keySet = new Set();
+    for (let i = 0; i < snap.length; i++) {
+      const r = snap[i];
+      const bu = String(r.businessName || "").trim() || "—";
+      const site = rowDummySite(r);
+      const key = bu + "\0" + site;
+      if (!keySet.has(key)) {
+        keySet.add(key);
+        rowKeys.push({ bu: bu, site: site });
+      }
+    }
+    rowKeys.sort((a, b) => {
+      const c = a.bu.localeCompare(b.bu);
+      if (c !== 0) return c;
+      return a.site.localeCompare(b.site);
+    });
+
     thead.innerHTML =
-      '<th scope="col" class="bu-matrix__th-bu">State / UT</th>' +
+      '<th scope="col" class="bu-matrix__th-bu">Business</th>' +
+      '<th scope="col" class="bu-matrix__th-bu">Site</th>' +
       kpisMeta
         .map(
           (k) =>
@@ -7611,14 +8200,20 @@
         )
         .join("");
     let html = "";
-    for (let si = 0; si < states.length; si++) {
-      const st = states[si];
-      html += '<tr><th scope="row">' + escapeHtml(st) + "</th>";
+    for (let ri = 0; ri < rowKeys.length; ri++) {
+      const row = rowKeys[ri];
+      html +=
+        '<tr><th scope="row">' +
+        escapeHtml(row.bu) +
+        '</th><td class="bu-matrix__cell-site">' +
+        escapeHtml(row.site) +
+        "</td>";
       for (let ki = 0; ki < kpisMeta.length; ki++) {
         const k = kpisMeta[ki];
         const slice = snap.filter(
           (r) =>
-            String(r.state || "").trim() === st &&
+            String(r.businessName || "").trim() === row.bu &&
+            rowDummySite(r) === row.site &&
             String(r.kpiKey) === String(k.kpiKey)
         );
         const vals = slice
@@ -8205,7 +8800,7 @@
       announce(
         (cat
           ? classicIndexCategoryDisplayName(catKey, cat.categoryName)
-          : "Leadership") + ". Meeting compliance matrix · slicers and drill-down."
+          : "Leadership") + ". Governance review matrix · slicers and drill-down."
       );
       return;
     }
@@ -8390,8 +8985,8 @@
     wrap.innerHTML =
       '<div class="lc-page">' +
       '<div class="cat-top-bar cat-top-bar--filters-only">' +
-      '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact" aria-label="Meeting compliance filters">' +
-      '<legend class="visually-hidden">Meeting compliance filters</legend>' +
+      '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact" aria-label="Governance review filters">' +
+      '<legend class="visually-hidden">Governance review filters</legend>' +
       '<div class="cat-toolbar__inner" role="group">' +
       '<div class="cat-toolbar__filters-scroll">' +
       '<div class="cat-toolbar__filters-all-scroll">' +
@@ -8445,7 +9040,7 @@
       '<button type="button" class="btn btn--reset-compact" id="lc-reset">Reset</button>' +
       "</div></div></fieldset></div>" +
       '<header class="lc-header">' +
-      '<h2 class="lc-title">Meeting Compliance Tracking</h2>' +
+      '<h2 class="lc-title">Governance Review &amp; Assurance Tracker</h2>' +
       '<div class="lc-matrix-mode" role="group" aria-label="Matrix rows">' +
       '<span class="lc-matrix-mode__lbl">View</span>' +
       '<div class="lc-matrix-mode__toggle">' +
@@ -8462,7 +9057,7 @@
       '' +
       "</div>" +
       '<div class="lc-matrix-scroll" tabindex="0">' +
-      '<table class="lc-matrix lc-matrix--bu-axis" id="lc-matrix" aria-label="Meeting compliance matrix">' +
+      '<table class="lc-matrix lc-matrix--bu-axis" id="lc-matrix" aria-label="Governance review and assurance matrix">' +
       "<thead><tr>" +
       '<th scope="col" class="lc-matrix__corner">BU <span class="lc-matrix__hint">/ Month</span></th>' +
       "</tr></thead>" +
@@ -8675,7 +9270,7 @@
       if (matrixAxisMode === "bu") {
         mat.setAttribute(
           "aria-label",
-          "Meeting compliance: business units by month"
+          "Governance review: business units by month"
         );
         const rows = busV.filter((b) => rowPassesRagFilter(b));
         theadRow.innerHTML =
@@ -8736,7 +9331,7 @@
 
       mat.setAttribute(
         "aria-label",
-        "Meeting compliance: months by business unit"
+        "Governance review: months by business unit"
       );
       const rowMonths = cols.filter((ym) => rowPassesRagFilterMonth(ym));
       theadRow.innerHTML =
@@ -9176,7 +9771,7 @@
       });
       updateLcFilterHints();
       paintAll();
-      announce("Meeting compliance filters reset.");
+      announce("Governance review filters reset.");
     });
 
     window.__adaniLeadershipMeetingsRerender = paintAll;
@@ -9191,33 +9786,35 @@
     catKey,
     cat,
     _cfg,
-    stateOpts,
-    periodRangesFieldHtml
+    periodRangesFieldHtml,
+    bizList
   ) {
     void _cfg;
-    const stateFieldHtml =
-      '<div class="field field--filter-compact field--state-vl"><label class="field-label" for="f-state">State</label>' +
-      '<select id="f-state">' +
-      stateOpts +
-      "</select></div>";
-    const filtersScroll = periodRangesFieldHtml + stateFieldHtml;
+    const businessFieldHtml = businessFilterFieldHtml(bizList || []);
+    const variableFieldHtml = variableFilterFieldHtml();
+    const siteFieldHtml = siteFilterFieldHtml();
+    const filtersScroll =
+      businessFieldHtml +
+      variableFieldHtml +
+      siteFieldHtml +
+      periodRangesFieldHtml;
     const comparePanelHtml =
       '<div id="view-panel-vl-compare" class="view-panel view-panel--vl-compare" role="tabpanel" aria-labelledby="view-tab-vl-compare" hidden><div class="chart-box chart-box--bu-compare">' +
       chartBlockTitleHtml(
-        '<span class="chart-analytics-title__label" id="chart-bu-compare-title">BU comparison — current vs base</span> <span id="chart-bu-compare-hint" class="chart-box__hint">Grouped bars · same KPI · all BUs</span>',
+        '<span class="chart-analytics-title__label" id="chart-bu-compare-title">Resilient vs vulnerable sites by business unit</span> <span id="chart-bu-compare-hint" class="chart-box__hint">Current period · top 5 vs bottom 5 states (map rule) · all BUs</span>',
         "chart-bu-compare",
-        "comparison-by-bu",
-        CHART_HELP.compareBu
+        "comparison-by-bu-vl",
+        CHART_HELP.compareBuVl
       ) +
-      '<div class="chart-canvas-wrap chart-canvas-wrap--bu-compare"><canvas id="chart-bu-compare" role="img" aria-label="Grouped bar chart: base vs current period by business unit"></canvas></div></div></div>';
+      '<div class="chart-canvas-wrap chart-canvas-wrap--bu-compare"><canvas id="chart-bu-compare" role="img" aria-label="Resilient versus vulnerable sites by business unit, current period"></canvas></div></div></div>';
     const wrap = document.createElement("div");
     wrap.className = insightShell
       ? "cat-view cat-view--modern cat-view--vulnerable-location"
       : "cat-view cat-view--vulnerable-location";
     wrap.innerHTML =
       '<div class="cat-top-bar cat-top-bar--filters-only">' +
-      '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact cat-toolbar--vl" aria-label="Map and geography filters">' +
-      '<legend class="visually-hidden">Map and geography filters</legend>' +
+      '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact cat-toolbar--vl" aria-label="Filters: business, verticals, sites, and periods">' +
+      '<legend class="visually-hidden">Business, verticals, sites, and period filters</legend>' +
       '<div class="cat-toolbar__inner" role="group">' +
       '<div class="cat-toolbar__filters-scroll">' +
       '<div class="cat-toolbar__filters-all-scroll">' +
@@ -9245,8 +9842,8 @@
       '<div class="vl-kpi"><div class="vl-kpi__label">Total safe man hours</div><div class="vl-kpi__value" id="vl-kpi-safe"></div></div>' +
       "</div></div>" +
       '<div class="cat-main-view cat-main-view--vl" id="cat-main-view" data-view="trend">' +
-      '<div class="view-tabs" role="tablist" aria-label="Trend, table, comparison or map">' +
-      '<button type="button" role="tab" id="view-tab-vl-trend" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-trend" data-view="trend">Trend &amp; Distribution</button>' +
+      '<div class="view-tabs" role="tablist" aria-label="Trend and Distribution, table, comparison, or map">' +
+      '<button type="button" role="tab" id="view-tab-vl-trend" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-trend" data-view="trend">Trend &amp; Distribution View</button>' +
       '<button type="button" role="tab" id="view-tab-vl-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-table" tabindex="-1" data-view="table">Table view</button>' +
       '<button type="button" role="tab" id="view-tab-vl-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-compare" tabindex="-1" data-view="compare">Comparison view</button>' +
       '<button type="button" role="tab" id="view-tab-vl-map" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-map" tabindex="-1" data-view="map">Map view</button>' +
@@ -9275,18 +9872,30 @@
       '<div class="vl-map-wrap">' +
       // map controls: resilient/vulnerable toggles and top5 lists
       '<div class="vl-map-controls">' +
-      '<label class="vl-map-controls__lbl"><input type="checkbox" id="vl-filter-resilient" checked /> Resilient sites</label>' +
-      '<label class="vl-map-controls__lbl"><input type="checkbox" id="vl-filter-vulnerable" checked /> Vulnerable sites</label>' +
+      '<label class="vl-map-controls__lbl">' +
+      '<input type="checkbox" id="vl-filter-resilient" checked />' +
+      '<span class="vl-map-cb-swatch vl-map-cb-swatch--resilient" aria-hidden="true" title="Map marker colour: resilient"></span>' +
+      "<span>Resilient sites</span></label>" +
+      '<label class="vl-map-controls__lbl">' +
+      '<input type="checkbox" id="vl-filter-vulnerable" checked />' +
+      '<span class="vl-map-cb-swatch vl-map-cb-swatch--vulnerable" aria-hidden="true" title="Map marker colour: vulnerable"></span>' +
+      "<span>Vulnerable sites</span></label>" +
       "</div>" +
       '' +
       '<div id="vl-leaflet-map" class="vl-map-host" role="application" aria-label="India map: vulnerable & resilient locations"></div>' +
-      '<p class="vl-map-legend" id="vl-map-legend">Markers show top resilient and vulnerable locations. Use the toggles to highlight categories; the rest are shown in muted colour.</p>' +
+      '<div class="vl-map-legend-block" id="vl-map-legend" aria-label="Map legend for vulnerable and resilient locations">' +
+      '<p class="vl-map-legend-block__title">Legend — vulnerable &amp; resilient locations</p>' +
+      '<ul class="vl-map-legend-block__list">' +
+      '<li><span class="vl-map-legend__sw vl-map-legend__sw--res" aria-hidden="true"></span><strong>Resilient locations</strong> — green markers: top five states/UTs by combined KPI total in the current window (preview ranking).</li>' +
+      '<li><span class="vl-map-legend__sw vl-map-legend__sw--vul" aria-hidden="true"></span><strong>Vulnerable locations</strong> — red/coral markers: bottom five states/UTs by the same ranking.</li>' +
+      '<li><span class="vl-map-legend__sw vl-map-legend__sw--oth" aria-hidden="true"></span><strong>Other</strong> — neutral markers; use the checkboxes to emphasise only resilient or vulnerable sites.</li>' +
+      "</ul></div>" +
       "</div></div>" +
       '<div id="view-panel-vl-table" class="view-panel view-panel--vl-table" role="tabpanel" aria-labelledby="view-tab-vl-table" hidden>' +
       '<div class="table-zone">' +
       '<div class="table-zone__head">' +
       '<div class="table-zone__title">' +
-      '<span class="table-zone__label" id="tbl-zone-label">State performance</span>' +
+      '<span class="table-zone__label" id="tbl-zone-label">Business &amp; site KPIs</span>' +
       '<span id="tbl-summary" class="table-zone__summary" aria-live="polite"></span>' +
       "</div>" +
       '<div class="table-zone__exports" role="group" aria-label="Export table">' +
@@ -9304,10 +9913,11 @@
       '<div class="table-scroll table-scroll--bu-matrix" tabindex="0">' +
       '<table class="data-table bu-matrix" id="tbl-detail">' +
       "<thead><tr>" +
-      '<th scope="col" class="bu-matrix__th-bu">State / UT</th>' +
+      '<th scope="col" class="bu-matrix__th-bu">Business</th>' +
+      '<th scope="col" class="bu-matrix__th-bu">Site</th>' +
       "</tr></thead>" +
       '<tbody id="tbl-body"></tbody></table>' +
-      "</div></div>" +
+      "</div></div></div>" +
       comparePanelHtml +
       "</div>" +
       '<p class="cat-context" id="cat-context">' +
@@ -9317,35 +9927,49 @@
     root.innerHTML = "";
     root.appendChild(wrap);
 
-    const stEl = document.getElementById("f-state");
-    if (stEl) stEl.value = "all";
+    initBusinessSiteCheckboxFilters();
+    applyVariableFilterFromStorage();
     initPeriodRangeInputs();
 
     function onFilterChange() {
       tableState.page = 0;
       refreshCategoryView(catKey);
     }
-    ["f-state", "f-cur-from", "f-cur-to", "f-cmp-from", "f-cmp-to"].forEach(
-      (id) => {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener("change", onFilterChange);
-      }
-    );
+    ["f-cur-from", "f-cur-to", "f-cmp-from", "f-cmp-to"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("change", onFilterChange);
+    });
+    wireBusinessAndSiteFilterControls(onFilterChange);
+    wireVariableFilterControls(onFilterChange);
     wireToolbarScopeScrollPanels(wrap);
 
     document.getElementById("f-reset").addEventListener("click", () => {
-      if (stEl) stEl.value = "all";
+      initBusinessSiteCheckboxFilters();
       ["f-cur-from", "f-cur-to", "f-cmp-from", "f-cmp-to"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
       initPeriodRangeInputs();
+      try {
+        localStorage.removeItem(LS_VARIABLE_FILTER);
+      } catch {
+        /* ignore */
+      }
+      const vAll = document.getElementById("f-var-all");
+      const vCbs = document.querySelectorAll("input.f-var-cb");
+      if (vAll) {
+        vAll.checked = true;
+        vCbs.forEach((cb) => {
+          cb.checked = false;
+        });
+        updateVariableSummary();
+      }
       tableState.page = 0;
       refreshCategoryView(catKey);
     });
 
     wireTableHeaders(catKey);
-    wireCatMainViewVulnerable();
+    wireCatMainViewIndex();
     wireExportDownloads(catKey);
     refreshCategoryView(catKey);
     const h = document.getElementById("cat-heading");
@@ -9429,12 +10053,15 @@
       "</div></div></div></div>";
 
     if (Number(catKey) === VULNERABLE_LOCATION_CATEGORY_KEY) {
+      const bizListVl = mergedBusinessList(
+        distinctSorted(rowsForCat, (r) => r.businessName)
+      );
       mountVulnerableLocationCategoryPage(
         catKey,
         cat,
         cfg,
-        stateOpts,
-        periodRangesFieldHtml
+        periodRangesFieldHtml,
+        bizListVl
       );
       return;
     }
@@ -9445,7 +10072,7 @@
     }
 
     const personalFieldHtml =
-      '<div class="field field--filter-compact field--personal-toolbar"><label class="field-label" for="f-personal">Personnel</label>' +
+      '<div class="field field--filter-compact field--personal-toolbar"><label class="field-label" for="f-personal">Personnel Type</label>' +
       '<select id="f-personal">' +
       '<option value="all">All</option>' +
       '<option value="Employee">Employee</option>' +
@@ -9463,6 +10090,7 @@
       : "";
     const filterCoreInner =
       businessFieldHtml +
+      variableFieldHtml +
       siteFieldHtml +
       personalFieldHtml +
       periodRangesFieldHtml +
@@ -9477,7 +10105,6 @@
         : "";
     const filtersAllScrollHtml =
       '<div class="cat-toolbar__filters-all-scroll">' +
-      variableFieldHtml +
       filterCoreInner +
       kpiSurfaceHtml +
       "</div>";

@@ -113,8 +113,12 @@
         white-space: nowrap;
         color: #6d6e71;
       }
+      /* Avoid flash of non-SPA content before app.js replaces #app-root */
+      #app-root:empty {
+        min-height: 60vh;
+      }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260418r2" />
+    <link rel="stylesheet" href="styles.css?v=20260424r1" />
     <link rel="preload" as="image" href="assets/home-2-6.png" />
     <link
       rel="stylesheet"
@@ -176,12 +180,6 @@
         tabindex="-1"
         aria-label="Adani Safety Performance Dashboard dashboard preview: safety KPIs for user research, IA, usability testing, accessibility, consistency, hierarchy, iterative UX, UCD, HCI, and CX design"
       ></main>
-
-      <footer class="app-footer" role="contentinfo" aria-label="Legal and data disclaimer">
-        <p class="app-footer__text">
-          <strong>Disclaimer:</strong> Sample data for user research, information architecture, usability testing, accessibility review, iterative UX validation, and UCD or HCI/CX design exploration—not operational reporting. Confirm all figures in your governed Power BI workspace.
-        </p>
-      </footer>
     </div>
 
     <div
@@ -220,6 +218,6 @@
       crossorigin=""
     ></script>
     <script defer src="embedded-data.js?v=20260418r1"></script>
-    <script defer src="app.js?v=20260418r3"></script>
+    <script defer src="app.js?v=20260424r1"></script>
   </body>
 </html>
