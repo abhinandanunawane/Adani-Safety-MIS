@@ -798,6 +798,7 @@ body {
   border-radius: 8px;
   background: rgba(0, 109, 182, 0.06);
   color: var(--brand-blue);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
 }
 
 .category-card__stack {
@@ -810,10 +811,15 @@ body {
 }
 
 .category-card:hover {
-  border-color: rgba(0, 109, 182, 0.35);
-  border-left-color: rgba(142, 39, 143, 0.55);
-  background: #ffffff;
-  box-shadow: 0 3px 12px rgba(0, 109, 182, 0.09);
+  border-color: rgba(0, 109, 182, 0.48);
+  border-left-color: var(--brand-blue);
+  background: #e8f3fa;
+  box-shadow: 0 4px 18px rgba(0, 109, 182, 0.16);
+}
+
+.category-card:hover .category-card__icon {
+  background: rgba(0, 109, 182, 0.18);
+  color: #005a9e;
 }
 
 .category-card:active {
@@ -902,8 +908,14 @@ body {
 }
 
 .category-card--launchpad:hover {
-  border-color: rgba(0, 109, 182, 0.28);
-  box-shadow: 0 8px 22px rgba(35, 31, 32, 0.1);
+  border-color: rgba(0, 109, 182, 0.45);
+  background: #e8f3fa;
+  box-shadow: 0 8px 24px rgba(0, 109, 182, 0.15);
+}
+
+.category-card--launchpad:hover .category-card__icon {
+  background: rgba(0, 109, 182, 0.16);
+  color: #005a9e;
 }
 
 .category-card--launchpad.category-card--disabled {
