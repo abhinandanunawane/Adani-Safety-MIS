@@ -1544,6 +1544,76 @@
     }
   }
 
+  /**
+   * Safety Performance Indices (category 3): five KPIs — drops Near Miss Rate (20). Must match SPI_KPI_ORDER below.
+   * Runs before `SPI_CATEGORY_KEY` / `SPI_KPI_ORDER` const initialisation (uses numeric category 3).
+   */
+  function previewRestrictSafetyPerformanceIndicesKpis() {
+    if (!DATA || !Array.isArray(DATA.kpiDetailByCategory)) return;
+    const spi = 3;
+    const allowOrder = [16, 17, 18, 21, 29];
+    const allowSet = new Set(allowOrder);
+    const block = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === spi
+    );
+    if (!block || !Array.isArray(block.kpis)) return;
+    const byKey = new Map(block.kpis.map((k) => [Number(k.kpiKey), k]));
+    block.kpis = allowOrder
+      .map((id) => byKey.get(id))
+      .filter(Boolean);
+    const catRow = DATA.categories.find((c) => Number(c.categoryKey) === spi);
+    if (catRow) catRow.kpiCount = block.kpis.length;
+
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter((r) => {
+        if (Number(r.categoryKey) !== spi) return true;
+        return allowSet.has(Number(r.kpiKey));
+      });
+    }
+
+    const mbc = DATA.monthlyByCategory.find(
+      (x) => Number(x.categoryKey) === spi
+    );
+    if (mbc && Array.isArray(DATA.months)) {
+      const monthKeys = DATA.months.map((m) => m.yearMonth).filter(Boolean);
+      mbc.series = monthKeys.map((ym) => {
+        const nums = DATA.factRows
+          .filter(
+            (r) =>
+              String(r.yearMonth) === String(ym) &&
+              Number(r.categoryKey) === spi
+          )
+          .map((r) => Number(r.value))
+          .filter((v) => Number.isFinite(v));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+
+    const bb = DATA.businessBreakdown.find(
+      (x) => Number(x.categoryKey) === spi
+    );
+    if (bb && Array.isArray(bb.bars) && DATA.months && DATA.months.length) {
+      const lastYm = DATA.months[DATA.months.length - 1].yearMonth;
+      for (let bi = 0; bi < bb.bars.length; bi++) {
+        const bar = bb.bars[bi];
+        const bn = String(bar.business || "").trim();
+        if (!bn) continue;
+        const sum = DATA.factRows
+          .filter(
+            (r) =>
+              Number(r.categoryKey) === spi &&
+              String(r.yearMonth) === String(lastYm) &&
+              String(r.businessName || "").trim() === bn
+          )
+          .reduce((acc, r) => acc + Number(r.value || 0), 0);
+        bar.value = Math.round(sum * 100) / 100;
+      }
+    }
+  }
+
   previewApplyDataMetaTitles();
   previewAddIncidentFirePropertyKpis();
   previewApplyIncidentKpiDisplayNames();
@@ -1556,6 +1626,7 @@
   previewRestrictHazardObservationKpis();
   previewRestrictTrainingCompetencyDevelopmentKpis();
   previewRestrictLeadershipSafetyGovernanceKpis();
+  previewRestrictSafetyPerformanceIndicesKpis();
   ensureCategoryCatalogueBaseline();
   normalizeCategorySelectionCatalog();
 
@@ -1722,10 +1793,10 @@
     "5 Catastrophic",
     "No Level",
   ];
-  /** Safety Performance Indices (category 3): Fatality Rate → LTIFR → LTISR → TRIR → Vehicle Incident Rate → Near Miss Rate. */
-  const SPI_KPI_ORDER = [16, 17, 18, 21, 29, 20];
-  /** Heat map row order (matches reference: Fatality Rate → LTIFR → LTISR → Near Miss Rate → TRIR → Vehicle Incident Rate). */
-  const SPI_HEATMAP_KPI_ORDER = [16, 17, 18, 20, 21, 29];
+  /** Safety Performance Indices (category 3): Fatality Rate → LTIFR → LTISR → TRIR → Vehicle Incident Rate (five KPIs; Near Miss Rate removed). */
+  const SPI_KPI_ORDER = [16, 17, 18, 21, 29];
+  /** Heat map row order (same five SPI KPIs as the category page). */
+  const SPI_HEATMAP_KPI_ORDER = [16, 17, 18, 21, 29];
   /** Approximate centroids for India states/UTs (preview map). */
   const STATE_CENTROID_BY_STATE = {
     "Andaman and Nicobar Islands": [11.7401, 92.6586],
@@ -1992,7 +2063,7 @@
     hazardVert:
       "Insight: Share of the selected KPI across Field / O&M / Office / Projects for the Current Period.\nUses: Vertical scope, KPI selection, filters.\nExport: JPEG.",
     spiHeat:
-      "Insight: Six-month grid of SPI indices — each cell is the monthly average for your filters; shading runs light→dark within that KPI row (compare months for the same measure).\nRows use three color families: green (Fatality Rate / LTIFR / LTISR / vehicle), red (Near Miss Rate), orange (TRIR).\nUses: All SPI KPIs, same filters as the rest of the page.\nExport: JPEG via camera icon.",
+      "Insight: Six-month grid of SPI indices — each cell is the monthly average for your filters; shading runs light→dark within that KPI row (compare months for the same measure).\nRows use color families: green (Fatality Rate / LTIFR / LTISR / vehicle), orange (TRIR).\nUses: SPI KPIs on this page, same filters as the rest of the page.\nExport: JPEG via camera icon.",
     spiMix:
       "Insight: 100% stacked trend of SPI KPI mix by month — see which indices dominate over time.\nUses: All SPI KPIs, filters.\nExport: JPEG.",
     bizRadar:
@@ -2002,7 +2073,7 @@
     compareBu:
       "Insight: Grouped bars — Comparison Period vs Current Period for the active KPI, every BU.\nUses: Current and Comparison period ranges, KPI selection, filters.\nExport: JPEG.",
     compareBuVl:
-      "Insight: Grouped bars by business unit — same KPI aggregated for the current period, split between sites in resilient states (top 5) and vulnerable states (bottom 5) using the same map ranking.\nUses: Current period window, KPI selection, business / site / vertical filters.\nExport: JPEG.",
+      "Insight: Grouped bars by business unit — same KPI for the current period, split between resilient and vulnerable states using the same map ranking.\nUses: Current period window, KPI selection, business / site / vertical filters.\nExport: JPEG.",
   };
 
   /** Chart "i" tooltip: keep Insight block only (drops Uses / Export lines). */
@@ -2956,7 +3027,7 @@
   }
 
   /**
-   * SPI heat map: KPI rows × last six calendar months; per-row color scale (greens / Near Miss reds / Incident oranges).
+   * SPI heat map: KPI rows × last six calendar months; per-row color scale (greens / TRIR orange / other rates green).
    */
   function renderSpiPerfHeatmapChart(snapPool, f) {
     const el = document.getElementById("chart-spi-bubble");
@@ -3813,17 +3884,11 @@
 
   function renderVulnerableLocationTrend(f) {
     const el1 = document.getElementById("chart-vl-trend");
-    const el2 = document.getElementById("chart-vl-dist");
     const tTitle = document.getElementById("chart-vl-trend-title");
-    const dTitle = document.getElementById("chart-vl-dist-title");
-    if (!el1 || !el2) return;
+    if (!el1) return;
     try {
       const c1 = Chart.getChart(el1);
       if (c1) c1.destroy();
-    } catch {}
-    try {
-      const c2 = Chart.getChart(el2);
-      if (c2) c2.destroy();
     } catch {}
 
     const pk =
@@ -3833,14 +3898,8 @@
     const kMeta = getKpis(VULNERABLE_LOCATION_CATEGORY_KEY).find(
       (x) => String(x.kpiKey) === pk
     );
-    const kLabel = kMeta ? kpiDropdownLabel(kMeta) : "KPI " + pk;
     if (tTitle) {
-      tTitle.textContent =
-        "Trend — " + kLabel + " (resilient vs vulnerable locations)";
-    }
-    if (dTitle) {
-      dTitle.textContent =
-        "Distribution — " + kLabel + " (latest month in current period)";
+      tTitle.textContent = "Trend — resilient vs vulnerable locations";
     }
 
     const rank = vulnerableLocationStateRankingFromFilters(f);
@@ -3878,14 +3937,6 @@
     const vulData = months.length
       ? months.map((ym) => monthAgg(botSet, ym) ?? 0)
       : [0];
-    const lastM = months.length ? months[months.length - 1] : null;
-    const distLabels = ["Resilient (top 5 states)", "Vulnerable (bottom 5 states)"];
-    const distData = lastM
-      ? [
-          monthAgg(topSet, lastM) ?? 0,
-          monthAgg(botSet, lastM) ?? 0,
-        ]
-      : [0, 0];
 
     const vlLegendBottom = {
       display: true,
@@ -3903,7 +3954,7 @@
       subtitle: {
         display: true,
         text:
-          "Legend: resilient = top 5 states/UTs by combined KPI values in the map window; vulnerable = bottom 5 (same rule as map markers).",
+          "Legend: resilient and vulnerable groupings follow the same rule as the map markers.",
         color: CHART_INK,
         font: { size: 8.5, family: FONT_UI },
         padding: { bottom: 2 },
@@ -3917,7 +3968,7 @@
           labels: labels,
           datasets: [
             {
-              label: "Resilient locations (top 5 states)",
+              label: "Resilient locations",
               data: resData,
               borderColor: "#34d399",
               backgroundColor: "rgba(52, 211, 153, 0.12)",
@@ -3927,7 +3978,7 @@
               pointRadius: 3,
             },
             {
-              label: "Vulnerable locations (bottom 5 states)",
+              label: "Vulnerable locations",
               data: vulData,
               borderColor: "#fb7185",
               backgroundColor: "rgba(251, 113, 133, 0.12)",
@@ -3945,31 +3996,9 @@
           plugins: vlChartPlugins,
         },
       });
-      new Chart(el2, {
-        type: "bar",
-        data: {
-          labels: distLabels,
-          datasets: [
-            {
-              label: kLabel + " · latest month",
-              data: distData,
-              backgroundColor: ["rgba(52, 211, 153, 0.55)", "rgba(251, 113, 133, 0.55)"],
-              borderColor: ["#34d399", "#fb7185"],
-              borderWidth: 1,
-            },
-          ],
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: vlChartPlugins,
-        },
-      });
     } else {
       const p1 = el1.parentElement;
-      const p2 = el2.parentElement;
       if (p1) p1.innerHTML = "<div class='chart-placeholder'>Trend chart (requires Chart.js)</div>";
-      if (p2) p2.innerHTML = "<div class='chart-placeholder'>Distribution chart (requires Chart.js)</div>";
     }
   }
 
@@ -5152,11 +5181,7 @@
     }
     if (cat === SPI_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
-      const ordered = SPI_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
-      const rest = list.filter(
-        (k) => !SPI_KPI_ORDER.includes(Number(k.kpiKey))
-      );
-      return ordered.concat(rest);
+      return SPI_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
     if (cat === TRAINING_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
@@ -6100,7 +6125,7 @@
           comparisonVsPeriodCaption(f);
       }
       if (titleEl) {
-        titleEl.textContent = "Resilient vs vulnerable sites — by business unit";
+        titleEl.textContent = "Resilient vs Vulnerable sites by business unit";
       }
       return;
     }
@@ -6140,7 +6165,7 @@
     const subLines =
       "Current period " +
       curRange +
-      " · each pair of bars is one BU — green = KPI total in resilient states (top 5), coral = in vulnerable states (bottom 5), same ranking as the map.";
+      " · each pair of bars is one BU — green = KPI total in resilient states, coral = in vulnerable states (same ranking as the map).";
 
     new Chart(el, {
       type: "bar",
@@ -6148,14 +6173,14 @@
         labels: labelList,
         datasets: [
           {
-            label: "Resilient sites (top 5 states/UTs)",
+            label: "Resilient sites",
             data: resData,
             backgroundColor: "rgba(52, 211, 153, 0.62)",
             borderColor: "#34d399",
             borderWidth: 1,
           },
           {
-            label: "Vulnerable sites (bottom 5 states/UTs)",
+            label: "Vulnerable sites",
             data: vulData,
             backgroundColor: "rgba(251, 113, 133, 0.62)",
             borderColor: "#fb7185",
@@ -6245,14 +6270,10 @@
       },
     });
     if (hint) {
-      hint.textContent =
-        "(Current period · resilient vs vulnerable states per BU · map ranking) · " +
-        curRange;
+      hint.textContent = curRange && String(curRange).trim() ? String(curRange).trim() : "";
     }
     if (titleEl) {
-      titleEl.textContent =
-        shortKpiHeaderLabel(kMeta.kpiName) +
-        " — resilient vs vulnerable sites by business unit";
+      titleEl.textContent = "Resilient vs Vulnerable sites by business unit";
     }
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -10374,7 +10395,7 @@
     const comparePanelHtml =
       '<div id="view-panel-vl-compare" class="view-panel view-panel--vl-compare" role="tabpanel" aria-labelledby="view-tab-vl-compare" hidden><div class="chart-box chart-box--bu-compare">' +
       chartBlockTitleHtml(
-        '<span class="chart-analytics-title__label" id="chart-bu-compare-title">Resilient vs vulnerable sites by business unit</span> <span id="chart-bu-compare-hint" class="chart-box__hint">Current period · top 5 vs bottom 5 states (map rule) · all BUs</span>',
+        '<span class="chart-analytics-title__label" id="chart-bu-compare-title">Resilient vs Vulnerable sites by business unit</span> <span id="chart-bu-compare-hint" class="chart-box__hint">Current period · map ranking · all BUs</span>',
         "chart-bu-compare",
         "comparison-by-bu-vl",
         CHART_HELP.compareBuVl
@@ -10415,31 +10436,23 @@
       '<div class="vl-kpi"><div class="vl-kpi__label">Total safe man hours</div><div class="vl-kpi__value" id="vl-kpi-safe"></div></div>' +
       "</div></div>" +
       '<div class="cat-main-view cat-main-view--vl" id="cat-main-view" data-view="trend">' +
-      '<div class="view-tabs" role="tablist" aria-label="Trend and Distribution, table, comparison, or map">' +
-      '<button type="button" role="tab" id="view-tab-vl-trend" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-trend" data-view="trend">Trend &amp; Distribution View</button>' +
+      '<div class="view-tabs" role="tablist" aria-label="Trend, table, comparison, or map">' +
+      '<button type="button" role="tab" id="view-tab-vl-trend" class="view-tabs__btn view-tabs__btn--active" aria-selected="true" aria-controls="view-panel-vl-trend" data-view="trend">Trend View</button>' +
       '<button type="button" role="tab" id="view-tab-vl-table" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-table" tabindex="-1" data-view="table">Table view</button>' +
       '<button type="button" role="tab" id="view-tab-vl-compare" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-compare" tabindex="-1" data-view="compare">Comparison view</button>' +
       '<button type="button" role="tab" id="view-tab-vl-map" class="view-tabs__btn" aria-selected="false" aria-controls="view-panel-vl-map" tabindex="-1" data-view="map">Map view</button>' +
       "</div>" +
-      // Trend & Distribution panel (two charts)
+      // Trend View panel (single trend chart)
       '<div id="view-panel-vl-trend" class="view-panel view-panel--vl-trend" role="tabpanel" aria-labelledby="view-tab-vl-trend">' +
-      '<div class="chart-row">' +
+      '<div class="chart-row chart-row--vl-trend-only">' +
       '<div class="chart-box chart-box--vl-trend">' +
       chartBlockTitleHtml(
-        '<span class="chart-analytics-title__label" id="chart-vl-trend-title">Trend — selected KPI</span>',
+        '<span class="chart-analytics-title__label" id="chart-vl-trend-title">Trend — resilient vs vulnerable locations</span>',
         "chart-vl-trend",
         "vl-trend",
         CHART_HELP.trend
       ) +
-      '<div class="chart-canvas-wrap"><canvas id="chart-vl-trend" role="img" aria-label="Trend chart"></canvas></div></div>' +
-      '<div class="chart-box chart-box--vl-dist">' +
-      chartBlockTitleHtml(
-        '<span class="chart-analytics-title__label" id="chart-vl-dist-title">Distribution — selected KPI</span>',
-        "chart-vl-dist",
-        "vl-dist",
-        CHART_HELP.dist
-      ) +
-      '<div class="chart-canvas-wrap"><canvas id="chart-vl-dist" role="img" aria-label="Distribution chart"></canvas></div></div>' +
+      '<div class="chart-canvas-wrap"><canvas id="chart-vl-trend" role="img" aria-label="Trend: resilient versus vulnerable locations"></canvas></div></div>' +
       "</div></div>" +
       '<div id="view-panel-vl-map" class="view-panel view-panel--vl-map" role="tabpanel" aria-labelledby="view-tab-vl-map" hidden>' +
       '<div class="vl-map-wrap">' +
@@ -10459,8 +10472,8 @@
       '<div class="vl-map-legend-block" id="vl-map-legend" aria-label="Map legend for vulnerable and resilient locations">' +
       '<p class="vl-map-legend-block__title">Legend — vulnerable &amp; resilient locations</p>' +
       '<ul class="vl-map-legend-block__list">' +
-      '<li><span class="vl-map-legend__sw vl-map-legend__sw--res" aria-hidden="true"></span><strong>Resilient locations</strong> — green markers: top five states/UTs by combined KPI total in the current window (preview ranking).</li>' +
-      '<li><span class="vl-map-legend__sw vl-map-legend__sw--vul" aria-hidden="true"></span><strong>Vulnerable locations</strong> — red/coral markers: bottom five states/UTs by the same ranking.</li>' +
+      '<li><span class="vl-map-legend__sw vl-map-legend__sw--res" aria-hidden="true"></span><strong>Resilient locations</strong> — green markers: highest-ranked states/UTs by combined KPI total in the current window (preview ranking).</li>' +
+      '<li><span class="vl-map-legend__sw vl-map-legend__sw--vul" aria-hidden="true"></span><strong>Vulnerable locations</strong> — red/coral markers: lowest-ranked states/UTs by the same ranking.</li>' +
       '<li><span class="vl-map-legend__sw vl-map-legend__sw--oth" aria-hidden="true"></span><strong>Other</strong> — neutral markers; use the checkboxes to emphasise only resilient or vulnerable sites.</li>' +
       "</ul></div>" +
       "</div></div>" +

@@ -118,7 +118,7 @@
         min-height: 60vh;
       }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260425r4" />
+    <link rel="stylesheet" href="styles.css?v=20260425r5" />
     <link rel="preload" as="image" href="assets/home-2-6.png" />
     <link
       rel="stylesheet"
@@ -218,17 +218,48 @@
       crossorigin=""
     ></script>
     <script defer src="embedded-data.js?v=20260418r1"></script>
-    <script defer src="app.js?v=20260425r12"></script>
+    <script defer src="app.js?v=20260425r15"></script>
     <!--
       index.html only — Incident Data: exactly 19 KPIs in stakeholder order (attachment 1–18 + #19 Property Damage).
       Omits kpiKey 4 from the catalogue so app INCIDENT_KPI_ORDER yields rank 6 = Total Recordable Injuries (58),
       … rank 18 = Delta of Fatal (19), rank 19 = Property Damage (57). TRIR (21) stays in data but out of the 19-tile list.
       Seeds 56 / 57 / 58 if missing.
+      Assurance and Compliance (cat 5): KPI 502 shorter label for this entry page only.
     -->
     <script type="module">
       (function () {
         const d = window.__DASHBOARD_DATA__;
         if (!d || !Array.isArray(d.kpiDetailByCategory)) return;
+
+        const ASSURANCE_CAT = 5;
+        const ASSURANCE_KPI_STANDARD = 502;
+        const ASSURANCE_STANDARD_LABEL =
+          "% Standard Implementation against the fatal four Standards";
+        const assBlk = d.kpiDetailByCategory.find(
+          (x) => Number(x.categoryKey) === ASSURANCE_CAT
+        );
+        if (assBlk && Array.isArray(assBlk.kpis)) {
+          for (let ai = 0; ai < assBlk.kpis.length; ai++) {
+            const ak = assBlk.kpis[ai];
+            if (Number(ak.kpiKey) === ASSURANCE_KPI_STANDARD) {
+              ak.kpiName = ASSURANCE_STANDARD_LABEL;
+              break;
+            }
+          }
+        }
+        const frAll = d.factRows;
+        if (Array.isArray(frAll)) {
+          for (let fi = 0; fi < frAll.length; fi++) {
+            const row = frAll[fi];
+            if (
+              Number(row.categoryKey) === ASSURANCE_CAT &&
+              Number(row.kpiKey) === ASSURANCE_KPI_STANDARD
+            ) {
+              row.kpiName = ASSURANCE_STANDARD_LABEL;
+            }
+          }
+        }
+
         const INC = 1;
         const OMIT_FROM_INCIDENT_TILES = 4;
         const SYNTH = [

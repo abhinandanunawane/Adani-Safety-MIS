@@ -6686,8 +6686,10 @@ body.shell--docs-body {
   gap: 12px;
   margin: 8px 0 16px;
 }
-.cat-view--vulnerable-location .chart-box--vl-trend,
-.cat-view--vulnerable-location .chart-box--vl-dist {
+.cat-view--vulnerable-location .chart-row--vl-trend-only {
+  grid-template-columns: 1fr;
+}
+.cat-view--vulnerable-location .chart-box--vl-trend {
   min-height: 220px;
 }
 .cat-view--vulnerable-location .chart-placeholder {
