@@ -1256,11 +1256,11 @@
   }
 
   /**
-   * Incident Management: same order as main app (Fatality → … → Investigation Closure %).
-   * 56/57 = Fire incidents / Property Damage incidents when present in data.
+   * Incident Management: align with main `app.js` INCIDENT_KPI_ORDER (incl. preview keys 56–58).
    */
   const INCIDENT_KPI_ORDER = [
-    8, 9, 10, 11, 12, 19, 14, 22, 4, 3, 7, 28, 56, 57, 1, 2, 5, 15, 44,
+    8, 9, 10, 11, 12, 4, 58, 3, 28, 5, 7, 56, 22, 1, 2, 44, 14, 15, 19, 57,
+    21,
   ];
 
   function sortKpisForDisplay(catKey, kpisMeta) {

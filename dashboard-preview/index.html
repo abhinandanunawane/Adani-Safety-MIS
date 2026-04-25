@@ -118,7 +118,7 @@
         min-height: 60vh;
       }
     </style>
-    <link rel="stylesheet" href="styles.css?v=20260425r1" />
+    <link rel="stylesheet" href="styles.css?v=20260425r2" />
     <link rel="preload" as="image" href="assets/home-2-6.png" />
     <link
       rel="stylesheet"
@@ -218,6 +218,142 @@
       crossorigin=""
     ></script>
     <script defer src="embedded-data.js?v=20260418r1"></script>
-    <script defer src="app.js?v=20260425r9"></script>
+    <script defer src="app.js?v=20260425r12"></script>
+    <!--
+      index.html only — Incident Data: exactly 19 KPIs in stakeholder order (attachment 1–18 + #19 Property Damage).
+      Omits kpiKey 4 from the catalogue so app INCIDENT_KPI_ORDER yields rank 6 = Total Recordable Injuries (58),
+      … rank 18 = Delta of Fatal (19), rank 19 = Property Damage (57). TRIR (21) stays in data but out of the 19-tile list.
+      Seeds 56 / 57 / 58 if missing.
+    -->
+    <script type="module">
+      (function () {
+        const d = window.__DASHBOARD_DATA__;
+        if (!d || !Array.isArray(d.kpiDetailByCategory)) return;
+        const INC = 1;
+        const OMIT_FROM_INCIDENT_TILES = 4;
+        const SYNTH = [
+          {
+            kpiKey: 56,
+            kpiName: "Fire incidents Count",
+            unitType: "Count",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 57,
+            kpiName: "Property Damage Count",
+            unitType: "Count",
+            latestValue: 0,
+          },
+          {
+            kpiKey: 58,
+            kpiName: "Total Recordable Injuries",
+            unitType: "Count",
+            latestValue: 0,
+          },
+        ];
+
+        const detail = d.kpiDetailByCategory.find(
+          (x) => Number(x.categoryKey) === INC
+        );
+        if (!detail || !Array.isArray(detail.kpis)) return;
+
+        detail.kpis = detail.kpis.filter(
+          (k) => Number(k.kpiKey) !== OMIT_FROM_INCIDENT_TILES
+        );
+
+        const fr = d.factRows;
+        const have = new Set(detail.kpis.map((k) => Number(k.kpiKey)));
+        const toSeed = [];
+        for (let i = 0; i < SYNTH.length; i++) {
+          const meta = SYNTH[i];
+          if (have.has(meta.kpiKey)) continue;
+          detail.kpis.push(meta);
+          have.add(meta.kpiKey);
+          toSeed.push(meta);
+        }
+
+        if (toSeed.length && Array.isArray(fr)) {
+          const monthKeys = (d.months || [])
+            .map((m) => m.yearMonth)
+            .filter(Boolean)
+            .sort();
+          const businesses = [];
+          const seen = new Set();
+          for (let i = 0; i < fr.length && businesses.length < 14; i++) {
+            const row = fr[i];
+            const b = String(row.businessName || "").trim();
+            if (!b || seen.has(b)) continue;
+            seen.add(b);
+            businesses.push({
+              businessName: b,
+              businessKey: row.businessKey,
+              state:
+                String(row.state || "Maharashtra").trim() || "Maharashtra",
+            });
+          }
+          if (!businesses.length) {
+            businesses.push({
+              businessName: "Power",
+              businessKey: 1,
+              state: "Madhya Pradesh",
+            });
+          }
+          function ymToDateKey(ym) {
+            return Number(String(ym).replace("-", "").slice(0, 6) + "01");
+          }
+          function seedValue(seedStr, min, max) {
+            let h = 2166136261;
+            const s = String(seedStr);
+            for (let j = 0; j < s.length; j++) {
+              h ^= s.charCodeAt(j);
+              h = Math.imul(h, 16777619);
+            }
+            const u = (h >>> 0) / 4294967296;
+            return min + u * (max - min);
+          }
+          for (let mi = 0; mi < monthKeys.length; mi++) {
+            const ym = monthKeys[mi];
+            const dk = ymToDateKey(ym);
+            for (let bi = 0; bi < businesses.length; bi++) {
+              const biz = businesses[bi];
+              for (let si = 0; si < toSeed.length; si++) {
+                const kpi = toSeed[si];
+                const v = Math.round(
+                  seedValue(
+                    ym + "|" + biz.businessName + "|" + kpi.kpiKey,
+                    0,
+                    12
+                  )
+                );
+                fr.push({
+                  yearMonth: ym,
+                  dateKey: dk,
+                  businessKey: biz.businessKey,
+                  businessName: biz.businessName,
+                  state: biz.state,
+                  kpiKey: kpi.kpiKey,
+                  kpiName: kpi.kpiName,
+                  categoryKey: INC,
+                  unitType: kpi.unitType,
+                  value: v,
+                  target: null,
+                });
+              }
+            }
+          }
+        }
+
+        const cat = (d.categories || []).find(
+          (c) => Number(c.categoryKey) === INC
+        );
+        if (cat) {
+          cat.kpiCount = detail.kpis.filter(
+            (k) => Number(k.kpiKey) !== 21
+          ).length;
+        }
+
+        window.dispatchEvent(new Event("hashchange"));
+      })();
+    </script>
   </body>
 </html>

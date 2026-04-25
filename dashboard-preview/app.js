@@ -285,7 +285,6 @@
     if (insightShell) return dataName || "";
     const k = Number(categoryKey);
     if (k === 1) return "Incident Data";
-    if (k === 3) return "Safety Incidents Rate";
     if (k === 10) return "Vulnerable & Resilient Locations";
     return dataName || "";
   }
@@ -447,9 +446,10 @@
 
   /** Synthetic preview category (replaces former Workforce cat 5 in bootstrap). */
   const ASSURANCE_CATEGORY_KEY = 5;
-  /** Incident-only additions (Dim keys 18 / 19 are used elsewhere — 56 / 57 here). */
+  /** Incident-only additions (Dim keys 18 / 19 are used elsewhere — 56 / 57 / 58 here). */
   const INCIDENT_FIRE_KPI_KEY = 56;
   const INCIDENT_PROPERTY_DAMAGE_KPI_KEY = 57;
+  const INCIDENT_TOTAL_RECORDABLE_INJURIES_KPI_KEY = 58;
 
   /** Align packaged JSON meta with header product name (avoid editing embedded-data.js). */
   function previewApplyDataMetaTitles() {
@@ -460,8 +460,8 @@
   }
 
   /**
-   * Incident Management: add Fire + Property Damage (19 KPIs total). Seeded fact rows.
-   * Display names align with stakeholder list (Fire incidents / Property Damage incidents).
+   * Incident Management: add Fire, Property Damage, and Total Recordable Injuries (preview Dim keys).
+   * Seeded fact rows; `ensureCategoryCatalogueBaseline` syncs category `kpiCount` from `detail.kpis`.
    */
   function previewAddIncidentFirePropertyKpis() {
     if (!DATA || !Array.isArray(DATA.factRows)) return;
@@ -471,7 +471,13 @@
     );
     if (!detail || !Array.isArray(detail.kpis)) return;
     const have = new Set(detail.kpis.map((k) => Number(k.kpiKey)));
-    if (have.has(INCIDENT_FIRE_KPI_KEY)) return;
+    if (
+      have.has(INCIDENT_FIRE_KPI_KEY) &&
+      have.has(INCIDENT_PROPERTY_DAMAGE_KPI_KEY) &&
+      have.has(INCIDENT_TOTAL_RECORDABLE_INJURIES_KPI_KEY)
+    ) {
+      return;
+    }
 
     function ymToDateKey(ym) {
       return Number(String(ym).replace("-", "").slice(0, 6) + "01");
@@ -487,21 +493,33 @@
       return min + u * (max - min);
     }
 
-    const extraMeta = [
-      {
-        kpiKey: INCIDENT_FIRE_KPI_KEY,
-        kpiName: "Fire incidents Count",
-        unitType: "Count",
-        latestValue: 0,
-      },
-      {
-        kpiKey: INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
-        kpiName: "Property Damage Count",
-        unitType: "Count",
-        latestValue: 0,
-      },
-    ];
-    detail.kpis.push(extraMeta[0], extraMeta[1]);
+    const fireMeta = {
+      kpiKey: INCIDENT_FIRE_KPI_KEY,
+      kpiName: "Fire incidents Count",
+      unitType: "Count",
+      latestValue: 0,
+    };
+    const propMeta = {
+      kpiKey: INCIDENT_PROPERTY_DAMAGE_KPI_KEY,
+      kpiName: "Property Damage Count",
+      unitType: "Count",
+      latestValue: 0,
+    };
+    const triMeta = {
+      kpiKey: INCIDENT_TOTAL_RECORDABLE_INJURIES_KPI_KEY,
+      kpiName: "Total Recordable Injuries",
+      unitType: "Count",
+      latestValue: 0,
+    };
+
+    const toAdd = [];
+    if (!have.has(INCIDENT_FIRE_KPI_KEY)) toAdd.push(fireMeta);
+    if (!have.has(INCIDENT_PROPERTY_DAMAGE_KPI_KEY)) toAdd.push(propMeta);
+    if (!have.has(INCIDENT_TOTAL_RECORDABLE_INJURIES_KPI_KEY))
+      toAdd.push(triMeta);
+    if (!toAdd.length) return;
+
+    detail.kpis.push(...toAdd);
     const cat = DATA.categories.find((c) => c.categoryKey === INCIDENT_CAT);
     if (cat) cat.kpiCount = detail.kpis.length;
 
@@ -539,8 +557,8 @@
       const dk = ymToDateKey(ym);
       for (let bi = 0; bi < businesses.length; bi++) {
         const biz = businesses[bi];
-        for (let ki = 0; ki < extraMeta.length; ki++) {
-          const kpi = extraMeta[ki];
+        for (let ki = 0; ki < toAdd.length; ki++) {
+          const kpi = toAdd[ki];
           const v = Math.round(
             seedValue(ym + "|" + biz.businessName + "|" + kpi.kpiKey, 0, 12)
           );
@@ -571,8 +589,8 @@
       1: "Process safety Incidents",
       2: "Process Safety Near Misses",
       3: "Leak/spill count",
-      4: "Total Recordable Injuries",
-      5: "Repeat incident cases (cat 0 to 5) count",
+      4: "Injury Illness incidents",
+      5: "Repeat incident cases count",
       7: "Dangerous occurrence count",
       8: "Fatality Count",
       9: "LTI Count",
@@ -587,6 +605,7 @@
       44: "Investigations Closure %",
       56: "Fire incidents Count",
       57: "Property Damage Count",
+      58: "Total Recordable Injuries",
     };
     const blocks = Array.isArray(DATA.kpiDetailByCategory)
       ? DATA.kpiDetailByCategory
@@ -2691,6 +2710,8 @@
   }
 
   function isTriKpiMeta(k) {
+    /** Dim 58 = Incident Data “Total Recordable Injuries” — not SPI TRIR; must stay in cat 1 lists. */
+    if (String(k.kpiKey) === "58") return false;
     return (
       String(k.kpiKey) === "21" ||
       /Total Recordable|TRIR|\bTRI\b|Recordable Incident Rate/i.test(
@@ -5050,8 +5071,8 @@
   }
 
   /**
-   * Incident Data: sequence Fatality → FAC → … → Fire → Man day → PSI/PSNM →
-   * Investigations % → Deltas → Property damage → TRIR (preview-seeded 56/57).
+   * Incident Data: Fatality → FAC → Injury Illness incidents (4) → Total Recordable Injuries (58) → …
+   * (preview-seeded 56 / 57 / 58).
    */
   const INCIDENT_KPI_ORDER = [
     8,
@@ -5060,6 +5081,7 @@
     11,
     12,
     4,
+    INCIDENT_TOTAL_RECORDABLE_INJURIES_KPI_KEY,
     3,
     28,
     5,
