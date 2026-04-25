@@ -109,7 +109,7 @@
   (function patchTrainingKpiDisplayNames() {
     function fixName(o) {
       if (!o || o.kpiName !== "Training Count") return;
-      o.kpiName = "Training Program Count";
+      o.kpiName = "Total Training Conducted";
     }
     (DATA.kpiDetailByCategory || []).forEach((block) => {
       (block.kpis || []).forEach(fixName);
@@ -779,17 +779,17 @@
         latestValue: 81,
       },
       {
-        kpiKey: 501,
-        kpiName: "FRC Compliance %",
-        unitType: "PercentOrRate",
-        latestValue: 88,
-      },
-      {
         kpiKey: 502,
         kpiName:
-          "Critical Standards Implementation %",
+          "% Standard Implementation against the fatal four top critical Safety Standards",
         unitType: "PercentOrRate",
         latestValue: 72,
+      },
+      {
+        kpiKey: 501,
+        kpiName: "FRC compliance Rate",
+        unitType: "PercentOrRate",
+        latestValue: 88,
       },
     ];
     DATA.categories.push({
@@ -880,7 +880,7 @@
     if (!block || !Array.isArray(block.kpis)) return;
     const siMeta = {
       kpiKey: siKpi,
-      kpiName: "SI Completion %",
+      kpiName: "SI (Planned vs Actual)",
       unitType: "PercentOrRate",
       latestValue: 84.2,
     };
@@ -920,7 +920,7 @@
   /**
    * Risk Control (7): remove KPIs that mirror Assurance and Compliance (cat 5) preview measures
    * — Incident Key Learning %, FRC Compliance %, Critical Standards % (Dim keys 51 / 52 / 54).
-   * Hazard still uses kpiKey 54 as "SI Completion %" under category 2 only.
+   * Hazard still uses kpiKey 54 as "SI (Planned vs Actual)" under category 2 only.
    */
   function previewStripRiskControlAssuranceDuplicateKpis() {
     if (!DATA) return;
@@ -981,6 +981,154 @@
             .reduce((acc, r) => acc + Number(r.value || 0), 0);
           b.value = Math.round(sum * 100) / 100;
         }
+      }
+    }
+  }
+
+  /**
+   * Risk Control Programs (7): exactly six KPIs in stakeholder order — Total Actions Closure %,
+   * Safety Inspection Observation closure %, Total SRFA Closure %, S-4 / S-5 SRFA closure %, Near Miss FR.
+   * Clones facts from Hazard (2) and SPI (3) before Hazard KPI restriction drops shared keys.
+   */
+  function previewSeedRiskControlProgramsKpis() {
+    if (!DATA || !Array.isArray(DATA.factRows)) return;
+    const RISK = 7;
+    const HAZ = 2;
+    const SPI = 3;
+    const order = [46, 45, 40, 41, 42, 20];
+    const displayNames = {
+      46: "Total Actions Closure %",
+      45: "Safety Inspection Observation closure %",
+      40: "Total SRFA Closure %",
+      41: "S-4 SRFA Closure %",
+      42: "S-5 SRFA Closure %",
+      20: "Near Miss FR",
+    };
+
+    function metaFrom(catKey, kpiKey) {
+      const b = DATA.kpiDetailByCategory.find(
+        (x) => Number(x.categoryKey) === catKey
+      );
+      if (!b || !Array.isArray(b.kpis)) return null;
+      return (
+        b.kpis.find((k) => Number(k.kpiKey) === Number(kpiKey)) || null
+      );
+    }
+
+    function nameFor(id) {
+      return displayNames[id] || "KPI " + id;
+    }
+
+    const templates = {};
+    for (let i = 0; i < order.length; i++) {
+      const id = order[i];
+      const preferCat =
+        id === 41 || id === 42 ? RISK : id === 20 ? SPI : HAZ;
+      let rows = DATA.factRows.filter(
+        (r) =>
+          Number(r.categoryKey) === preferCat && Number(r.kpiKey) === id
+      );
+      if (!rows.length && (id === 41 || id === 42)) {
+        rows = DATA.factRows.filter(
+          (r) => Number(r.categoryKey) === HAZ && Number(r.kpiKey) === id
+        );
+      }
+      templates[id] = rows;
+    }
+
+    const kpisOut = order.map((id) => {
+      const m =
+        metaFrom(HAZ, id) || metaFrom(RISK, id) || metaFrom(SPI, id);
+      const sampleVal =
+        templates[id] && templates[id].length
+          ? Number(templates[id][templates[id].length - 1].value)
+          : 0;
+      const base = m || {
+        kpiKey: id,
+        kpiName: nameFor(id),
+        unitType: "PercentOrRate",
+        latestValue: sampleVal,
+      };
+      return {
+        kpiKey: base.kpiKey,
+        kpiName: nameFor(id),
+        unitType: base.unitType || "PercentOrRate",
+        latestValue:
+          base.latestValue != null && base.latestValue !== ""
+            ? base.latestValue
+            : sampleVal,
+      };
+    });
+
+    let riskDetail = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === RISK
+    );
+    if (!riskDetail) {
+      riskDetail = { categoryKey: RISK, kpis: [] };
+      DATA.kpiDetailByCategory.push(riskDetail);
+    }
+    riskDetail.kpis = kpisOut;
+
+    DATA.factRows = DATA.factRows.filter(
+      (r) => Number(r.categoryKey) !== RISK
+    );
+
+    for (let i = 0; i < order.length; i++) {
+      const id = order[i];
+      const rows = templates[id] || [];
+      for (let j = 0; j < rows.length; j++) {
+        const r = rows[j];
+        DATA.factRows.push({
+          ...r,
+          categoryKey: RISK,
+          kpiKey: id,
+          kpiName: nameFor(id),
+        });
+      }
+    }
+
+    const catRow = DATA.categories.find((c) => Number(c.categoryKey) === RISK);
+    if (catRow) catRow.kpiCount = order.length;
+
+    const mbc = DATA.monthlyByCategory.find(
+      (x) => Number(x.categoryKey) === RISK
+    );
+    if (mbc && Array.isArray(DATA.months)) {
+      const monthKeys = DATA.months.map((m) => m.yearMonth).filter(Boolean);
+      mbc.series = monthKeys.map((ym) => {
+        const nums = DATA.factRows
+          .filter(
+            (r) =>
+              String(r.yearMonth) === String(ym) &&
+              Number(r.categoryKey) === RISK
+          )
+          .map((r) => Number(r.value))
+          .filter((v) => Number.isFinite(v));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+
+    const bb = DATA.businessBreakdown.find(
+      (x) => Number(x.categoryKey) === RISK
+    );
+    if (bb && Array.isArray(bb.bars) && DATA.months && DATA.months.length) {
+      const lastYm = DATA.months[DATA.months.length - 1].yearMonth;
+      for (let bi = 0; bi < bb.bars.length; bi++) {
+        const bar = bb.bars[bi];
+        const bn = String(bar.business || "").trim();
+        if (!bn) continue;
+        const sum = DATA.factRows
+          .filter(
+            (r) =>
+              Number(r.categoryKey) === RISK &&
+              String(r.yearMonth) === String(lastYm) &&
+              String(r.businessName || "").trim() === bn
+          )
+          .reduce((acc, r) => acc + Number(r.value || 0), 0);
+        bar.value = Math.round(sum * 100) / 100;
       }
     }
   }
@@ -1061,9 +1209,319 @@
         latestMonthIndex: 1,
       };
       DATA.categories.push(catRow);
-    } else if (catRow) {
+    } else     if (catRow) {
       catRow.kpiCount = locKpis.length;
       catRow.latestMonthIndex = 1;
+    }
+  }
+
+  /**
+   * Hazard & Observation Management: stakeholder KPIs in fixed order
+   * (Observations → Closure % → SI planned vs actual → unsafe acts/hr in SI → Near miss → Life saved).
+   * Runs after Vulnerable Location seed (which clones the fuller hazard catalogue first).
+   */
+  function previewRestrictHazardObservationKpis() {
+    if (!DATA || !Array.isArray(DATA.kpiDetailByCategory)) return;
+    const haz = 2;
+    const allowOrder = [38, 39, 54, 53, 13, 6];
+    const allowSet = new Set(allowOrder);
+    const displayNames = {
+      38: "Hazard Spotting Observations",
+      39: "Hazard Spotting Closure %",
+      54: "SI (Planned vs Actual)",
+      53: "Unsafe Acts Identified per hour in SI Round",
+      13: "Near Miss Count",
+      6: "Life Saved Cases Count",
+    };
+    const block = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === haz
+    );
+    if (!block || !Array.isArray(block.kpis)) return;
+    const byKey = new Map(block.kpis.map((k) => [Number(k.kpiKey), k]));
+    block.kpis = allowOrder
+      .map((id) => {
+        const row = byKey.get(id);
+        if (!row) return null;
+        const label = displayNames[id];
+        if (label) row.kpiName = label;
+        return row;
+      })
+      .filter(Boolean);
+    const catRow = DATA.categories.find((c) => Number(c.categoryKey) === haz);
+    if (catRow) catRow.kpiCount = block.kpis.length;
+
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter((r) => {
+        if (Number(r.categoryKey) !== haz) return true;
+        return allowSet.has(Number(r.kpiKey));
+      });
+      DATA.factRows.forEach((r) => {
+        if (Number(r.categoryKey) !== haz) return;
+        const lab = displayNames[Number(r.kpiKey)];
+        if (lab) r.kpiName = lab;
+      });
+    }
+  }
+
+  /**
+   * Consequence Management (4): exactly five KPIs in stakeholder order — Total CMP action Taken,
+   * Fatality vs CMP, Job band, Category, LTI vs CMP. Drops any merged Risk Control duplicates (e.g. 51/52).
+   */
+  function previewRestrictConsequenceManagementKpis() {
+    if (!DATA || !Array.isArray(DATA.kpiDetailByCategory)) return;
+    const cons = 4;
+    const allowOrder = [25, 23, 27, 26, 24];
+    const allowSet = new Set(allowOrder);
+    const displayNames = {
+      25: "Total CMP action Taken",
+      23: "Fatality vs CMP action Compliance",
+      27: "CMP action Job band wise",
+      26: "CMP action category wise",
+      24: "LTI vs CMP action Compliance",
+    };
+    const block = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === cons
+    );
+    if (!block || !Array.isArray(block.kpis)) return;
+    const byKey = new Map(block.kpis.map((k) => [Number(k.kpiKey), k]));
+    block.kpis = allowOrder
+      .map((id) => {
+        const row = byKey.get(id);
+        if (!row) return null;
+        const label = displayNames[id];
+        if (label) row.kpiName = label;
+        return row;
+      })
+      .filter(Boolean);
+    const catRow = DATA.categories.find((c) => Number(c.categoryKey) === cons);
+    if (catRow) catRow.kpiCount = block.kpis.length;
+
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter((r) => {
+        if (Number(r.categoryKey) !== cons) return true;
+        return allowSet.has(Number(r.kpiKey));
+      });
+      DATA.factRows.forEach((r) => {
+        if (Number(r.categoryKey) !== cons) return;
+        const lab = displayNames[Number(r.kpiKey)];
+        if (lab) r.kpiName = lab;
+      });
+    }
+
+    const mbc = DATA.monthlyByCategory.find(
+      (x) => Number(x.categoryKey) === cons
+    );
+    if (mbc && Array.isArray(DATA.months)) {
+      const monthKeys = DATA.months.map((m) => m.yearMonth).filter(Boolean);
+      mbc.series = monthKeys.map((ym) => {
+        const nums = DATA.factRows
+          .filter(
+            (r) =>
+              String(r.yearMonth) === String(ym) &&
+              Number(r.categoryKey) === cons
+          )
+          .map((r) => Number(r.value))
+          .filter((v) => Number.isFinite(v));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+
+    const bb = DATA.businessBreakdown.find(
+      (x) => Number(x.categoryKey) === cons
+    );
+    if (bb && Array.isArray(bb.bars) && DATA.months && DATA.months.length) {
+      const lastYm = DATA.months[DATA.months.length - 1].yearMonth;
+      for (let bi = 0; bi < bb.bars.length; bi++) {
+        const bar = bb.bars[bi];
+        const bn = String(bar.business || "").trim();
+        if (!bn) continue;
+        const sum = DATA.factRows
+          .filter(
+            (r) =>
+              Number(r.categoryKey) === cons &&
+              String(r.yearMonth) === String(lastYm) &&
+              String(r.businessName || "").trim() === bn
+          )
+          .reduce((acc, r) => acc + Number(r.value || 0), 0);
+        bar.value = Math.round(sum * 100) / 100;
+      }
+    }
+  }
+
+  /**
+   * Training & Competency Development (6): five KPIs in stakeholder order with catalogue labels.
+   */
+  function previewRestrictTrainingCompetencyDevelopmentKpis() {
+    if (!DATA || !Array.isArray(DATA.kpiDetailByCategory)) return;
+    const tr = 6;
+    const allowOrder = [34, 35, 37, 36, 49];
+    const allowSet = new Set(allowOrder);
+    const displayNames = {
+      34: "Total Training Conducted",
+      35: "Training Intensity Rate",
+      37:
+        "Executive training Index (Functional Managers, Managing Managers, Managing Others & Managing Self )",
+      36: "Frontline Worker Training Index",
+      49: "SAKSHAM Implementation %",
+    };
+    const block = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === tr
+    );
+    if (!block || !Array.isArray(block.kpis)) return;
+    const byKey = new Map(block.kpis.map((k) => [Number(k.kpiKey), k]));
+    block.kpis = allowOrder
+      .map((id) => {
+        const row = byKey.get(id);
+        if (!row) return null;
+        const label = displayNames[id];
+        if (label) row.kpiName = label;
+        return row;
+      })
+      .filter(Boolean);
+    const catRow = DATA.categories.find((c) => Number(c.categoryKey) === tr);
+    if (catRow) catRow.kpiCount = block.kpis.length;
+
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter((r) => {
+        if (Number(r.categoryKey) !== tr) return true;
+        return allowSet.has(Number(r.kpiKey));
+      });
+      DATA.factRows.forEach((r) => {
+        if (Number(r.categoryKey) !== tr) return;
+        const lab = displayNames[Number(r.kpiKey)];
+        if (lab) r.kpiName = lab;
+      });
+    }
+
+    const mbc = DATA.monthlyByCategory.find(
+      (x) => Number(x.categoryKey) === tr
+    );
+    if (mbc && Array.isArray(DATA.months)) {
+      const monthKeys = DATA.months.map((m) => m.yearMonth).filter(Boolean);
+      mbc.series = monthKeys.map((ym) => {
+        const nums = DATA.factRows
+          .filter(
+            (r) =>
+              String(r.yearMonth) === String(ym) &&
+              Number(r.categoryKey) === tr
+          )
+          .map((r) => Number(r.value))
+          .filter((v) => Number.isFinite(v));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+
+    const bb = DATA.businessBreakdown.find(
+      (x) => Number(x.categoryKey) === tr
+    );
+    if (bb && Array.isArray(bb.bars) && DATA.months && DATA.months.length) {
+      const lastYm = DATA.months[DATA.months.length - 1].yearMonth;
+      for (let bi = 0; bi < bb.bars.length; bi++) {
+        const bar = bb.bars[bi];
+        const bn = String(bar.business || "").trim();
+        if (!bn) continue;
+        const sum = DATA.factRows
+          .filter(
+            (r) =>
+              Number(r.categoryKey) === tr &&
+              String(r.yearMonth) === String(lastYm) &&
+              String(r.businessName || "").trim() === bn
+          )
+          .reduce((acc, r) => acc + Number(r.value || 0), 0);
+        bar.value = Math.round(sum * 100) / 100;
+      }
+    }
+  }
+
+  /**
+   * Leadership & Safety Governance (8): four KPIs in stakeholder order; keeps multi-KPI / standard charts.
+   */
+  function previewRestrictLeadershipSafetyGovernanceKpis() {
+    if (!DATA || !Array.isArray(DATA.kpiDetailByCategory)) return;
+    const ld = 8;
+    const allowOrder = [47, 48, 43, 55];
+    const allowSet = new Set(allowOrder);
+    const displayNames = {
+      47: "Business Safety Council Meeting",
+      48: "6 Taskforce governance meeting",
+      43: "Leadership Safety Walkthroughs",
+      55: "Leadership Safety Observations",
+    };
+    const block = DATA.kpiDetailByCategory.find(
+      (x) => Number(x.categoryKey) === ld
+    );
+    if (!block || !Array.isArray(block.kpis)) return;
+    const byKey = new Map(block.kpis.map((k) => [Number(k.kpiKey), k]));
+    block.kpis = allowOrder
+      .map((id) => {
+        const row = byKey.get(id);
+        if (!row) return null;
+        const label = displayNames[id];
+        if (label) row.kpiName = label;
+        return row;
+      })
+      .filter(Boolean);
+    const catRow = DATA.categories.find((c) => Number(c.categoryKey) === ld);
+    if (catRow) catRow.kpiCount = block.kpis.length;
+
+    if (Array.isArray(DATA.factRows)) {
+      DATA.factRows = DATA.factRows.filter((r) => {
+        if (Number(r.categoryKey) !== ld) return true;
+        return allowSet.has(Number(r.kpiKey));
+      });
+      DATA.factRows.forEach((r) => {
+        if (Number(r.categoryKey) !== ld) return;
+        const lab = displayNames[Number(r.kpiKey)];
+        if (lab) r.kpiName = lab;
+      });
+    }
+
+    const mbc = DATA.monthlyByCategory.find(
+      (x) => Number(x.categoryKey) === ld
+    );
+    if (mbc && Array.isArray(DATA.months)) {
+      const monthKeys = DATA.months.map((m) => m.yearMonth).filter(Boolean);
+      mbc.series = monthKeys.map((ym) => {
+        const nums = DATA.factRows
+          .filter(
+            (r) =>
+              String(r.yearMonth) === String(ym) &&
+              Number(r.categoryKey) === ld
+          )
+          .map((r) => Number(r.value))
+          .filter((v) => Number.isFinite(v));
+        const v = nums.length
+          ? nums.reduce((a, b) => a + b, 0) / nums.length
+          : 0;
+        return { yearMonth: ym, value: Math.round(v * 100) / 100 };
+      });
+    }
+
+    const bb = DATA.businessBreakdown.find(
+      (x) => Number(x.categoryKey) === ld
+    );
+    if (bb && Array.isArray(bb.bars) && DATA.months && DATA.months.length) {
+      const lastYm = DATA.months[DATA.months.length - 1].yearMonth;
+      for (let bi = 0; bi < bb.bars.length; bi++) {
+        const bar = bb.bars[bi];
+        const bn = String(bar.business || "").trim();
+        if (!bn) continue;
+        const sum = DATA.factRows
+          .filter(
+            (r) =>
+              Number(r.categoryKey) === ld &&
+              String(r.yearMonth) === String(lastYm) &&
+              String(r.businessName || "").trim() === bn
+          )
+          .reduce((acc, r) => acc + Number(r.value || 0), 0);
+        bar.value = Math.round(sum * 100) / 100;
+      }
     }
   }
 
@@ -1073,7 +1531,12 @@
   previewCategoryDataBootstrap();
   previewAddHazardSiPlannedActualKpi();
   previewStripRiskControlAssuranceDuplicateKpis();
+  previewRestrictConsequenceManagementKpis();
+  previewSeedRiskControlProgramsKpis();
   previewSeedVulnerableLocationCategory();
+  previewRestrictHazardObservationKpis();
+  previewRestrictTrainingCompetencyDevelopmentKpis();
+  previewRestrictLeadershipSafetyGovernanceKpis();
   ensureCategoryCatalogueBaseline();
   normalizeCategorySelectionCatalog();
 
@@ -1102,6 +1565,8 @@
   const TRAINING_CATEGORY_KEY = 6;
   const SYSTEMS_ADOPTION_CATEGORY_KEY = 9;
   const LEADERSHIP_CATEGORY_KEY = 8;
+  /** Risk Control Programs — preview roster matches stakeholder workbook order (six KPIs). */
+  const RISK_CONTROL_PROGRAMS_CATEGORY_KEY = 7;
   /** Main dashboard (`index.html`) only — mandatory meeting types for compliance matrix. */
   const LEADERSHIP_MEETING_TYPE_LABELS = [
     "Executive safety board",
@@ -1227,8 +1692,8 @@
     ADANI_GREEN,
     ADANI_BLUE,
   ];
-  /** Incident Key Learning (501): dual Group vs business gauge when selected in Assurance. */
-  const INCIDENT_KEY_LEARNING_SPEEDOMETER_KPI_KEY = "501";
+  /** Incident Key Learning (503): dual Group vs business gauge when selected in Assurance. */
+  const INCIDENT_KEY_LEARNING_SPEEDOMETER_KPI_KEY = "503";
   const EVENT_LEVEL_LABELS = [
     "0 Near Miss",
     "1 Minor",
@@ -4094,7 +4559,7 @@
     return avg(nums);
   }
 
-  /** Group roll-up for KPI 501 (all BUs): same Current Period / geo / vertical filters, business ignored. */
+  /** Group roll-up for KPI 503 (all BUs): same Current Period / geo / vertical filters, business ignored. */
   function incidentKeyLearningGroupPercent(poolAll, f) {
     const snapPool = applyNonMonthFiltersExceptBusiness(poolAll, f, true);
     const winMonths = new Set(effectiveBizWindowMonths(f));
@@ -4611,27 +5076,33 @@
     21,
   ];
   /**
-   * Hazard & Observation (leading): stakeholder sequence
-   * (Spotting → closures → SRFA → Near Miss → SI/action % → Unsafe Acts/hr → Life saved).
-   * Other keys in category (e.g. S-4/S-5 SRFA, TRI) follow via sortKpisForDisplay rest.
+   * Hazard & Observation (leading): stakeholder sequence for the main preview —
+   * Observations → Spotting closure % → SI (planned vs actual) → unsafe acts/hr in SI → Near miss → Life saved.
    */
-  const HAZARD_KPI_ORDER = [38, 39, 40, 13, 45, 46, 53, 54, 6];
-  /** Consequence Management + compliance KPIs moved from Risk Control. */
+  const HAZARD_KPI_ORDER = [38, 39, 54, 53, 13, 6];
   /**
-   * Consequence Management (4): Fatality vs CMP → LTI vs CMP → totals → category → job band.
-   * Other KPIs in this category (e.g. from former Risk Control) follow in sortKpisForDisplay.
+   * Consequence Management (4): stakeholder order — Total CMP action Taken → Fatality vs CMP →
+   * Job band → Category → LTI vs CMP (five KPIs; no merged extras).
    */
-  const CONSEQUENCE_KPI_ORDER = [23, 24, 25, 26, 27];
+  const CONSEQUENCE_KPI_ORDER = [25, 23, 27, 26, 24];
   /**
-   * Training & Competency Development (6): conducted → intensity → executive index →
-   * frontline index → SAKSHAM.
+   * Training & Competency Development (6): Total Training Conducted → Intensity → Executive index →
+   * Frontline Worker index → SAKSHAM (five KPIs).
    */
   const TRAINING_KPI_ORDER = [34, 35, 37, 36, 49];
   /**
-   * Leadership & Safety Governance (8): council → taskforce → walkthrough →
-   * observations / CAPA (Felt leadership actions).
+   * Leadership & Safety Governance (8): council → taskforce governance → walkthroughs → observations (four KPIs).
    */
   const LEADERSHIP_KPI_ORDER = [47, 48, 43, 55];
+  /**
+   * Risk Control Programs (7): Total Actions → SI observation closure → Total SRFA →
+   * S-4 / S-5 SRFA → Near Miss FR (preview-seeded; Dim keys 46 / 45 / 40 / 41 / 42 / 20).
+   */
+  const RISK_CONTROL_KPI_ORDER = [46, 45, 40, 41, 42, 20];
+  /**
+   * Assurance and Compliance (5): Incident Key Learning → Standards implementation → FRC rate.
+   */
+  const ASSURANCE_KPI_ORDER = [503, 502, 501];
 
   function sortKpisForDisplay(catKey, kpisMeta) {
     const cat = Number(catKey);
@@ -4647,26 +5118,15 @@
     }
     if (cat === HAZARD_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
-      const ordered = HAZARD_KPI_ORDER.map((id) => map.get(id)).filter(
-        Boolean
-      );
-      const rest = list.filter(
-        (k) => !HAZARD_KPI_ORDER.includes(Number(k.kpiKey))
-      );
-      return ordered.concat(rest);
+      return HAZARD_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
     if (cat === ASSURANCE_CATEGORY_KEY) {
-      const order = [503, 501, 502];
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
-      return order.map((id) => map.get(id)).filter(Boolean);
+      return ASSURANCE_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
     if (cat === CONSEQUENCE_MANAGEMENT_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
-      return CONSEQUENCE_KPI_ORDER.map((id) => map.get(id))
-        .filter(Boolean)
-        .concat(
-          list.filter((k) => !CONSEQUENCE_KPI_ORDER.includes(Number(k.kpiKey)))
-        );
+      return CONSEQUENCE_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
     if (cat === SPI_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
@@ -4678,23 +5138,15 @@
     }
     if (cat === TRAINING_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
-      const ordered = TRAINING_KPI_ORDER.map((id) => map.get(id)).filter(
-        Boolean
-      );
-      const rest = list.filter(
-        (k) => !TRAINING_KPI_ORDER.includes(Number(k.kpiKey))
-      );
-      return ordered.concat(rest);
+      return TRAINING_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
     if (cat === LEADERSHIP_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
-      const ordered = LEADERSHIP_KPI_ORDER.map((id) => map.get(id)).filter(
-        Boolean
-      );
-      const rest = list.filter(
-        (k) => !LEADERSHIP_KPI_ORDER.includes(Number(k.kpiKey))
-      );
-      return ordered.concat(rest);
+      return LEADERSHIP_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
+    }
+    if (cat === RISK_CONTROL_PROGRAMS_CATEGORY_KEY) {
+      const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
+      return RISK_CONTROL_KPI_ORDER.map((id) => map.get(id)).filter(Boolean);
     }
     if (cat === VULNERABLE_LOCATION_CATEGORY_KEY) {
       const map = new Map(list.map((k) => [Number(k.kpiKey), k]));
@@ -5530,6 +5982,9 @@
     }
     function openCompareForKpi() {
       applyToolbarSingleKpiSelection(catKey, item.kpiKey);
+      if (Number(catKey) === LEADERSHIP_CATEGORY_KEY) {
+        return;
+      }
       const tCharts = document.getElementById("view-tab-charts");
       if (tCharts) tCharts.click();
     }
@@ -6145,10 +6600,10 @@
     /** Absolute counts + only green/red vs previous period (Week or Month). */
     const useHazardAbsDeltaColors = isHazardSpotting || isUnsafeActsPerHour;
     const rowTitles = isUnsafeActsPerHour
-      ? ["Unsafe Acts per Hour"]
+      ? ["Unsafe Acts Identified per hour in SI Round"]
       : isHazardSpotting
         ? ["Unsafe Acts", "Unsafe Condition"]
-        : ["Hazard Spotting Rate", "Hazard Closure %"];
+        : ["Hazard Spotting Observations", "Hazard Spotting Closure %"];
     const matrix = [];
     for (let ri = 0; ri < rowTitles.length; ri++) {
       const row = [];
@@ -6342,7 +6797,7 @@
         ? "<strong>Absolute counts only</strong> (no percentages; preview sample). " +
           (isHazardSpotting
             ? "Rows: <strong>Unsafe Acts</strong>, <strong>Unsafe Condition</strong>, <strong>Total (Acts + Condition)</strong>. "
-            : "<strong>Unsafe Acts per Hour</strong>. ") +
+            : "<strong>Unsafe Acts Identified per hour in SI Round</strong>. ") +
           "<strong>Pastel green</strong> = same or higher than the previous " +
           periodWord +
           " (first column vs a seeded baseline for color). <strong>Pastel red</strong> = lower. Chart uses only these two colours."
@@ -6350,7 +6805,7 @@
           n +
           "</strong> (" +
           momStr +
-          ") · <strong>Hazard Closure %</strong> indicators for the selected filters (preview sample).";
+          ") · <strong>Hazard Spotting Closure %</strong> indicators for the selected filters (preview sample).";
     }
   }
 
@@ -8839,6 +9294,47 @@
     }
   }
 
+  /**
+   * Leadership Governance page (`index.html`): multi-KPI summary row (same card pattern as Training).
+   */
+  function refreshLeadershipGovernanceKpiStrip(catKey) {
+    if (Number(catKey) !== LEADERSHIP_CATEGORY_KEY) return;
+    const multiWrap = document.getElementById("multi-kpi-wrap");
+    if (!multiWrap) return;
+    const kpisMeta = getKpis(catKey);
+    const f = readFilters(catKey);
+    if (!f) return;
+    const aggList = buildKpiDetailMetrics(catKey, kpisMeta, f);
+    const presentationSeed = [
+      String(catKey),
+      f.currentFrom || "",
+      f.currentTo || "",
+      f.comparisonFrom || "",
+      f.comparisonTo || "",
+      f.refMonth || "",
+      f.state || "",
+      (Array.isArray(f.business)
+        ? JSON.stringify(f.business.slice().sort())
+        : String(f.business || "")),
+      String(f.kpi || ""),
+      JSON.stringify(f.kpiKeys || []),
+      JSON.stringify(f.variable || {}),
+    ].join("|");
+    if (!aggList.length) {
+      multiWrap.innerHTML =
+        '<div class="empty-msg" style="padding:8px">No KPI data for this selection.</div>';
+    } else {
+      renderMultiKpiCards(
+        multiWrap,
+        aggList,
+        f,
+        f.kpiKeys && f.kpiKeys.length ? f.kpiKeys : [f.kpi],
+        presentationSeed,
+        catKey
+      );
+    }
+  }
+
   function announceFilterSummary(catKey) {
     const f = readFilters(catKey);
     if (!f) return;
@@ -8903,6 +9399,7 @@
       if (typeof window.__adaniLeadershipMeetingsRerender === "function") {
         window.__adaniLeadershipMeetingsRerender();
       }
+      refreshLeadershipGovernanceKpiStrip(catKey);
       announceFilterSummary(catKey);
       return;
     }
@@ -9029,8 +9526,14 @@
 
     const wrap = document.createElement("div");
     wrap.className = "cat-view cat-view--leadership-meetings";
+    const lcKpiTilesHtml =
+      '<fieldset class="kpi-summary-region">' +
+      '<legend class="visually-hidden">KPI summary for current filters</legend>' +
+      '<div class="multi-kpi-row" id="multi-kpi-wrap"></div>' +
+      "</fieldset>";
     wrap.innerHTML =
       '<div class="lc-page">' +
+      lcKpiTilesHtml +
       '<div class="cat-top-bar cat-top-bar--filters-only">' +
       '<fieldset id="cat-heading" tabindex="-1" class="cat-toolbar cat-toolbar--compact" aria-label="Governance review filters">' +
       '<legend class="visually-hidden">Governance review filters</legend>' +
@@ -9823,6 +10326,7 @@
 
     window.__adaniLeadershipMeetingsRerender = paintAll;
     paintAll();
+    refreshLeadershipGovernanceKpiStrip(catKey);
     announceFilterSummary(catKey);
     const h = document.getElementById("cat-heading");
     if (h) h.focus();

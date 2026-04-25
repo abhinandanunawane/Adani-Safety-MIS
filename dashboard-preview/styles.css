@@ -6124,6 +6124,12 @@ body.shell--docs-body {
   overflow: hidden;
 }
 
+/* KPI list + multi-KPI tiles (same pattern as Training) above governance slicers */
+.cat-view--leadership-meetings .lc-page > fieldset.kpi-summary-region {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
 /* Filters first (same strip as other KPI pages) — stays above the fold */
 .cat-view--leadership-meetings .cat-top-bar.cat-top-bar--filters-only {
   flex: 0 0 auto;
