@@ -225,6 +225,8 @@
       … rank 18 = Delta of Fatal (19), rank 19 = Property Damage (57). TRIR (21) stays in data but out of the 19-tile list.
       Seeds 56 / 57 / 58 if missing.
       Assurance and Compliance (cat 5): KPI 502 shorter label for this entry page only.
+      Category display names (cats 3, 9, 10): SPI → Safety Incidents Rate; Digital → Interventions;
+      Vulnerable → Resilient sites (DOM patch covers header + cards where app overrides VL title).
     -->
     <script type="module">
       (function () {
@@ -260,6 +262,55 @@
           }
         }
 
+        function patchIndexOnlyCategoryDisplayNames() {
+          const dd = window.__DASHBOARD_DATA__;
+          if (!dd || !Array.isArray(dd.categories)) return;
+          const SPI_K = 3;
+          const DIG_K = 9;
+          const VL_K = 10;
+          for (let ci = 0; ci < dd.categories.length; ci++) {
+            const c = dd.categories[ci];
+            const k = Number(c.categoryKey);
+            if (k === SPI_K) c.categoryName = "Safety Incidents Rate";
+            else if (k === DIG_K)
+              c.categoryName = "Digital & Technology Interventions";
+            else if (k === VL_K) c.categoryName = "Vulnerable & Resilient sites";
+          }
+          const pairs = [
+            ["Safety Performance Indices (SPI)", "Safety Incidents Rate"],
+            ["Safety Performance Indices", "Safety Incidents Rate"],
+            ["Vulnerable & Resilient Locations", "Vulnerable & Resilient sites"],
+            [
+              "Digital & Technology Intervention",
+              "Digital & Technology Interventions",
+            ],
+          ];
+          function rewrite(t) {
+            let s = String(t || "");
+            for (let pi = 0; pi < pairs.length; pi++) {
+              const from = pairs[pi][0];
+              const to = pairs[pi][1];
+              if (s.indexOf(from) !== -1) s = s.split(from).join(to);
+            }
+            return s;
+          }
+          document.querySelectorAll(".category-card__name").forEach((el) => {
+            el.textContent = rewrite(el.textContent);
+          });
+          document
+            .querySelectorAll(
+              "button.category-card.category-card--launchpad[aria-label]"
+            )
+            .forEach((btn) => {
+              const al = btn.getAttribute("aria-label");
+              if (al) btn.setAttribute("aria-label", rewrite(al));
+            });
+          const sub = document.getElementById("header-category-subtitle");
+          if (sub && sub.textContent) sub.textContent = rewrite(sub.textContent);
+        }
+
+        patchIndexOnlyCategoryDisplayNames();
+
         const INC = 1;
         const OMIT_FROM_INCIDENT_TILES = 4;
         const SYNTH = [
@@ -286,8 +337,7 @@
         const detail = d.kpiDetailByCategory.find(
           (x) => Number(x.categoryKey) === INC
         );
-        if (!detail || !Array.isArray(detail.kpis)) return;
-
+        if (detail && Array.isArray(detail.kpis)) {
         detail.kpis = detail.kpis.filter(
           (k) => Number(k.kpiKey) !== OMIT_FROM_INCIDENT_TILES
         );
@@ -382,8 +432,14 @@
             (k) => Number(k.kpiKey) !== 21
           ).length;
         }
+        }
 
+        window.addEventListener(
+          "hashchange",
+          patchIndexOnlyCategoryDisplayNames
+        );
         window.dispatchEvent(new Event("hashchange"));
+        patchIndexOnlyCategoryDisplayNames();
       })();
     </script>
   </body>
